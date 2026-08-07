@@ -17,12 +17,15 @@ jobs:
       - name: Create Release Package
         run: |
           mkdir -p release_assets
+          cp build_out/deployment/apps/LinuxTerminal.apk release_assets/LinuxTerminal.apk
           tar -czvf release_assets/aosp-linux-deployment-v1.0.0.tar.gz -C build_out/deployment .
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: release_assets/aosp-linux-deployment-v1.0.0.tar.gz
+          files: |
+            release_assets/LinuxTerminal.apk
+            release_assets/aosp-linux-deployment-v1.0.0.tar.gz
           name: AOSP Dual-OS Release ${{ github.ref_name }}
           draft: false
           prerelease: false
