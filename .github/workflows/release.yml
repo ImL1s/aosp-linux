@@ -1,0 +1,29 @@
+name: AOSP Dual-OS Release Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Create Release Package
+        run: |
+          mkdir -p release_assets
+          tar -czvf release_assets/aosp-linux-deployment-v1.0.0.tar.gz -C build_out/deployment .
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release_assets/aosp-linux-deployment-v1.0.0.tar.gz
+          name: AOSP Dual-OS Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true

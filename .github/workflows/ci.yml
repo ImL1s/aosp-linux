@@ -1,0 +1,39 @@
+name: AOSP Dual-OS CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  verify-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+
+      - name: Verify SELinux Policies & NEVERALLOW Rules
+        run: |
+          echo "Verifying linux_manager.te NEVERALLOW rules..."
+          grep "neverallow linux_manager" system/sepolicy/private/linux_manager.te
+
+      - name: Run E2E Test Suite (430 Tests)
+        run: |
+          python3 tests/e2e/runner.py --output-json tests/e2e_ci_report.json
+          python3 -c "import json; data=json.load(open('tests/e2e_ci_report.json')); assert data['summary']['failed'] == 0, 'Tests Failed!'"
+
+      - name: Build Guest Bridge Agent (Rust)
+        run: |
+          cd guest/bridge-agent
+          cargo check --target aarch64-unknown-linux-gnu
