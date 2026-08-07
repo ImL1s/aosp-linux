@@ -1,0 +1,46 @@
+// Android.bp for system/linux_bridge native daemon
+
+cc_binary {
+    name: "linux_bridge",
+    srcs: [
+        "main.cpp",
+        "socket_server.cpp",
+        "vsock_framing.cpp",
+        "vsock_server.cpp",
+        "hmac_auth.cpp",
+        "guest_ota_rollback_watchdog.cpp",
+    ],
+    shared_libs: [
+        "liblog",
+        "libutils",
+        "libcutils",
+        "libbinder",
+        "libcrypto",
+    ],
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+        "-std=c++20",
+    ],
+    init_rc: ["linux_bridge.rc"],
+}
+
+cc_binary {
+    name: "guest_ota_rollback_watchdog",
+    srcs: [
+        "guest_ota_rollback_watchdog.cpp",
+    ],
+    shared_libs: [
+        "libbase",
+        "liblog",
+        "libutils",
+        "libcrypto",
+    ],
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+        "-std=c++20",
+    ],
+}

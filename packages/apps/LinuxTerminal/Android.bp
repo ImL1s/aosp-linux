@@ -1,0 +1,60 @@
+// packages/apps/LinuxTerminal/Android.bp
+
+cc_library_shared {
+    name: "libvterm_jni",
+    srcs: [
+        "jni/libvterm_jni.cpp",
+        "jni/terminal_renderer.cpp",
+        "jni/vterm_parser.cpp",
+        "jni/sgr_mouse_generator.cpp",
+        "jni/pty_framing_handler.cpp",
+        "jni/libvterm/src/vterm.c",
+        "jni/libvterm/src/screen.c",
+        "jni/libvterm/src/state.c",
+        "jni/libvterm/src/parser.c",
+        "jni/libvterm/src/pen.c",
+        "jni/libvterm/src/unicode.c",
+        "jni/libvterm/src/encoding.c",
+    ],
+    include_dirs: [
+        "packages/apps/LinuxTerminal/jni",
+        "packages/apps/LinuxTerminal/jni/libvterm/include",
+    ],
+    shared_libs: [
+        "liblog",
+        "libandroid",
+        "libjnigraphics",
+    ],
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wno-unused-parameter",
+        "-std=c99",
+    ],
+    cppflags: [
+        "-std=c++20",
+        "-fexceptions",
+    ],
+    sdk_version: "current",
+}
+
+android_app {
+    name: "LinuxTerminal",
+    srcs: [
+        "src/**/*.java",
+    ],
+    resource_dirs: ["res"],
+    platform_apis: true,
+    certificate: "platform",
+    privileged: true,
+    jni_libs: [
+        "libvterm_jni",
+    ],
+    static_libs: [
+        "androidx.appcompat_appcompat",
+        "android.system.linux",
+    ],
+    optimize: {
+        enabled: false,
+    },
+}

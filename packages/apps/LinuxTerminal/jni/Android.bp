@@ -1,0 +1,37 @@
+cc_library_shared {
+    name: "libvterm_jni",
+    srcs: [
+        "libvterm_jni.cpp",
+        "terminal_renderer.cpp",
+        "vterm_parser.cpp",
+        "sgr_mouse_generator.cpp",
+        "pty_framing_handler.cpp",
+        "libvterm/src/vterm.c",
+        "libvterm/src/screen.c",
+        "libvterm/src/state.c",
+        "libvterm/src/parser.c",
+        "libvterm/src/pen.c",
+        "libvterm/src/unicode.c",
+        "libvterm/src/encoding.c",
+    ],
+    include_dirs: [
+        "packages/apps/LinuxTerminal/jni",
+        "packages/apps/LinuxTerminal/jni/libvterm/include",
+    ],
+    shared_libs: [
+        "liblog",
+        "libandroid",
+        "libjnigraphics",
+    ],
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wno-unused-parameter",
+        "-std=c99",
+    ],
+    cppflags: [
+        "-std=c++20",
+        "-fexceptions",
+    ],
+    sdk_version: "current",
+}

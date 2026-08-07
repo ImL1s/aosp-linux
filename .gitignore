@@ -1,0 +1,21 @@
+# .gitignore for AOSP Dual-OS Project
+
+# Build & System Artifacts
+build_out/
+*.o
+*.so
+*.a
+*.class
+*.dex
+*.apk
+
+# IDE & OS Files
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*~
+
+# Temporary Logs
+*.log
+.agents/scratch/

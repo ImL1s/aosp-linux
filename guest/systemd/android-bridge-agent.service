@@ -1,0 +1,14 @@
+[Unit]
+Description=Android Linux Bridge Agent Daemon
+After=network.target default.target
+Wants=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/android-bridge-agent
+Restart=always
+RestartSec=3
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+[Install]
+WantedBy=default.target multi-user.target

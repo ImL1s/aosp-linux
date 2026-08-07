@@ -1,0 +1,34 @@
+# system/sepolicy/private/linux_manager.te
+# Domain definition for LinuxManagerService and AVF guest management
+
+type linux_manager, domain, coredomain;
+type linux_manager_exec, exec_type, file_type, system_file_type;
+type linux_vm_data_file, file_type, data_file_type, core_data_file_type;
+
+# Grant system_server interaction
+binder_use(linux_manager)
+binder_call(linux_manager, system_server)
+binder_call(system_server, linux_manager)
+
+# Allow KVM access and VirtualizationService AIDL calls
+allow linux_manager kvm_device:chr_file rw_file_perms;
+allow linux_manager virtualizationservice_service:service_manager find;
+binder_call(linux_manager, virtualizationservice)
+
+# Access VM disk images in /data/system/linux/
+allow linux_manager linux_vm_data_file:dir create_dir_perms;
+allow linux_manager linux_vm_data_file:file create_file_perms;
+
+# Vsock socket creation & communication
+allow linux_manager self:vsock_socket { create read write bind connect listen accept getattr setopt };
+
+# NEVERALLOW Enforcements (Hard security boundaries)
+neverallow linux_manager efs_file:dir *;
+neverallow linux_manager efs_file:file *;
+neverallow linux_manager system_data_file:file { write create delete };
+neverallow linux_manager block_device:blk_file { read write open ioctl };
+neverallow linux_manager radio_data_file:file *;
+neverallow linux_manager radio_service:service_manager find;
+neverallow linux_manager bluetooth_data_file:file *;
+neverallow linux_manager nfc_data_file:file *;
+neverallow linux_manager { su init }:process transition;

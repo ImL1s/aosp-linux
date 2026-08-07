@@ -1,0 +1,37 @@
+// Android.bp for AOSP Dual-OS Framework Modules
+
+java_sdk_library {
+    name: "android.system.linux",
+    srcs: [
+        "frameworks/base/core/java/**/*.java",
+        "frameworks/base/core/java/**/*.aidl",
+    ],
+    api_packages: ["android.system.linux"],
+    platform_apis: true,
+    installable: true,
+}
+
+java_library {
+    name: "framework-linux",
+    static_libs: [
+        "android.system.linux",
+    ],
+}
+
+java_library {
+    name: "services.linux",
+    srcs: [
+        "frameworks/base/services/core/java/com/android/server/linux/**/*.java",
+    ],
+    libs: [
+        "services.core",
+        "android.system.linux",
+    ],
+}
+
+java_library {
+    name: "service-linux",
+    static_libs: [
+        "services.linux",
+    ],
+}

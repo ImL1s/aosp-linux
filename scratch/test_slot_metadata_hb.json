@@ -1,0 +1,19 @@
+{
+  "activeSlot": "slot_b",
+  "bootAttempts": 0,
+  "maxBootAttempts": 3,
+  "slotA": {
+    "imagePath": "/data/system/linux/base_a.img",
+    "version": "12.5.0-aosp1",
+    "sha256": "sha256_slot_a",
+    "successfulBoot": 1,
+    "rollbackIndex": 1001
+  },
+  "slotB": {
+    "imagePath": "/data/system/linux/base_b.img",
+    "version": "12.4.0-aosp1",
+    "sha256": "sha256_slot_b",
+    "successfulBoot": 0,
+    "rollbackIndex": 1000
+  }
+}

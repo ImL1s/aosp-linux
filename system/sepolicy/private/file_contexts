@@ -1,0 +1,7 @@
+# system/sepolicy/private/file_contexts
+/dev/socket/linux_bridge    u:object_r:linux_bridge_socket:s0
+/dev/socket/linux_portal    u:object_r:linux_portal_socket:s0
+/system/bin/linux_bridge    u:object_r:linux_bridge_exec:s0
+/system/bin/linux_portal    u:object_r:linux_portal_exec:s0
+/data/system/linux(/.*)?    u:object_r:linux_vm_data_file:s0
+/data/media/0/LinuxShared(/.*)? u:object_r:linux_shared_data_file:s0

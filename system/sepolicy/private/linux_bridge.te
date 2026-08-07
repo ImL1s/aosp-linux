@@ -1,0 +1,30 @@
+# system/sepolicy/private/linux_bridge.te
+# Domain definition for linux_bridge native daemon
+
+type linux_bridge, domain, coredomain;
+type linux_bridge_exec, exec_type, file_type, system_file_type;
+type linux_bridge_socket, file_type, coredomain_socket;
+
+init_daemon_domain(linux_bridge)
+
+# Allow Unix domain socket creation at /dev/socket/linux_bridge
+allow linux_bridge linux_bridge_socket:sock_file create_file_perms;
+allow system_server linux_bridge_socket:sock_file rw_file_perms;
+unix_socket_connect(system_server, linux_bridge, linux_bridge)
+
+# Binder IPC with system_server
+binder_use(linux_bridge)
+binder_call(linux_bridge, system_server)
+binder_call(system_server, linux_bridge)
+
+# Vsock socket operations (Ports 5000, 5001, 5002)
+allow linux_bridge self:vsock_socket { create read write bind connect listen accept getattr setopt };
+
+# Neverallow enforcements
+neverallow linux_bridge efs_file:dir *;
+neverallow linux_bridge efs_file:file *;
+neverallow linux_bridge system_data_file:file { write create delete };
+neverallow linux_bridge block_device:blk_file { read write open ioctl };
+neverallow linux_bridge radio_data_file:file *;
+neverallow linux_bridge radio_service:service_manager find;
+neverallow linux_bridge { su init }:process transition;

@@ -1,0 +1,38 @@
+{
+  "vm_name": "debian_arm64_guest",
+  "protected": false,
+  "cpu": {
+    "cpus": 4
+  },
+  "memory": {
+    "ram_mb": 4096
+  },
+  "kernel": {
+    "kernel_path": "/apex/com.android.virt/etc/vmlinux",
+    "initrd_path": "/data/misc/linux/initrd.img",
+    "cmdline": "console=ttyS0 root=/dev/vda ro init=/sbin/init linux_auth_token=0000000000000000000000000000000000000000000000000000000000000000 panic=1 quiet"
+  },
+  "vsock": {
+    "cid": 3
+  },
+  "disks": {
+    "base_rootfs": {
+      "path": "/data/misc/linux/base_rootfs.img",
+      "read_only": true,
+      "device": "/dev/vda"
+    },
+    "custom_overlay": {
+      "path": "/data/misc/linux/custom_overlay.img",
+      "read_only": false,
+      "device": "/dev/vdb"
+    },
+    "user_home": {
+      "path": "/dev/mapper/user_home_decrypted",
+      "read_only": false,
+      "device": "/dev/vdc"
+    }
+  },
+  "snapshot": {
+    "path": "/data/misc/linux/vm_state.snapshot"
+  }
+}

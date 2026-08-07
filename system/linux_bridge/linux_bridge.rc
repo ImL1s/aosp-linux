@@ -1,0 +1,9 @@
+service linux_bridge /system/bin/linux_bridge
+    class main
+    user system
+    group system inet
+    socket linux_bridge stream 0660 system system
+    capabilities
+    disabled
+    oneshot
+    seclabel u:r:linux_bridge:s0

@@ -1,0 +1,41 @@
+# system/sepolicy/private/linux_portal.te
+# Domain definition for linux_portal XDG portal bridge daemon
+
+type linux_portal, domain, coredomain;
+type linux_portal_exec, exec_type, file_type, system_file_type;
+type linux_portal_socket, file_type, coredomain_socket;
+type linux_shared_data_file, file_type, data_file_type, core_data_file_type;
+
+init_daemon_domain(linux_portal)
+
+# Unix socket communication with SystemServer / LinuxPortalService
+allow linux_portal linux_portal_socket:sock_file create_file_perms;
+allow system_server linux_portal_socket:sock_file rw_file_perms;
+unix_socket_connect(system_server, linux_portal, linux_portal)
+
+# Binder IPC for AppOps, Camera2, AudioRecord, LocationManager
+binder_use(linux_portal)
+binder_call(linux_portal, system_server)
+binder_call(system_server, linux_portal)
+
+# Service manager lookups
+allow linux_portal appops_service:service_manager find;
+allow linux_portal camera_service:service_manager find;
+allow linux_portal audioserver_service:service_manager find;
+allow linux_portal location_service:service_manager find;
+
+# Vsock IPC for guest portal-agent communications
+allow linux_portal self:vsock_socket { create read write bind connect listen accept getattr setopt };
+
+# Access to virtiofs shared data file
+allow linux_portal linux_shared_data_file:dir create_dir_perms;
+allow linux_portal linux_shared_data_file:file create_file_perms;
+
+# HARD SECURITY BOUNDARY NEVERALLOW RULES
+neverallow linux_portal efs_file:dir *;
+neverallow linux_portal efs_file:file *;
+neverallow linux_portal system_data_file:file { write create delete };
+neverallow linux_portal device:chr_file raw_io;
+neverallow linux_portal radio_data_file:file *;
+neverallow linux_portal radio_service:service_manager find;
+neverallow linux_portal { su init }:process transition;
