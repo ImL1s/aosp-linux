@@ -29,5 +29,8 @@ public final class DocumentsContract {
         public static final int FLAG_SUPPORTS_RENAME = 0x10;
         public static final int FLAG_DIR_SUPPORTS_CREATE = 0x08;
     }
-}
 
+    public static android.net.Uri buildRootsUri(String authority) {
+        return android.net.Uri.parse("content://" + authority + "/root");
+    }
+}

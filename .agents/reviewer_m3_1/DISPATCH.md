@@ -1,23 +1,22 @@
-## 2026-08-06T11:02:53Z
-You are Reviewer 1 for Milestone M3: Native Touch Terminal Engine & IME.
-Working Directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m3_1
+## 2026-08-08T06:22:37Z
+You are Reviewer 1 for Milestone M3 (Real Vsock Socket Connect & Session ID - R3).
+Your working directory is /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m3_1.
 
-MANDATORY INPUT FILES TO READ FIRST:
-1. /Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md
-2. /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
-3. /Users/iml1s/Documents/mine/aosp-linux/.agents/sub_orch_m3/SCOPE.md
-4. /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m3/handoff.md
-5. /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m3/changes.md
+Paths to read before starting:
+- /Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md
+- /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m3_1/changes.md
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m3_1/handoff.md
 
-YOUR OBJECTIVES:
-Perform independent code review of:
-1. F-R3-001 Native Surface Canvas Renderer (`TerminalSurfaceView.java`, `jni/terminal_renderer.cpp`/`.h`).
-2. F-R3-002 libvterm Parser Integration (`jni/vterm_parser.cpp`/`.h`, `jni/libvterm_jni.cpp`).
-3. F-R3-003 TerminalInputConnection (`TerminalInputConnection.java`).
-4. F-R3-004 Multi-stage CJK IME Commit (`CJKImeHandler.java`, `ComposingTextSpan.java`).
+Review Task:
+1. Review code changes made by Worker M3 in:
+   - packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/net/VsockTerminalClient.java
+   - packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/TerminalView.java
+   - frameworks/base/services/core/java/com/android/server/linux/LinuxManagerService.java (or relevant path)
+2. Verify correctness, completeness, exception handling, and robustness of AF_VSOCK Os.connect(mSocketFd, address) call targeting CID 3 Port 5001.
+3. Verify dynamic 16-byte session ID generation in LinuxManagerService and usage in TerminalView.
+4. Execute build and test verification commands (e.g. python3 tests/e2e/runner.py, atest LinuxTerminalTests, atest LinuxManagerServiceTest).
+5. Render a clear verdict: APPROVE or REQUEST_CHANGES.
 
-VERIFICATION REQUIREMENTS:
-- Run build and test suite: `pytest tests/e2e/tier1_feature_coverage/test_m3_tier1.py` and `pytest tests/e2e/tier2_boundary_corner/test_m3_tier2.py`.
-- Evaluate code quality, memory management (ANativeWindow locks, C++ buffers, JNI reference management), thread safety, and robustness.
-- Write your structured handoff report to `/Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m3_1/handoff.md` with an explicit verdict: `APPROVE` or `REQUEST_CHANGES`.
-- Send a message when complete.
+Write your review report to /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m3_1/review.md and handoff report to /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m3_1/handoff.md.
+When finished, send a message to parent with your verdict, summary, and artifact path.

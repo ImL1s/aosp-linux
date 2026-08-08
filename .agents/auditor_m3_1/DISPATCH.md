@@ -1,23 +1,21 @@
-## 2026-08-06T11:02:53Z
-You are the Forensic Auditor for Milestone M3: Native Touch Terminal Engine & IME.
-Working Directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/auditor_m3_1
+## 2026-08-08T14:22:38Z
+You are Forensic Auditor for Milestone M3 (Real Vsock Socket Connect & Session ID - R3).
+Your working directory is /Users/iml1s/Documents/mine/aosp-linux/.agents/auditor_m3_1.
 
-MANDATORY INPUT FILES TO READ FIRST:
-1. /Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md
-2. /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
-3. /Users/iml1s/Documents/mine/aosp-linux/.agents/sub_orch_m3/SCOPE.md
-4. /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m3/handoff.md
-5. /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m3/changes.md
+Paths to read before starting:
+- /Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md
+- /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m3_1/changes.md
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m3_1/handoff.md
 
-YOUR OBJECTIVES:
-Perform forensic integrity verification on all code added or modified for Milestone M3 under `packages/apps/TerminalApp/` (and `LinuxTerminal/`).
-Verify:
-1. No hardcoded test responses or expected outputs in source code or JNI C++ files.
-2. No dummy/facade implementations that simulate pass conditions without genuine execution logic.
-3. No fake verification outputs, logs, or bypassed checks.
-4. Genuine implementation of Surface Canvas rendering, libvterm JNI integration, InputConnection, CJK IME handling, Touch Mode state machine, SGR mouse protocol, and Vsock PTY framing.
+Audit Task:
+1. Perform forensic integrity audit on all changes made for Milestone M3 in:
+   - packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/net/VsockTerminalClient.java
+   - packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/TerminalView.java
+   - frameworks/base/services/core/java/com/android/server/linux/LinuxManagerService.java
+2. Verify that NO test results are hardcoded, NO dummy/facade implementations bypass AF_VSOCK syscalls, and NO static session IDs remain.
+3. Check code diffs, static analysis, runtime call paths, and test execution authenticity.
+4. Render a clear audit verdict: CLEAN or INTEGRITY VIOLATION.
 
-DELIVERABLES:
-- Write your detailed forensic investigation log and evidence to `/Users/iml1s/Documents/mine/aosp-linux/.agents/auditor_m3_1/analysis.md`.
-- Write your structured handoff report to `/Users/iml1s/Documents/mine/aosp-linux/.agents/auditor_m3_1/handoff.md` with an explicit verdict: `CLEAN` or `INTEGRITY VIOLATION`.
-- Send a message when complete.
+Write your audit report to /Users/iml1s/Documents/mine/aosp-linux/.agents/auditor_m3_1/audit.md and handoff report to /Users/iml1s/Documents/mine/aosp-linux/.agents/auditor_m3_1/handoff.md.
+When finished, send a message to parent with your audit verdict, summary, and artifact path.

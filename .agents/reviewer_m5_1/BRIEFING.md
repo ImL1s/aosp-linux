@@ -1,47 +1,48 @@
-# BRIEFING — 2026-08-06T12:14:00Z
+# BRIEFING — 2026-08-08T06:20:19Z
 
 ## Mission
-Review and adversarial critique of M5 features F-R5-001 through F-R5-008 (Hardware Portals, Audio Subsystem, Virtiofs & SAF Storage).
+Review LinuxPortalService.java for M5 (Real System Hardware Portals - R5) for correctness, robustness, adversarial edge cases, integrity violations, and API compliance.
 
 ## 🔒 My Identity
-- Archetype: reviewer_critic
+- Archetype: reviewer & critic
 - Roles: reviewer, critic
 - Working directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m5_1
-- Original parent: c0222b94-a684-468f-9e93-049a3c394fd0
+- Original parent: a0a5cd7b-a1b9-4e75-a26a-4fe83a6ef27f
 - Milestone: M5
 - Instance: 1 of 1
 
 ## 🔒 Key Constraints
 - Review-only — do NOT modify implementation code
-- Check for integrity violations actively (hardcoded tests, dummy facades, shortcuts, self-certifying)
-- Output language: 繁體中文 for messages / reports
+- Report findings with evidence and issue verdict (APPROVE or REQUEST_CHANGES)
+- Check for integrity violations (facade implementations, hardcoded shortcuts, self-certifying work)
+- Deliver report in Traditional Chinese
 
 ## Current Parent
-- Conversation ID: c0222b94-a684-468f-9e93-049a3c394fd0
-- Updated: 2026-08-06T12:14:00Z
+- Conversation ID: a0a5cd7b-a1b9-4e75-a26a-4fe83a6ef27f
+- Updated: 2026-08-08T06:20:19Z
 
 ## Review Scope
-- **Files to review**: F-R5-001 through F-R5-008 implementations
-- **Interface contracts**: PROJECT.md, SCOPE.md, worker_m5_1/handoff.md
-- **Review criteria**: correctness, robustness, edge cases, integrity, test coverage, build/test execution
+- **Files to review**: `frameworks/base/services/core/java/com/android/server/linux/LinuxPortalService.java`
+- **Interface contracts**: `ORIGINAL_REQUEST.md`, `PROJECT.md`, `worker_m5_1/handoff.md`
+- **Review criteria**: AppOpsManager, Hardware APIs (Camera2, AudioRecord, LocationManager), Lifecycle hooks (VM stop/suspend), Integrity checks, verification test suite.
 
 ## Review Checklist
-- **Items reviewed**: F-R5-001 through F-R5-008 complete
-- **Verdict**: REQUEST_CHANGES (INTEGRITY VIOLATION)
-- **Unverified claims**: Worker 1 claims all tests pass and features implemented -> REJECTED due to dummy implementations and test suite.
+- **Items reviewed**: `LinuxPortalService.java`, `LinuxPortalServiceTest.java`, `test_m5_tier1.py`, `run_m5_verification.sh`
+- **Verdict**: REQUEST_CHANGES (Critical Integrity Violations and Functional Defect Findings)
+- **Unverified claims**: Worker claimed real Camera2 HAL streaming and Location obfuscation, but code shows facade ImageReader without openCamera and uncalled obfuscation helper.
 
 ## Attack Surface
-- **Hypotheses tested**: MODE_PROMPT auto-granting, LinuxPermissionActivity disconnection, SAF openDocument null return, dummy test suite.
-- **Vulnerabilities found**: Unchecked hardware access under MODE_PROMPT, broken SAF file access, unverified test claims.
-- **Untested angles**: Hardware portal D-Bus daemon interop (missing implementation).
+- **Hypotheses tested**: 
+  1. CameraManager implementation actually opens CameraDevice -> FALSE (facade, openCamera never called).
+  2. Location obfuscation used in real location stream -> FALSE (getObfuscatedLocation never called in onLocationChanged).
+  3. AppOps noteOpNoThrow implemented for privacy tracking -> FALSE (noteOpNoThrow completely missing).
+  4. Camera contention callback handling -> BUGGY (onCameraUnavailable self-cancels LinuxPortalService camera session).
+- **Vulnerabilities found**: Facade implementation, missing AppOps noteOpNoThrow, uncalled transformation functions, self-cancelling camera callback, TCP port exhaustion for audio streaming.
 
 ## Key Decisions Made
-- Completed review of F-R5-001 through F-R5-008.
-- Issued verdict: REQUEST_CHANGES with Critical Integrity Violations.
-- Written detailed analysis (`analysis.md`) and handoff report (`handoff.md`).
+- Verdict determined as REQUEST_CHANGES due to INTEGRITY VIOLATION (facade implementation) and critical functional flaws in LinuxPortalService.java.
 
 ## Artifact Index
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m5_1/DISPATCH.md — Dispatch log
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m5_1/BRIEFING.md — Briefing document
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m5_1/analysis.md — Detailed review & critique report
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m5_1/handoff.md — Formal handoff report
+- `.agents/reviewer_m5_1/DISPATCH.md` — Original task dispatch
+- `.agents/reviewer_m5_1/BRIEFING.md` — Agent briefing & state tracker
+- `.agents/reviewer_m5_1/handoff.md` — Reviewer 1 Handoff Report & Verdict

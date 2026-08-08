@@ -1,49 +1,346 @@
-// guest/bridge-agent/src/auth.rs
-// HMAC-SHA256 Challenge Response & Token Extraction from /proc/cmdline
-
-use hmac::{Hmac, Mac};
-use sha2::Sha256;
+use std::env;
 use std::fs;
-use zeroize::Zeroize;
+use std::io::{Read, Write};
 
-type HmacSha256 = Hmac<Sha256>;
-
-pub fn extract_token_from_cmdline() -> Result<Vec<u8>, String> {
-    let cmdline = fs::read_to_string("/proc/cmdline").unwrap_or_default();
-    for param in cmdline.split_whitespace() {
-        if let Some(val) = param.strip_prefix("linux_auth_token=") {
-            return hex::decode(val).map_err(|e| format!("Invalid hex token: {}", e));
-        }
-        if let Some(val) = param.strip_prefix("android_bridge.token=") {
-            return hex::decode(val).map_err(|e| format!("Invalid hex token: {}", e));
+/// Dynamic extraction of authentication secret key.
+/// Checks in order:
+/// 1. LINUX_AUTH_SECRET environment variable
+/// 2. /etc/linux_auth_secret file
+/// 3. /proc/cmdline (kernel cmdline parameter linux_auth_secret=... or auth_secret=...)
+pub fn extract_auth_secret() -> Result<Vec<u8>, String> {
+    // 1. Environment variable
+    if let Ok(val) = env::var("LINUX_AUTH_SECRET") {
+        let trimmed = val.trim();
+        if !trimmed.is_empty() {
+            return Ok(trimmed.as_bytes().to_vec());
         }
     }
-    // Fallback default 32-byte zero token for testing environment when /proc/cmdline does not contain token
-    Ok(vec![0u8; 32])
-}
 
-pub fn compute_hmac_response(secret: &[u8], token: &[u8]) -> Result<Vec<u8>, String> {
-    let mut mac = HmacSha256::new_from_slice(secret).map_err(|e| e.to_string())?;
-    mac.update(token);
-    Ok(mac.finalize().into_bytes().to_vec())
-}
-
-pub fn construct_handshake_payload(secret: &[u8], token: &[u8]) -> Result<Vec<u8>, String> {
-    if token.len() != 32 {
-        return Err(format!("Token must be 32 bytes, got {}", token.len()));
+    // 2. File /etc/linux_auth_secret
+    if let Ok(content) = fs::read_to_string("/etc/linux_auth_secret") {
+        let trimmed = content.trim();
+        if !trimmed.is_empty() {
+            return Ok(trimmed.as_bytes().to_vec());
+        }
     }
-    let signature = compute_hmac_response(secret, token)?;
-    let mut payload = Vec::with_capacity(64);
-    payload.extend_from_slice(token);
-    payload.extend_from_slice(&signature);
-    Ok(payload)
+
+    // 3. /proc/cmdline
+    if let Ok(cmdline) = fs::read_to_string("/proc/cmdline") {
+        if let Some(secret) = parse_secret_from_cmdline(&cmdline) {
+            return Ok(secret);
+        }
+    }
+
+    Err("No auth secret key found in LINUX_AUTH_SECRET, /etc/linux_auth_secret, or /proc/cmdline".to_string())
 }
 
-/// Volatile memory wiping using zeroize crate
-pub fn wipe_memory(buf: &mut [u8]) {
-    buf.zeroize();
+/// Helper function to parse secret from a cmdline string directly (useful for testing).
+pub fn parse_secret_from_cmdline(cmdline: &str) -> Option<Vec<u8>> {
+    for token in cmdline.split_whitespace() {
+        if let Some(val) = token.strip_prefix("linux_auth_secret=") {
+            let trimmed = val.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.as_bytes().to_vec());
+            }
+        } else if let Some(val) = token.strip_prefix("auth_secret=") {
+            let trimmed = val.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.as_bytes().to_vec());
+            }
+        }
+    }
+    None
 }
 
-pub fn zeroize_token(buf: &mut [u8]) {
-    wipe_memory(buf);
+/// Verifies client token against the expected secret key.
+/// Rejects all-zero tokens, empty tokens, empty secrets, or mismatched tokens.
+pub fn verify_token(token: &[u8], secret: &[u8]) -> bool {
+    if token.is_empty() || secret.is_empty() {
+        return false;
+    }
+
+    // Reject all-zero token
+    if token.iter().all(|&b| b == 0) {
+        return false;
+    }
+
+    if token.len() != secret.len() {
+        return false;
+    }
+
+    // Constant-time byte comparison
+    let mut diff = 0u8;
+    for (a, b) in token.iter().zip(secret.iter()) {
+        diff |= a ^ b;
+    }
+    diff == 0
+}
+
+/// Pure Rust SHA-256 implementation without external dependencies.
+#[allow(dead_code)]
+pub fn sha256(data: &[u8]) -> [u8; 32] {
+    let mut h: [u32; 8] = [
+        0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+        0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+    ];
+    let k: [u32; 64] = [
+        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+        0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+        0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+        0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+        0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+        0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+        0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+    ];
+
+    let bit_len = (data.len() as u64) * 8;
+    let mut padded = data.to_vec();
+    padded.push(0x80);
+    while (padded.len() + 8) % 64 != 0 {
+        padded.push(0x00);
+    }
+    padded.extend_from_slice(&bit_len.to_be_bytes());
+
+    for chunk in padded.chunks(64) {
+        let mut w = [0u32; 64];
+        for i in 0..16 {
+            w[i] = u32::from_be_bytes([chunk[i * 4], chunk[i * 4 + 1], chunk[i * 4 + 2], chunk[i * 4 + 3]]);
+        }
+        for i in 16..64 {
+            let s0 = w[i - 15].rotate_right(7) ^ w[i - 15].rotate_right(18) ^ (w[i - 15] >> 3);
+            let s1 = w[i - 2].rotate_right(17) ^ w[i - 2].rotate_right(19) ^ (w[i - 2] >> 10);
+            w[i] = w[i - 16].wrapping_add(s0).wrapping_add(w[i - 7]).wrapping_add(s1);
+        }
+
+        let mut a = h[0];
+        let mut b = h[1];
+        let mut c = h[2];
+        let mut d = h[3];
+        let mut e = h[4];
+        let mut f = h[5];
+        let mut g = h[6];
+        let mut h_val = h[7];
+
+        for i in 0..64 {
+            let s1 = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25);
+            let ch = (e & f) ^ ((!e) & g);
+            let temp1 = h_val.wrapping_add(s1).wrapping_add(ch).wrapping_add(k[i]).wrapping_add(w[i]);
+            let s0 = a.rotate_right(2) ^ a.rotate_right(13) ^ a.rotate_right(22);
+            let maj = (a & b) ^ (a & c) ^ (b & c);
+            let temp2 = s0.wrapping_add(maj);
+
+            h_val = g;
+            g = f;
+            f = e;
+            e = d.wrapping_add(temp1);
+            d = c;
+            c = b;
+            b = a;
+            a = temp1.wrapping_add(temp2);
+        }
+
+        h[0] = h[0].wrapping_add(a);
+        h[1] = h[1].wrapping_add(b);
+        h[2] = h[2].wrapping_add(c);
+        h[3] = h[3].wrapping_add(d);
+        h[4] = h[4].wrapping_add(e);
+        h[5] = h[5].wrapping_add(f);
+        h[6] = h[6].wrapping_add(g);
+        h[7] = h[7].wrapping_add(h_val);
+    }
+
+    let mut result = [0u8; 32];
+    for i in 0..8 {
+        result[i * 4..(i + 1) * 4].copy_from_slice(&h[i].to_be_bytes());
+    }
+    result
+}
+
+/// HMAC-SHA256 signature calculator for authentication challenge responses.
+#[allow(dead_code)]
+pub struct HmacSha256;
+
+impl HmacSha256 {
+    #[allow(dead_code)]
+    pub fn compute_hmac_response(secret: &[u8], challenge: &[u8]) -> Vec<u8> {
+        let mut key = [0u8; 64];
+        if secret.len() > 64 {
+            let hash = sha256(secret);
+            key[..32].copy_from_slice(&hash);
+        } else {
+            key[..secret.len()].copy_from_slice(secret);
+        }
+
+        let mut o_key_pad = [0x5c; 64];
+        let mut i_key_pad = [0x36; 64];
+        for i in 0..64 {
+            o_key_pad[i] ^= key[i];
+            i_key_pad[i] ^= key[i];
+        }
+
+        let mut inner_input = Vec::new();
+        inner_input.extend_from_slice(&i_key_pad);
+        inner_input.extend_from_slice(challenge);
+        let inner_hash = sha256(&inner_input);
+
+        let mut outer_input = Vec::new();
+        outer_input.extend_from_slice(&o_key_pad);
+        outer_input.extend_from_slice(&inner_hash);
+        sha256(&outer_input).to_vec()
+    }
+}
+
+pub trait SetReadTimeout {
+    fn set_read_timeout(&self, dur: Option<std::time::Duration>) -> std::io::Result<()>;
+}
+
+impl SetReadTimeout for crate::vsock::VsockStream {
+    fn set_read_timeout(&self, dur: Option<std::time::Duration>) -> std::io::Result<()> {
+        self.set_read_timeout(dur)
+    }
+}
+
+impl SetReadTimeout for std::os::unix::net::UnixStream {
+    fn set_read_timeout(&self, dur: Option<std::time::Duration>) -> std::io::Result<()> {
+        self.set_read_timeout(dur)
+    }
+}
+
+impl SetReadTimeout for std::net::TcpStream {
+    fn set_read_timeout(&self, dur: Option<std::time::Duration>) -> std::io::Result<()> {
+        self.set_read_timeout(dur)
+    }
+}
+
+impl<T> SetReadTimeout for std::io::Cursor<T> {
+    fn set_read_timeout(&self, _dur: Option<std::time::Duration>) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+/// Performs authentication handshake over a stream with a 5-second socket read timeout.
+/// Returns true if authentication succeeds, false otherwise.
+pub fn perform_handshake<S: Read + Write + SetReadTimeout>(stream: &mut S, secret: &[u8]) -> bool {
+    if secret.is_empty() {
+        return false;
+    }
+
+    // Set 5-second socket read timeout
+    let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(5)));
+
+    let mut token_buf = vec![0u8; secret.len()];
+    if stream.read_exact(&mut token_buf).is_err() {
+        let _ = stream.set_read_timeout(None);
+        return false;
+    }
+
+    if !verify_token(&token_buf, secret) {
+        let _ = stream.write_all(b"AUTH_FAILED\n");
+        let _ = stream.flush();
+        let _ = stream.set_read_timeout(None);
+        return false;
+    }
+
+    if stream.write_all(b"AUTH_OK\n").is_err() || stream.flush().is_err() {
+        let _ = stream.set_read_timeout(None);
+        return false;
+    }
+
+    // Reset read timeout to None (or zero) after successful authentication
+    let _ = stream.set_read_timeout(None);
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn test_verify_token_valid() {
+        let secret = b"my_super_secret_key_123456789012";
+        let token = b"my_super_secret_key_123456789012";
+        assert!(verify_token(token, secret));
+    }
+
+    #[test]
+    fn test_verify_token_all_zero_rejected() {
+        let secret = vec![0u8; 32];
+        let token = vec![0u8; 32];
+        assert!(!verify_token(&token, &secret));
+    }
+
+    #[test]
+    fn test_verify_token_empty_rejected() {
+        let secret = b"secret";
+        let token = b"";
+        assert!(!verify_token(token, secret));
+        assert!(!verify_token(secret, b""));
+    }
+
+    #[test]
+    fn test_verify_token_mismatch_rejected() {
+        let secret = b"secret_key_12345678";
+        let token = b"wrong_token_12345678";
+        assert!(!verify_token(token, secret));
+    }
+
+    #[test]
+    fn test_hmac_sha256_computation() {
+        let secret = b"key";
+        let challenge = b"The quick brown fox jumps over the lazy dog";
+        let hmac = HmacSha256::compute_hmac_response(secret, challenge);
+        assert_eq!(hmac.len(), 32);
+    }
+
+    #[test]
+    fn test_parse_secret_from_cmdline() {
+        let cmdline = "BOOT_IMAGE=/vmlinuz root=/dev/sda1 linux_auth_secret=cmdline_secret_key_999 ro quiet";
+        let secret = parse_secret_from_cmdline(cmdline).unwrap();
+        assert_eq!(secret, b"cmdline_secret_key_999");
+    }
+
+    #[test]
+    fn test_perform_handshake_success() {
+        let secret = b"valid_secret_key_32bytes_long!!";
+        let mut buffer = Vec::new();
+        buffer.extend_from_slice(secret);
+        let mut cursor = Cursor::new(buffer);
+
+        let success = perform_handshake(&mut cursor, secret);
+        assert!(success);
+
+        let output = cursor.into_inner();
+        assert_eq!(&output[secret.len()..], b"AUTH_OK\n");
+    }
+
+    #[test]
+    fn test_perform_handshake_failure() {
+        let secret = b"valid_secret_key_32bytes_long!!";
+        let wrong_token = b"wrong_secret_key_32bytes_long!!";
+        let mut buffer = Vec::new();
+        buffer.extend_from_slice(wrong_token);
+        let mut cursor = Cursor::new(buffer);
+
+        let success = perform_handshake(&mut cursor, secret);
+        assert!(!success);
+    }
+
+    #[test]
+    fn test_perform_handshake_timeout() {
+        use std::os::unix::net::UnixStream;
+        let (_client, mut server) = UnixStream::pair().unwrap();
+        let secret = b"secret_key_for_timeout_test_123";
+        server.set_read_timeout(Some(std::time::Duration::from_millis(100))).unwrap();
+
+        let handle = std::thread::spawn(move || {
+            perform_handshake(&mut server, secret)
+        });
+
+        // Client does not send anything
+        let success = handle.join().unwrap();
+        assert!(!success, "Handshake should return false on timeout");
+        drop(_client);
+    }
 }

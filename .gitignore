@@ -19,3 +19,6 @@ build_out/
 # Temporary Logs
 *.log
 .agents/scratch/
+target/
+guest/bridge-agent/target/
+

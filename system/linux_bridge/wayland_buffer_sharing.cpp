@@ -28,10 +28,56 @@
 #include <sys/syscall.h>
 #endif
 
+#if defined(__ANDROID__)
+#include <android/hardware_buffer.h>
+#include <android/surface_control.h>
+#include <android/native_window.h>
+#else
+// Host environment mock declarations for NDK SurfaceControl & HardwareBuffer types
+struct AHardwareBuffer {
+    int dmaBufFd;
+    android::linux_bridge::GraphicBufferSpec spec;
+    uint64_t magic{0x4857425546464552ULL};
+};
+
+struct ASurfaceControl {
+    void* handle;
+};
+
+struct ASurfaceTransaction {
+    ASurfaceControl* targetControl{nullptr};
+    AHardwareBuffer* boundBuffer{nullptr};
+    int fenceFd{-1};
+};
+
+static ASurfaceTransaction* ASurfaceTransaction_create() {
+    return new ASurfaceTransaction();
+}
+
+static void ASurfaceTransaction_setBuffer(ASurfaceTransaction* transaction, ASurfaceControl* surface_control, AHardwareBuffer* buffer, int fence_fd) {
+    if (transaction) {
+        transaction->targetControl = surface_control;
+        transaction->boundBuffer = buffer;
+        transaction->fenceFd = fence_fd;
+    }
+}
+
+static void ASurfaceTransaction_apply(ASurfaceTransaction* transaction) {
+    (void)transaction;
+}
+
+static void ASurfaceTransaction_delete(ASurfaceTransaction* transaction) {
+    delete transaction;
+}
+#endif
+
 namespace android {
 namespace linux_bridge {
 
-WaylandBufferSharingManager::WaylandBufferSharingManager() : mActiveBuffers(0), mGpuHealthy(true) {}
+WaylandBufferSharingManager::WaylandBufferSharingManager() {
+    mActiveBuffers.store(0, std::memory_order_relaxed);
+    mGpuHealthy.store(true, std::memory_order_relaxed);
+}
 
 WaylandBufferSharingManager::~WaylandBufferSharingManager() {
     onGpuReset();
@@ -42,14 +88,12 @@ int WaylandBufferSharingManager::exportDmaBufFd(uint32_t bufferId) {
         return -1;
     }
 
-    // Create a genuine kernel file descriptor representing exported dma-buf handle
     int fd = -1;
 #if defined(__linux__) && defined(SYS_memfd_create)
     std::string name = "dmabuf_" + std::to_string(bufferId);
     fd = static_cast<int>(syscall(SYS_memfd_create, name.c_str(), 0));
 #endif
     if (fd < 0) {
-        // Fallback Unix pipe descriptor for environments without memfd_create
         int pfd[2];
         if (pipe(pfd) == 0) {
             close(pfd[1]);
@@ -64,20 +108,65 @@ void* WaylandBufferSharingManager::importDmaBufToHardwareBuffer(int dmaBufFd, co
         throw std::invalid_argument("Invalid dma-buf handle or zero dimensions");
     }
 
-    if (!mGpuHealthy) {
+    if (!mGpuHealthy.load(std::memory_order_relaxed)) {
         throw std::runtime_error("GPU state error: GPU device reset");
     }
 
-    // Allocate opaque handle simulating AHardwareBuffer pointer
-    uintptr_t handle = static_cast<uintptr_t>(dmaBufFd) + 0x1000;
-    mActiveBuffers++;
-    return reinterpret_cast<void*>(handle);
+#if defined(__ANDROID__)
+    AHardwareBuffer_Desc desc = {};
+    desc.width = spec.width;
+    desc.height = spec.height;
+    desc.layers = 1;
+    switch (spec.format) {
+        case PixelFormat::ARGB_8888:
+            desc.format = AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM;
+            break;
+        case PixelFormat::XRGB_8888:
+            desc.format = AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM;
+            break;
+        case PixelFormat::RGB_888:
+            desc.format = AHARDWAREBUFFER_FORMAT_R8G8B8_UNORM;
+            break;
+        default:
+            desc.format = AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM;
+            break;
+    }
+    desc.usage = AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE |
+                 AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT |
+                 AHARDWAREBUFFER_USAGE_COMPOSITOR_MERGE;
+
+    AHardwareBuffer* buffer = nullptr;
+    int res = AHardwareBuffer_allocate(&desc, &buffer);
+    if (res != 0 || !buffer) {
+        throw std::runtime_error("Failed to allocate AHardwareBuffer via NDK, code: " + std::to_string(res));
+    }
+    void* handle = reinterpret_cast<void*>(buffer);
+#else
+    AHardwareBuffer* buffer = new AHardwareBuffer{dmaBufFd, spec, 0x4857425546464552ULL};
+    void* handle = reinterpret_cast<void*>(buffer);
+#endif
+
+    mActiveBuffers.fetch_add(1, std::memory_order_relaxed);
+    return handle;
 }
 
 bool WaylandBufferSharingManager::bindHardwareBufferToSurfaceControl(void* surfaceControlPtr, void* hardwareBufferPtr) {
     if (!surfaceControlPtr || !hardwareBufferPtr) {
         return false;
     }
+
+    ASurfaceControl* surfaceControl = reinterpret_cast<ASurfaceControl*>(surfaceControlPtr);
+    AHardwareBuffer* hardwareBuffer = reinterpret_cast<AHardwareBuffer*>(hardwareBufferPtr);
+
+    ASurfaceTransaction* transaction = ASurfaceTransaction_create();
+    if (!transaction) {
+        return false;
+    }
+
+    ASurfaceTransaction_setBuffer(transaction, surfaceControl, hardwareBuffer, -1 /* fenceFd */);
+    ASurfaceTransaction_apply(transaction);
+    ASurfaceTransaction_delete(transaction);
+
     return true;
 }
 
@@ -86,7 +175,6 @@ bool WaylandBufferSharingManager::waitGpuFenceCompletion(int fenceFd, uint64_t t
         return false;
     }
 
-    // Genuine Linux poll/sync_wait GPU fence completion check
     struct pollfd pfd;
     pfd.fd = fenceFd;
     pfd.events = POLLIN | POLLOUT;
@@ -97,7 +185,6 @@ bool WaylandBufferSharingManager::waitGpuFenceCompletion(int fenceFd, uint64_t t
 
     int ret = poll(&pfd, 1, timeoutMs);
     if (ret == 0) {
-        // Timeout expired before fence signaled
         throw std::runtime_error("SyncFenceWaitTimeout");
     } else if (ret < 0) {
         if (errno == EBADF || errno == EINVAL || errno == ETIMEDOUT || errno == ETIME) {
@@ -128,14 +215,29 @@ PixelFormat WaylandBufferSharingManager::negotiateFormat(PixelFormat requestedFo
 }
 
 void WaylandBufferSharingManager::onGpuReset() {
-    std::cout << "[WaylandBufferSharing] GPU reset: Recreating host surface registry and releasing " << mActiveBuffers << " active buffers.\n";
-    mActiveBuffers = 0;
-    mGpuHealthy = true;
+    size_t releasedCount = mActiveBuffers.exchange(0, std::memory_order_relaxed);
+    std::cout << "[WaylandBufferSharing] GPU reset: Recreating host surface registry and releasing " << releasedCount << " active buffers.\n";
+    mGpuHealthy.store(true, std::memory_order_relaxed);
 }
 
 void WaylandBufferSharingManager::releaseBuffer(void* hardwareBufferPtr) {
-    if (hardwareBufferPtr && mActiveBuffers > 0) {
-        mActiveBuffers--;
+    if (!hardwareBufferPtr) {
+        return;
+    }
+
+#if defined(__ANDROID__)
+    AHardwareBuffer* buffer = reinterpret_cast<AHardwareBuffer*>(hardwareBufferPtr);
+    AHardwareBuffer_release(buffer);
+#else
+    AHardwareBuffer* buffer = reinterpret_cast<AHardwareBuffer*>(hardwareBufferPtr);
+    delete buffer;
+#endif
+
+    size_t current = mActiveBuffers.load(std::memory_order_relaxed);
+    while (current > 0) {
+        if (mActiveBuffers.compare_exchange_weak(current, current - 1, std::memory_order_relaxed)) {
+            break;
+        }
     }
 }
 

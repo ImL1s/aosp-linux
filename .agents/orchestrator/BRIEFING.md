@@ -1,62 +1,69 @@
-# BRIEFING — 2026-08-06T23:56:14+08:00
+# BRIEFING — 2026-08-08T18:33:00+08:00
 
 ## Mission
-AOSP Dual-OS Verification & Deployment Run (Gen 2): Verify status of M1, M2, and M3, execute remaining verification/build/deployment steps, run Forensic Integrity Audit, and report results.
+Orchestrate the production remediation of all 6 deterministic defects (R1-R6) in the AOSP Dual-OS codebase.
 
 ## 🔒 My Identity
-- Archetype: Project Orchestrator
+- Archetype: teamwork_orchestrator
 - Roles: orchestrator, user_liaison, human_reporter, successor
 - Working directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/orchestrator
 - Original parent: parent
-- Original parent conversation ID: c9ce2019-3aa6-4a5b-8ff3-0d56cc4e2cce
+- Original parent conversation ID: df2965af-4a5b-4bcf-a879-554214e15204
 
 ## 🔒 My Workflow
-- **Pattern**: Project Pattern
+- **Pattern**: Project
 - **Scope document**: /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
-1. **Decompose**: Survey codebase with Explorers, create PROJECT.md with Feature Inventory, Milestones, and Interface Contracts.
-2. **Dispatch & Execute**: Delegate milestones to sub-orchestrators or run iteration loop (Explorer → Worker → Reviewer → Challenger → Auditor).
-3. **On failure**: Retry, Replace, Skip, Redistribute, Redesign, Escalate.
-4. **Succession**: Self-succeed at 20 spawns.
+1. **Decompose**: Survey codebase with Explorers, build Feature Inventory, decompose into 6 sub-orchestrator milestones (M1-M6) and E2E Testing Track.
+2. **Dispatch & Execute**: Spawn sub-orchestrators for milestones M1-M6 and E2E testing. Each sub-orchestrator runs Explorer -> Worker -> Reviewer -> Challenger -> Auditor iteration loop.
+3. **On failure**: Retry, Replace, Skip, Redistribute, Redesign, Escalate (in order).
+4. **Succession**: At 20 spawns or context limit, write handoff.md, spawn successor, update parent.
 - **Work items**:
-  1. Survey & Status Verification [in-progress]
-  2. R1: E2E & Empirical Stress Test Execution [pending]
-  3. R2: Soong & Rust & AVB Packaging [pending]
-  4. R3: Deployment & Target Verification [pending]
-- **Current phase**: 1 (Verification Iteration Loop)
-- **Current focus**: Surveying current M1, M2, M3 artifact & verification status with 3 Explorers
+  1. Survey & Plan Creation [done]
+  2. M1: Real AVF VM Launch (R1) [done - Gate PASS]
+  3. M2: Production Guest Agent Loop (R2) [done - Gate PASS]
+  4. M3: Real Vsock Socket Connect & Session ID (R3) [done - Gate PASS]
+  5. M4: Real Wayland dma-buf & SurfaceControl Binding (R4) [done - Gate PASS]
+  6. M5: Real System Hardware Portals (R5) [done - Gate PASS]
+  7. M6: Clean & Honest E2E Test Suite (R6) [in-progress - Iteration 4 needed]
+- **Current phase**: 2 (Dispatch & Execute)
+- **Current focus**: Finalizing M2 & M5 verification and completing M6 E2E Test Suite gate pass.
 
 ## 🔒 Key Constraints
-- Dispatch-only orchestrator: MUST NOT write source code or run build/test commands directly.
-- NEVER reuse a subagent after handoff.
-- Binary veto on integrity violations from Forensic Auditor.
-- Mandatory pass on all gates.
+- DISPATCH-ONLY orchestrator: NEVER write source code directly, NEVER run build/test commands directly.
+- All code inspection/analysis done via Explorer subagents.
+- Forensic Auditor (teamwork_preview_auditor) verdict is a BINARY VETO — violation means failure, no exceptions.
+- Never reuse a subagent after handoff.
 
 ## Current Parent
-- Conversation ID: c9ce2019-3aa6-4a5b-8ff3-0d56cc4e2cce
-- Updated: not yet
+- Conversation ID: df2965af-4a5b-4bcf-a879-554214e15204
+- Updated: 2026-08-08T18:33:00+08:00
 
 ## Key Decisions Made
-- Initiated Gen 2 verification loop with 3 Explorers (`explorer_gen2_1`, `explorer_gen2_2`, `explorer_gen2_3`) to inspect R1, R2, R3 status and verification requirements.
+- Confirmed M1, M3, M4 passed their gates.
+- Verified M2 passed Iteration 3 gate (Auditor CLEAN, Reviewers APPROVE, Challengers APPROVE).
+- Verified M5 passed Iteration 2 gate (Auditor CLEAN, Reviewers APPROVE, Challengers APPROVE).
+- Identified M6 requirement: Resolve Challenger 2 REJECT on socket lifecycle leak & concurrency drop in `tests/e2e/framework/socket_harness.py`.
 
 ## Team Roster
 | Agent | Type | Work Item | Status | Conv ID |
 |-------|------|-----------|--------|---------|
-| explorer_gen2_1 | teamwork_preview_explorer | R1 E2E Test Suite Status Investigator | in-progress | 931c1893-4d9f-4b06-ad35-c5e5d46dfda4 |
-| explorer_gen2_2 | teamwork_preview_explorer | R2 Build & Packaging Status Investigator | in-progress | e27b909d-fb4d-426b-ba9c-53cf7c79d773 |
-| explorer_gen2_3 | teamwork_preview_explorer | R3 Deployment & Verification Status Investigator | in-progress | a43672a1-d404-4a28-b09d-e7d6ec435995 |
+| sub_orch_m6_gen1 | self | Sub-Orchestrator M6 (gen1) | completed (succeeded) | ab8e4f37-1d32-4551-8252-ec539c24f1e6 |
+| sub_orch_m6_gen2 | self | Sub-Orchestrator M6 (gen2) | in-progress | 5649ea65-f844-4f1c-96f6-1236bf8121d3 |
 
 ## Succession Status
 - Succession required: no
-- Spawn count: 0 / 20
-- Pending subagents: none
-- Predecessor: gen1
+- Spawn count: 7 / 20
+- Pending subagents: 5649ea65-f844-4f1c-96f6-1236bf8121d3
+- Predecessor: none
 - Successor: not yet spawned
 
 ## Active Timers
-- Heartbeat cron: b8603b4a-bf5d-41bf-99d4-55f612cd7d42/task-31
+- Heartbeat cron: task-11
 - Safety timer: none
 
 ## Artifact Index
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/ORIGINAL_REQUEST.md — Original Request
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/orchestrator/DISPATCH.md — Dispatch instructions
-
+- /Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md — Original User Request
+- /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md — Master Blueprint
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/orchestrator/DISPATCH.md — Dispatch log
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/orchestrator/progress.md — Progress tracking
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/orchestrator/GATE_STATUS.md — Gate status log

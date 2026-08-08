@@ -18,7 +18,7 @@ package com.android.server.linux;
 
 /**
  * System-internal local service interface for cross-module communication within system_server.
- * @hide
+ * {@hide}
  */
 public abstract class LinuxManagerInternal {
 
@@ -36,4 +36,33 @@ public abstract class LinuxManagerInternal {
      * Called when a target user unlocks their Credential Encrypted (CE) storage.
      */
     public abstract void onUserUnlocked(int userId);
+
+    /**
+     * Returns true if the LUKS2 CE storage volume is unlocked and available.
+     */
+    public abstract boolean isCeKeyAvailable();
+
+    /**
+     * Returns true if the storage volume is mounted read-only.
+     */
+    public abstract boolean isReadOnlyMount();
+
+    /**
+     * Registers a listener for storage and VM state changes.
+     */
+    public abstract void registerStorageStateListener(StorageStateListener listener);
+
+    /**
+     * Unregisters a storage state listener.
+     */
+    public abstract void unregisterStorageStateListener(StorageStateListener listener);
+
+    /**
+     * Interface for listening to storage and VM state change events.
+     */
+    public interface StorageStateListener {
+        void onVmStateChanged(int newState, int oldState);
+        void onCeKeyStatusChanged(boolean available);
+        void onStorageMountChanged(boolean isReadOnly);
+    }
 }

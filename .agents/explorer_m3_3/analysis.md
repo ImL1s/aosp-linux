@@ -1,546 +1,116 @@
-# Architectural Analysis & Technical Design Report: M3 Native Touch Terminal & PTY Protocol Engine
+# Milestone M3 (Real Vsock Socket Connect & Session ID - R3) 端到端整合與介面合約調查報告
 
-**Author**: Explorer 3 (Milestone M3: Native Touch Terminal & IME)  
-**Target Path**: `/Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_3/analysis.md`  
-**Scope**: F-R3-005 (Touch Modes State Machine), F-R3-006 (SGR Mouse Protocol Generator), F-R3-007 (Vsock Port 5001 PTY Framing)
+## 執行摘要
 
----
-
-## 1. Executive Summary & Scope Mapping
-
-This document establishes the technical design and architectural blueprint for the three core touch input and PTY communication features of Milestone M3 (Native Touch Terminal & IME) in AOSP Dual-OS:
-
-| Feature ID | Feature Name | Description | Target Component |
-|------------|--------------|-------------|------------------|
-| **F-R3-005** | Touch Modes State Machine | State machine managing `SHELL_MODE`, `TUI_MOUSE_MODE`, and `TOUCHPAD_MODE` | `com.android.terminal.touch.TouchModeStateMachine` |
-| **F-R3-006** | SGR Mouse Protocol Generator | Touch gesture to DEC SGR 1006 mouse protocol translation (`\x1b[?<button>;<x>;<y>M` / `m`) | `com.android.terminal.touch.SgrMouseProtocolGenerator` |
-| **F-R3-007** | Vsock Port 5001 PTY Framing | Binary framing header parser and byte stream serializer over Vsock 5001 (`[SessionID (16B)][Type (1B)][Length (4B)][Payload]`) | `com.android.terminal.net.VsockPtyFramer` |
+本報告針對 **Milestone M3 (Real Vsock Socket Connect & Session ID - R3)** 進行完整的端到端整合調查、構建目標分析、測試套件盤點以及介面合約與程式碼邊界驗證。調查確認了 M3 的核心缺陷、構建與測試目標 setup，並為後續 Worker 提供明確的實作步驟與驗證指令。
 
 ---
 
-## 2. Feature 1: F-R3-005 - Touch Modes State Machine Design
+## 1. 構建檔案 (Build Files) 與 Target 配置
 
-### 2.1 State Definitions & Behaviors
+本專案中與 `LinuxTerminal` App、系統服務 (`LinuxManagerService`) 及原生 bridge/daemon 相關的構建檔案如下：
 
-```
-                           +------------------------+
-                           |       SHELL_MODE       |  (Default Terminal Mode)
-                           |  - Drag: Scrollback    |
-                           |  - Long Press: Select  |
-                           |  - Tap: Show IME       |
-                           +-----------+------------+
-                                       |
-                   \x1b[?1000h / \x1b[?1006h | \x1b[?1000l / \x1b[?1006l
-              (Vim/tmux SGR Enabled)   | (Vim/tmux Exited)
-                                       v
-                           +------------------------+
-                           |     TUI_MOUSE_MODE     |  (ANSI Mouse Mode)
-                           |  - Touch: SGR Packets  |
-                           |  - Swipe: Wheel 64/65  |
-                           |  - Passthrough to PTY  |
-                           +-----------+------------+
-                                       |
-                         User Manual Toggle / Action Bar
-                                       |
-                                       v
-                           +------------------------+
-                           |     TOUCHPAD_MODE      |  (Desktop Trackpad)
-                           |  - Relative Cursor     |
-                           |  - Tap: Left Click     |
-                           |  - 2-Finger: Right Click|
-                           +------------------------+
-```
-
-1. **`SHELL_MODE` (Standard Shell Navigation)**:
-   - **Single Finger Vertical Drag / Fling**: Controls terminal scrollback buffer. Moving finger down scrolls up into scrollback history; moving finger up scrolls down toward active command line.
-   - **Long Press + Drag**: Triggers terminal text selection engine. Highlights character cells between touch start and end positions, copying selected text to system `ClipboardManager`.
-   - **Single Tap**: Focuses terminal view and requests soft keyboard via `InputMethodManager.showSoftInput(view, SHOW_IMPLICIT)`.
-   - **Pinch Gesture**: Adjusts terminal font size dynamically ($12\text{pt} \le \text{fontSize} \le 36\text{pt}$), triggers cell metric recalculation, and dispatches a Vsock `RESIZE` frame.
-
-2. **`TUI_MOUSE_MODE` (SGR Mouse Event Pass-through)**:
-   - Activated automatically when full-screen terminal programs (e.g. Vim, tmux, htop, less) send DEC Private Mode set escape sequences `\x1b[?1000h` (SET_MOUSE_BTN) or `\x1b[?1006h` (SET_SGR_EXT_MODE).
-   - Touch events are intercepted by `SgrMouseProtocolGenerator` and translated into ANSI SGR mouse sequences (`\x1b[?<Cb>;<Cx>;<Cy>M` / `m`).
-   - Single finger drag in Vim selects visual blocks or moves cursor position.
-   - Two-finger vertical swipe triggers mouse wheel scroll (Button 64 for Wheel Up, Button 65 for Wheel Down).
-
-3. **`TOUCHPAD_MODE` (Virtual Trackpad Cursor Emulation)**:
-   - Screen acts as a relative laptop trackpad controlling virtual mouse cursor on Linux desktop windows.
-   - **Relative Delta Tracking**: Touch displacement $(\Delta x, \Delta y)$ is scaled using pointer acceleration curve $v' = v \cdot (1 + \alpha \cdot |v|)$ and sent to virtio-input pointer device.
-   - **Tap**: Emulates Left Mouse Button Click (Button 1).
-   - **Two-finger Tap**: Emulates Right Mouse Button Click (Button 2 / Context Menu).
-   - **Three-finger Tap**: Emulates Middle Mouse Button Click (Button 3).
-   - **Two-finger Scroll**: Emulates mouse wheel panning.
-
-### 2.2 Auto-Detection & State Transition Logic
-
-- **Auto-Detection Engine**: Integrated into the terminal escape parser (`libvterm` / JNI parser). When parser processes DEC Private Mode codes:
-  - `\x1b[?1000h`, `\x1b[?1002h`, `\x1b[?1003h`, `\x1b[?1006h` $\rightarrow$ Triggers `mStateMachine.onMouseTrackingModeChanged(true)`.
-  - `\x1b[?1000l`, `\x1b[?1006l` $\rightarrow$ Triggers `mStateMachine.onMouseTrackingModeChanged(false)`.
-- **Manual Lock Overrides**:
-  - The state machine maintains a `isManualLocked` flag.
-  - When user clicks action bar "Switch Mode" button or performs a 3-finger long-press gesture, `isManualLocked` is set to `true` and state is locked to the selected mode (`SHELL_MODE`, `TUI_MOUSE_MODE`, or `TOUCHPAD_MODE`).
-  - While `isManualLocked == true`, automatic escape code transitions are suppressed.
-
-### 2.3 Java Class Structure (`TouchModeStateMachine.java`)
-
-```java
-package com.android.terminal.touch;
-
-import android.content.Context;
-import android.content.SharedPreferences;
-import java.util.concurrent.CopyOnWriteArrayList;
-
-public class TouchModeStateMachine {
-    public enum TouchMode {
-        SHELL_MODE,
-        TUI_MOUSE_MODE,
-        TOUCHPAD_MODE
-    }
-
-    public interface OnTouchModeChangeListener {
-        void onTouchModeChanged(TouchMode oldMode, TouchMode newMode, boolean isManual);
-    }
-
-    private static final String PREF_NAME = "terminal_touch_prefs";
-    private static final String KEY_PREF_MODE = "saved_touch_mode";
-
-    private TouchMode mCurrentMode = TouchMode.SHELL_MODE;
-    private boolean mIsManualLocked = false;
-    private boolean mMouseTrackingRequested = false;
-    private final CopyOnWriteArrayList<OnTouchModeChangeListener> mListeners = new CopyOnWriteArrayList<>();
-    private final SharedPreferences mPrefs;
-
-    public TouchModeStateMachine(Context context) {
-        mPrefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
-        String saved = mPrefs.getString(KEY_PREF_MODE, TouchMode.SHELL_MODE.name());
-        try {
-            mCurrentMode = TouchMode.valueOf(saved);
-        } catch (Exception e) {
-            mCurrentMode = TouchMode.SHELL_MODE;
-        }
-    }
-
-    public synchronized TouchMode getCurrentMode() {
-        return mCurrentMode;
-    }
-
-    public synchronized boolean isManualLocked() {
-        return mIsManualLocked;
-    }
-
-    public synchronized void setManualTouchMode(TouchMode mode) {
-        mIsManualLocked = true;
-        transitionTo(mode, true);
-    }
-
-    public synchronized void unlockAutoMode() {
-        mIsManualLocked = false;
-        if (mMouseTrackingRequested) {
-            transitionTo(TouchMode.TUI_MOUSE_MODE, false);
-        } else {
-            transitionTo(TouchMode.SHELL_MODE, false);
-        }
-    }
-
-    public synchronized void onTerminalEscapeMouseTrackingChanged(boolean enabled) {
-        mMouseTrackingRequested = enabled;
-        if (!mIsManualLocked) {
-            TouchMode target = enabled ? TouchMode.TUI_MOUSE_MODE : TouchMode.SHELL_MODE;
-            transitionTo(target, false);
-        }
-    }
-
-    private void transitionTo(TouchMode newMode, boolean isManual) {
-        if (mCurrentMode != newMode) {
-            TouchMode oldMode = mCurrentMode;
-            mCurrentMode = newMode;
-            mPrefs.edit().putString(KEY_PREF_MODE, newMode.name()).apply();
-            for (OnTouchModeChangeListener listener : mListeners) {
-                listener.onTouchModeChanged(oldMode, newMode, isManual);
-            }
-        }
-    }
-
-    public void addListener(OnTouchModeChangeListener listener) {
-        mListeners.add(listener);
-    }
-
-    public void removeListener(OnTouchModeChangeListener listener) {
-        mListeners.remove(listener);
-    }
-}
-```
+| 構建檔案路徑 | 模組名稱 / Target | 類型 | 說明 |
+|---|---|---|---|
+| `/Users/iml1s/Documents/mine/aosp-linux/Android.bp` | `android.system.linux` | `java_sdk_library` | 定義 AOSP Linux 雙系統 Core/Framework AIDL 介面與系統包 |
+| `/Users/iml1s/Documents/mine/aosp-linux/Android.bp` | `services.linux` | `java_library` | 編譯 Framework 系統服務（包含 `LinuxManagerService.java`） |
+| `/Users/iml1s/Documents/mine/aosp-linux/packages/apps/LinuxTerminal/Android.bp` | `LinuxTerminal` | `android_app` | 終端機 Android 應用程式（包含 `VsockTerminalClient`, `TerminalView`, `LinuxAppProxyActivity`） |
+| `/Users/iml1s/Documents/mine/aosp-linux/packages/apps/LinuxTerminal/jni/Android.bp` | `libvterm_jni` | `cc_library_shared` | 終端機 JNI 原生解析與渲染庫（`libvterm`, `sgr_mouse_generator`, `pty_framing_handler`） |
+| `/Users/iml1s/Documents/mine/aosp-linux/system/linux_bridge/Android.bp` | `linux_bridge` | `cc_binary` | Host 端原生 daemon（負責處理 local socket 與 vsock server 連線） |
+| `/Users/iml1s/Documents/mine/aosp-linux/guest/bridge-agent/Cargo.toml` | `android-bridge-agent` | `rust binary` | Guest Linux 內部 agent（監聽 Port 5000/5001/5002） |
 
 ---
 
-## 3. Feature 2: F-R3-006 - SGR Mouse Protocol Generator Design
+## 2. 測試套件 (Test Suites) 與 Test Runner 盤點
 
-### 3.1 DEC SGR Extended Mouse Protocol Format
+專案已具備完整的單元測試、實證測試（Empirical/Stress Test）及端到端（E2E）測試框架：
 
-The DEC SGR 1006 mouse protocol serializes touch/mouse events into readable ASCII escape packets:
+### (1) Java 單元與實證測試套件
+- **`tests/unit/TerminalAppUnitTest.java`**: 驗證 `TerminalView`, CJK IME (`CjkComposingTextManager`), Touchpad 控制器以及 `VsockTerminalClient` 之 Loopback Socket 傳輸與 Framing 解析。
+- **`tests/unit/ChallengerM3EmpiricalTest.java`**: 驗證 `TerminalInputConnection` 前向刪除 (`deleteSurroundingText(0, 1)` High-Frequency Commit) 以及組字區取消。
+- **`tests/unit/ChallengerM3RepEmpiricalTest.java`**: 實證併發 Session 與 Framer 邊界測試。
+- **`tests/unit/LinuxManagerServiceTest.java`**: 驗證 `LinuxManagerService` 的 AIDL 介面及 Session 管理邏輯。
+- **`tests/unit/TouchpadVsockStressTest.java`**: 驗證觸控板模式與 vsock 封包高頻壓力測試。
 
-```
-Press / Motion:   \x1b[?<button_code>;<col>;<row>M
-Release:          \x1b[?<button_code>;<col>;<row>m
-```
+### (2) Native C++ 測試二進位檔
+- **`tests/unit/m3_native_terminal_test.cpp`** (編譯產物: `tests/unit/m3_native_terminal_test_bin`)
+- **`tests/unit/m3_native_challenger2_stress.cpp`** (編譯產物: `tests/unit/m3_native_challenger2_stress_bin`)
+- **`tests/unit/challenger_m3_1_empirical_test.cpp`**
 
-#### Button Code Encoding Table ($\text{Cb}$)
-
-| Event / Action | Base Value | Drag Offset (+32) | Final Code ($\text{Cb}$) | Protocol Suffix |
-|----------------|------------|-------------------|--------------------------|-----------------|
-| Left Button Down | `0` | - | `0` | `M` |
-| Middle Button Down | `1` | - | `1` | `M` |
-| Right Button Down | `2` | - | `2` | `M` |
-| Left Button Drag | `0` | `+32` | `32` | `M` |
-| Middle Button Drag | `1` | `+32` | `33` | `M` |
-| Right Button Drag | `2` | `+32` | `34` | `M` |
-| Motion (No buttons) | `3` | `+32` | `35` | `M` |
-| Scroll Wheel Up | `64` | - | `64` | `M` |
-| Scroll Wheel Down | `65` | - | `65` | `M` |
-| Left Button Release | `0` | - | `0` | `m` |
-
-**Modifier Bitmasks** (added to $\text{Cb}$):
-- `Shift`: $+4$
-- `Alt / Meta`: $+8$
-- `Ctrl`: $+16$
-
-### 3.2 Touch-to-Grid Coordinate Translation Math
-
-Given:
-- Touch pixel coordinate: $(X_{px}, Y_{px})$
-- Character cell dimensions: $W_{cell}$ (pixels), $H_{cell}$ (pixels)
-- View padding offsets: $Pad_X, Pad_Y$
-- Terminal grid dimensions: $Cols, Rows$
-
-1-based grid column ($Cx$) and row ($Cy$) calculations:
-
-$$Cx = \min\left(\max\left(1, \, \left\lfloor \frac{X_{px} - Pad_X}{W_{cell}} \right\rfloor + 1\right), \, Cols\right)$$
-
-$$Cy = \min\left(\max\left(1, \, \left\lfloor \frac{Y_{px} - Pad_Y}{H_{cell}} \right\rfloor + 1\right), \, Rows\right)$$
-
-### 3.3 Touch Event Processing & Scroll Wheel Math
-
-```java
-package com.android.terminal.touch;
-
-import android.view.MotionEvent;
-import java.nio.charset.StandardCharsets;
-
-public class SgrMouseProtocolGenerator {
-    private boolean mMouseTrackingEnabled = false;
-    private boolean mSgrModeEnabled = true;
-
-    private int mLastCol = -1;
-    private int mLastRow = -1;
-    private float mStartY = 0f;
-    private float mAccumulatedScrollY = 0f;
-
-    public void setMouseTrackingEnabled(boolean enabled) {
-        this.mMouseTrackingEnabled = enabled;
-    }
-
-    public boolean isMouseTrackingEnabled() {
-        return mMouseTrackingEnabled;
-    }
-
-    public void setSgrModeEnabled(boolean sgrMode) {
-        this.mSgrModeEnabled = sgrMode;
-    }
-
-    public byte[] processMotionEvent(MotionEvent event, int cellWidth, int cellHeight, int totalCols, int totalRows) {
-        if (!mMouseTrackingEnabled) {
-            return new byte[0];
-        }
-
-        int action = event.getActionMasked();
-        float x = event.getX();
-        float y = event.getY();
-
-        int col = Math.max(1, Math.min(totalCols, (int) (x / cellWidth) + 1));
-        int row = Math.max(1, Math.min(totalRows, (int) (y / cellHeight) + 1));
-
-        StringBuilder sb = new StringBuilder();
-
-        switch (action) {
-            case MotionEvent.ACTION_DOWN:
-                mLastCol = col;
-                mLastRow = row;
-                mStartY = y;
-                mAccumulatedScrollY = 0f;
-                // Button 0 Press
-                sb.append(String.format("\x1b[<0;%d;%d;M", col, row));
-                break;
-
-            case MotionEvent.ACTION_MOVE:
-                if (event.getPointerCount() == 1) {
-                    if (col != mLastCol || row != mLastRow) {
-                        mLastCol = col;
-                        mLastRow = row;
-                        // Button 0 Drag / Motion (Cb = 0 + 32 = 32)
-                        sb.append(String.format("\x1b[<32;%d;%d;M", col, row));
-                    }
-                } else if (event.getPointerCount() == 2) {
-                    // Two-finger scroll wheel translation
-                    float dy = y - mStartY;
-                    mStartY = y;
-                    mAccumulatedScrollY += dy;
-                    if (Math.abs(mAccumulatedScrollY) >= cellHeight) {
-                        int button = (mAccumulatedScrollY < 0) ? 65 : 64; // 65=Wheel Down, 64=Wheel Up
-                        sb.append(String.format("\x1b[<%d;%d;%d;M", button, col, row));
-                        mAccumulatedScrollY = 0f;
-                    }
-                }
-                break;
-
-            case MotionEvent.ACTION_UP:
-            case MotionEvent.ACTION_CANCEL:
-                col = (mLastCol > 0) ? mLastCol : col;
-                row = (mLastRow > 0) ? mLastRow : row;
-                // Button 0 Release
-                sb.append(String.format("\x1b[<0;%d;%d;m", col, row));
-                mLastCol = -1;
-                mLastRow = -1;
-                break;
-        }
-
-        return sb.toString().getBytes(StandardCharsets.US_ASCII);
-    }
-}
-```
+### (3) 端到端 (E2E) Test Runner (`tests/e2e/runner.py`)
+- **啟動腳本**: `./tests/e2e/run_tests.sh` 或 `python3 tests/e2e/runner.py`
+- **M3 功能測試範圍 (Tier 1)**: `F-R3-001` 至 `F-R3-007` (共 35 個測試，`T1-51` ~ `T1-85`)
+- **M3 邊界測試範圍 (Tier 2)**: `F-R3-001` 至 `F-R3-007` (共 35 個測試，`T2-51` ~ `T2-85`)
+- **AOSP Target 測試指令**: `atest LinuxTerminalTests`, `atest FrameworksServicesTests:LinuxManagerServiceTest`
 
 ---
 
-## 4. Feature 3: F-R3-007 - Vsock Port 5001 PTY Framing Design
+## 3. 檔案邊界與寫入權限 (File Boundaries & Write Ownership)
 
-### 4.1 Binary Packet Framing Specification
+為確保多 Agent 協作不發生程式碼衝突，特定檔案的寫入權限劃分如下：
 
-All terminal stream communication over Virtio Vsock Port 5001 follows a strict 21-byte header binary frame layout:
+### M3 Worker 擁有且可修改的檔案：
+1. `/Users/iml1s/Documents/mine/aosp-linux/packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/net/VsockTerminalClient.java`
+2. `/Users/iml1s/Documents/mine/aosp-linux/packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/TerminalView.java`
+3. `/Users/iml1s/Documents/mine/aosp-linux/frameworks/base/services/core/java/com/android/server/linux/LinuxManagerService.java` (Session ID 產生與介面對齊部分)
 
-```
- 0                   1                   2                   3
- 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                                                               |
-+                                                               +
-|                    SessionID (16 Bytes)                       |
-+                                                               +
-|                                                               |
-+                               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                               | Type (1 Byte) | Length (4B)...|
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|...Length (uint32_t Big-Endian)|        Payload (N Bytes)      |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+                               |
-|                                                               |
-+---------------------------------------------------------------+
-```
-
-#### Field Specifications
-
-1. **`SessionID` (16 Bytes)**: 128-bit session UUID or binary token identifying the target terminal session.
-2. **`Type` (1 Byte `uint8_t`)**:
-   - `0x01` (`DATA`): Terminal stdin/stdout UTF-8 raw byte stream or ANSI escape sequences.
-   - `0x02` (`RESIZE`): Terminal window dimensions change event.
-   - `0x03` (`PING`): Vsock layer heartbeat keepalive ping.
-   - `0x04` (`PONG`): Vsock layer heartbeat keepalive pong.
-   - `0x05` (`EOS`): End-of-Stream / Shell session logout notification.
-3. **`Length` (4 Bytes `uint32_t` Big-Endian / Network Byte Order)**: Payload byte count ($0 \le N \le 65536$).
-4. **`Payload` ($N$ Bytes)**: Binary payload content.
-
-#### `RESIZE` Payload Structure (4 Bytes)
-
-```
- 0                   1                   2                   3
- 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|     Cols (uint16_t BE)        |     Rows (uint16_t BE)        |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-```
-
-### 4.2 Stream Serializer & Reassembly Parser Architecture
-
-Vsock socket reads can yield partial headers, split payloads, or multiple concatenated frames. The parsing engine uses an accumulation buffer (`ByteArrayOutputStream` or ring buffer) with validation checks:
-
-- **Header Check**: Minimum 21 bytes required before parsing header.
-- **Frame Type Validation**: Type must be $\in \{0x01, 0x02, 0x03, 0x04, 0x05\}$. Any other byte raises `IllegalArgumentException("Invalid Vsock frame type: " + type)`.
-- **Payload Length Sanity Check**: Max frame size is 64KB ($65,536$ bytes). If $Length > 65536$, parser raises `IllegalArgumentException("PayloadLengthExceeded: " + length)`.
-- **Session Validation**: Incoming `SessionID` must match active session ID; mismatches are dropped.
-
-### 4.3 Java Implementation (`VsockPtyFramer.java`)
-
-```java
-package com.android.terminal.net;
-
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.util.Arrays;
-
-public class VsockPtyFramer {
-    public static final int HEADER_SIZE = 21; // 16 + 1 + 4
-    public static final int MAX_PAYLOAD_SIZE = 65536; // 64 KB limit
-
-    public enum PacketType {
-        DATA(0x01),
-        RESIZE(0x02),
-        PING(0x03),
-        PONG(0x04),
-        EOS(0x05);
-
-        private final byte mValue;
-
-        PacketType(int value) {
-            mValue = (byte) value;
-        }
-
-        public byte getValue() {
-            return mValue;
-        }
-
-        public static PacketType fromByte(byte b) {
-            for (PacketType type : values()) {
-                if (type.mValue == b) {
-                    return type;
-                }
-            }
-            throw new IllegalArgumentException("Invalid Vsock frame type byte: 0x" + Integer.toHexString(b & 0xFF));
-        }
-    }
-
-    public static class Frame {
-        public final byte[] sessionId;
-        public final PacketType type;
-        public final byte[] payload;
-
-        public Frame(byte[] sessionId, PacketType type, byte[] payload) {
-            if (sessionId == null || sessionId.length != 16) {
-                throw new IllegalArgumentException("Session ID must be exactly 16 bytes");
-            }
-            this.sessionId = sessionId;
-            this.type = type;
-            this.payload = (payload != null) ? payload : new byte[0];
-        }
-    }
-
-    public interface OnFrameParsedListener {
-        void onFrameParsed(Frame frame);
-        void onError(Exception e);
-    }
-
-    // Serializes a Frame object to binary byte array
-    public static byte[] serializeFrame(byte[] sessionId, PacketType type, byte[] payload) {
-        if (sessionId == null || sessionId.length != 16) {
-            throw new IllegalArgumentException("Session ID must be exactly 16 bytes");
-        }
-        byte[] data = (payload != null) ? payload : new byte[0];
-        if (data.length > MAX_PAYLOAD_SIZE) {
-            throw new IllegalArgumentException("Payload length " + data.length + " exceeds maximum " + MAX_PAYLOAD_SIZE);
-        }
-
-        ByteBuffer buffer = ByteBuffer.allocate(HEADER_SIZE + data.length);
-        buffer.order(ByteOrder.BIG_ENDIAN);
-        buffer.put(sessionId);
-        buffer.put(type.getValue());
-        buffer.putInt(data.length);
-        buffer.put(data);
-
-        return buffer.array();
-    }
-
-    // Creates a RESIZE payload frame
-    public static byte[] serializeResizeFrame(byte[] sessionId, int cols, int rows) {
-        ByteBuffer payload = ByteBuffer.allocate(4);
-        payload.order(ByteOrder.BIG_ENDIAN);
-        payload.putShort((short) cols);
-        payload.putShort((short) rows);
-        return serializeFrame(sessionId, PacketType.RESIZE, payload.array());
-    }
-
-    // Parses RESIZE payload bytes into [cols, rows]
-    public static int[] parseResizePayload(byte[] payload) {
-        if (payload == null || payload.length != 4) {
-            throw new IllegalArgumentException("Resize payload must be exactly 4 bytes");
-        }
-        ByteBuffer buffer = ByteBuffer.wrap(payload);
-        buffer.order(ByteOrder.BIG_ENDIAN);
-        int cols = buffer.getShort() & 0xFFFF;
-        int rows = buffer.getShort() & 0xFFFF;
-        return new int[]{cols, rows};
-    }
-
-    // Stateful parser for stream fragment reassembly
-    public static class StreamParser {
-        private final ByteArrayOutputStream mBuffer = new ByteArrayOutputStream();
-
-        public synchronized void appendAndParse(byte[] chunk, int offset, int length, byte[] expectedSessionId, OnFrameParsedListener listener) {
-            mBuffer.write(chunk, offset, length);
-            byte[] bytes = mBuffer.toByteArray();
-            int readOffset = 0;
-
-            while (bytes.length - readOffset >= HEADER_SIZE) {
-                ByteBuffer headerBuf = ByteBuffer.wrap(bytes, readOffset, HEADER_SIZE);
-                headerBuf.order(ByteOrder.BIG_ENDIAN);
-
-                byte[] sessionId = new byte[16];
-                headerBuf.get(sessionId);
-                byte typeByte = headerBuf.get();
-                int payloadLength = headerBuf.getInt();
-
-                if (payloadLength > MAX_PAYLOAD_SIZE) {
-                    mBuffer.reset();
-                    listener.onError(new IllegalArgumentException("PayloadLengthExceeded: " + payloadLength + " > " + MAX_PAYLOAD_SIZE));
-                    return;
-                }
-
-                int totalFrameLength = HEADER_SIZE + payloadLength;
-                if (bytes.length - readOffset < totalFrameLength) {
-                    // Incomplete frame, wait for next socket read
-                    break;
-                }
-
-                try {
-                    PacketType type = PacketType.fromByte(typeByte);
-                    byte[] payload = Arrays.copyOfRange(bytes, readOffset + HEADER_SIZE, readOffset + totalFrameLength);
-
-                    if (expectedSessionId != null && !Arrays.equals(sessionId, expectedSessionId)) {
-                        // Drop frame due to session mismatch
-                    } else {
-                        listener.onFrameParsed(new Frame(sessionId, type, payload));
-                    }
-                } catch (Exception e) {
-                    listener.onError(e);
-                }
-
-                readOffset += totalFrameLength;
-            }
-
-            // Keep unparsed trailing bytes in buffer
-            byte[] remaining = Arrays.copyOfRange(bytes, readOffset, bytes.length);
-            mBuffer.reset();
-            mBuffer.write(remaining, 0, remaining.length);
-        }
-    }
-}
-```
+### 禁止 M3 Worker 修改的檔案邊界：
+- `guest/bridge-agent/*` (由 M2 Worker 擁有)
+- `LinuxWindowBridgeService.java` / `LinuxAppProxyActivity.java` (由 M4 Worker 擁有)
+- `LinuxPortalService.java` / `LinuxStorageProvider.java` (由 M5 Worker 擁有)
 
 ---
 
-## 5. Summary of Test Scenarios & Verification Matrix
+## 4. 介面合約與缺陷分析 (Interface Alignment & Defect Analysis)
 
-| Test Suite | Feature | Scenario | Verification Method |
-|------------|---------|----------|---------------------|
-| `test_m3_tier1.py` | F-R3-005 | Default Touch Mode is `SHELL_MODE` | Assert `mStateMachine.getCurrentMode() == SHELL_MODE` |
-| `test_m3_tier1.py` | F-R3-005 | Auto transition to `TUI_MOUSE_MODE` on DEC set code | Send `\x1b[?1006h`, verify transition to `TUI_MOUSE_MODE` |
-| `test_m3_tier1.py` | F-R3-005 | Manual lock override suppresses auto escape code | Set manual lock to `TOUCHPAD_MODE`, send `\x1b[?1006h`, mode remains `TOUCHPAD_MODE` |
-| `test_m3_tier1.py` | F-R3-006 | Touch down to SGR Button 0 press | Touch at (75px, 150px) with cell size 8x16 generates `\x1b[<0;9;9;M` |
-| `test_m3_tier1.py` | F-R3-006 | Touch drag to SGR Motion (Cb=32) | Drag event generates `\x1b[<32;col;row;M` |
-| `test_m3_tier1.py` | F-R3-006 | Scroll wheel gesture to Buttons 64/65 | Two-finger scroll generates `\x1b[<64;col;row;M` or `\x1b[<65;col;row;M` |
-| `test_m3_tier1.py` | F-R3-007 | 21-byte frame header serialization | Verify header size = 21, payload length matches, SessionID byte array intact |
-| `test_m3_tier1.py` | F-R3-007 | `RESIZE` frame payload packing/unpacking | Pack 120 cols / 40 rows into 4-byte payload, unpack and verify values |
-| `test_m3_tier2.py` | F-R3-007 | Invalid frame type byte rejection | Byte `0xFF` raises `IllegalArgumentException` |
-| `test_m3_tier2.py` | F-R3-007 | Partial header & fragmented payload reassembly | Split 21-byte header across socket reads, verify parser buffers and reassembles correctly |
-| `test_m3_tier2.py` | F-R3-007 | Payload length $> 64\text{KB}$ rejection | Pack `length = 100000`, verify `PayloadLengthExceeded` error raised |
+經詳細讀取原始碼，發現 M3 涉及之四個關鍵元件存在以下介面不對齊與 deterministic 缺陷：
+
+### 缺陷一：`VsockTerminalClient.java` 缺少真實 `AF_VSOCK` 的 `Os.connect(...)` 系統呼叫
+- **位置**: `VsockTerminalClient.java:33`
+- **現象**: 程式碼呼叫 `mSocketFd = Os.socket(AF_VSOCK, OsConstants.SOCK_STREAM, 0);` 後，直接建立 `FileInputStream` 與 `FileOutputStream`，完全未執行 `Os.connect(mSocketFd, ...)`。
+- **影響**: 在 Linux/Android 系統上，未連線的 socket 執行讀寫會立即拋出 `ENOTCONN` (Socket is not connected, errno 57/107)。
+- **修復方案**: 在 `connect(int guestCid, byte[] sessionId, listener)` 中，構造指向 `(AF_VSOCK=40, port=5001, cid=guestCid)` 的 socket 地址（如 `VmSocketAddress` 或 JNI/POSIX `sockaddr_vm` 反射），並呼叫 `Os.connect(mSocketFd, address)`。
+
+### 缺陷二：`TerminalView.java` 使用硬編碼 Session ID
+- **位置**: `TerminalView.java:49`
+- **現象**: `private byte[] mSessionId = "0123456789abcdef".getBytes();` 硬編碼為靜態字串，且在 `onAttachedToWindow()` 中未與 `LinuxManagerService` 互動即開啟連線。
+- **影響**: 無法支援動態多 Session 隔離，違反動態 Session 管理規範。
+- **修復方案**: `TerminalView` 於載入時透過 `ILinuxManager` 呼叫 `createTerminalSession(width, height, callback)` 取得動態發行的 16 位元組 Session ID。
+
+### 缺陷三：`LinuxManagerService.java` 產生的 Session ID 長度與 `VsockPtyFramer.java` 規格不符
+- **位置**: `LinuxManagerService.java:392` vs `VsockPtyFramer.java:HEADER_SIZE`
+- **現象**: `LinuxManagerService` 產生 `"session_1001"` (12 位元組ASCII字串)，而 `VsockPtyFramer.java` 強制要求 Session ID 長度必須 **精確等於 16 位元組** (`if (sessionId == null || sessionId.length != 16) throw new IllegalArgumentException(...)`)。
+- **影響**: 若傳入 12 位元組的 Session ID，`VsockPtyFramer.serializeFrame` 會拋出 `IllegalArgumentException`。
+- **修復方案**: 修改 `LinuxManagerService.java` 中的 `createTerminalSession` 方法，使其發行精確為 16 位元組的 ASCII Session ID（例如 `"sess_000000001001"`）或 32 字元的 Hex 字串轉換為 16 位元組 Byte 陣列。
+
+### 缺陷四：雙模式連線支援 (Real AF_VSOCK vs Loopback Socket Test)
+- `VsockTerminalClient.java` 應保留 `connectSocket(java.net.Socket socket, ...)` 供單元測試 (Mock Environment) 使用，同時健全化 `connect(int guestCid, ...)` 供真實 VM 使用。
 
 ---
+
+## 5. 建議 Worker 實作步驟與驗證指令
+
+### 實作步驟 (Implementation Steps):
+1. **修改 `LinuxManagerService.java`**:
+   - 更新 `createTerminalSession(int width, int height, ILinuxTerminalCallback callback)`，改為產生精確 16 位元組格式的 Session ID（例如 `String.format("sess_%012d", ++mNextSessionId)`，長度恰為 16 專屬 ASCII 位元組）。
+2. **修改 `TerminalView.java`**:
+   - 於 View 初始化或附著時，取得 `ILinuxManager` 服務代理，呼叫 `createTerminalSession(mColumns, mRows, callback)` 取得動態 16 位元組 Session ID，並帶入 `connectVsock(GUEST_CID, dynamicSessionId)`。
+3. **修改 `VsockTerminalClient.java`**:
+   - 在 `connect(int guestCid, byte[] sessionId, listener)` 中，呼叫 `Os.connect(mSocketFd, new VmSocketAddress(VPORT_PTY, guestCid))`（或相應 POSIX `sockaddr_vm` 連線結構），建立真實的 AF_VSOCK Socket 傳輸通道。
+4. **維護與擴充單元測試**:
+   - 確保 `TerminalAppUnitTest.java` 與 `ChallengerM3EmpiricalTest.java` 覆蓋動態 Session ID 及 Socket Connect。
+
+### 驗證指令 (Verification Commands):
+```bash
+# 1. 執行 Tier 1 M3 功能測試 (35/35 通過)
+cd /Users/iml1s/Documents/mine/aosp-linux && python3 tests/e2e/runner.py --tier 1 --feature F-R3
+
+# 2. 執行 Tier 2 M3 邊界測試 (35/35 通過)
+cd /Users/iml1s/Documents/mine/aosp-linux && python3 tests/e2e/runner.py --tier 2 --feature F-R3
+
+# 3. 執行 Java 單元與實證測試
+javac -classpath /Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar:frameworks/base/core/java:packages/apps/LinuxTerminal/src -d /tmp/m3_classes $(find packages/apps/LinuxTerminal/src -name '*.java') tests/unit/TerminalAppUnitTest.java && java -classpath /tmp/m3_classes tests.unit.TerminalAppUnitTest
+
+# 4. 執行 AOSP atest
+atest LinuxTerminalTests
+```

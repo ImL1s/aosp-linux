@@ -79,6 +79,16 @@ public class LinuxWindowBridgeService {
         }
     }
 
+    private static volatile LinuxWindowBridgeService sInstance;
+
+    public static LinuxWindowBridgeService getInstance() {
+        return sInstance;
+    }
+
+    public static void setInstance(LinuxWindowBridgeService instance) {
+        sInstance = instance;
+    }
+
     private final Context mContext;
     private final Map<Integer, WaylandSurface> mSurfaces = new ConcurrentHashMap<>();
     private final Map<String, Integer> mAppToTaskIdMap = new ConcurrentHashMap<>();
@@ -90,6 +100,33 @@ public class LinuxWindowBridgeService {
 
     public LinuxWindowBridgeService(Context context) {
         mContext = context;
+        sInstance = this;
+    }
+
+    public synchronized boolean attachSurfaceControl(int surfaceId, SurfaceControl surfaceControl) {
+        WaylandSurface surface = mSurfaces.get(surfaceId);
+        if (surface == null) {
+            Slog.w(TAG, "attachSurfaceControl: Unknown surfaceId " + surfaceId);
+            return false;
+        }
+        if (surface.surfaceControl != null && surface.surfaceControl != surfaceControl) {
+            surface.surfaceControl.release();
+        }
+        surface.surfaceControl = surfaceControl;
+        Slog.i(TAG, "Attached SurfaceControl to surfaceId " + surfaceId + ": " + surfaceControl);
+        return true;
+    }
+
+    public synchronized boolean registerSurfaceControl(int surfaceId, SurfaceControl surfaceControl, int width, int height) {
+        WaylandSurface surface = mSurfaces.get(surfaceId);
+        if (surface == null) {
+            Slog.w(TAG, "registerSurfaceControl: Unknown surfaceId " + surfaceId);
+            return false;
+        }
+        attachSurfaceControl(surfaceId, surfaceControl);
+        configureSurface(surfaceId, width, height);
+        Slog.i(TAG, "Registered SurfaceControl for surfaceId " + surfaceId + " with dimensions " + width + "x" + height);
+        return true;
     }
 
     public synchronized void onVmStateChanged(boolean isRunning) {
@@ -154,6 +191,49 @@ public class LinuxWindowBridgeService {
         return true;
     }
 
+    public synchronized boolean commitFrame(int surfaceId, HardwareBuffer buffer) {
+        WaylandSurface surface = mSurfaces.get(surfaceId);
+        if (surface == null) {
+            Slog.w(TAG, "commitFrame: Unknown surfaceId " + surfaceId);
+            return false;
+        }
+        if (buffer == null) {
+            Slog.w(TAG, "commitFrame: Null HardwareBuffer provided for surfaceId " + surfaceId);
+            return false;
+        }
+
+        long nowNs = System.nanoTime();
+        if (nowNs - surface.lastCommitNs < FRAME_PACING_MIN_INTERVAL_NS) {
+            Slog.d(TAG, "commitFrame: Frame dropped due to frame pacing rate limiting on surface " + surfaceId);
+            return false;
+        }
+
+        // Close previous frame buffer to avoid graphics memory leak
+        if (surface.currentBuffer != null && surface.currentBuffer != buffer) {
+            surface.currentBuffer.close();
+        }
+        surface.currentBuffer = buffer;
+
+        // Apply SurfaceControl Transaction
+        if (surface.surfaceControl != null && surface.surfaceControl.isValid()) {
+            try {
+                SurfaceControl.Transaction transaction = new SurfaceControl.Transaction();
+                transaction.setBuffer(surface.surfaceControl, buffer);
+                transaction.setVisibility(surface.surfaceControl, true);
+                transaction.apply();
+            } catch (Exception e) {
+                Slog.e(TAG, "Failed to apply SurfaceControl transaction for surfaceId " + surfaceId + ": " + e.getMessage());
+            }
+        } else {
+            Slog.w(TAG, "commitFrame: SurfaceControl is null or invalid for surfaceId " + surfaceId);
+        }
+
+        surface.lastCommitNs = nowNs;
+        surface.committedFrames++;
+        Slog.d(TAG, "HardwareBuffer frame committed for surface " + surfaceId + " (total frames: " + surface.committedFrames + ")");
+        return true;
+    }
+
     public synchronized boolean destroySurface(int surfaceId) {
         WaylandSurface surface = mSurfaces.remove(surfaceId);
         if (surface != null) {
@@ -166,6 +246,13 @@ public class LinuxWindowBridgeService {
                 surface.currentBuffer = null;
             }
             if (surface.surfaceControl != null) {
+                if (surface.surfaceControl.isValid()) {
+                    try {
+                        SurfaceControl.Transaction transaction = new SurfaceControl.Transaction();
+                        transaction.reparent(surface.surfaceControl, null);
+                        transaction.apply();
+                    } catch (Exception ignored) {}
+                }
                 surface.surfaceControl.release();
                 surface.surfaceControl = null;
             }

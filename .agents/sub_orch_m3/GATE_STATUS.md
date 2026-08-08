@@ -1,17 +1,11 @@
-# Gate Status — Milestone M3 (Iteration 3 Final)
-
-## Gate Evaluation Summary
-- Date: 2026-08-06T19:32:00+08:00
-- Iteration: 3 / 32
-- Verdict: **PASS**
-
-## Detailed Verdict Table
-| Agent | Role | Verdict | Handoff Path | Key Findings / Verification Summary |
-|-------|------|---------|--------------|------------------------------------|
-| reviewer_m3_1_r3 | Reviewer 1 (R3) | APPROVE | `/Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m3_1_r3/handoff.md` | `javac` exit code 0; JNI symbol alignment 100%; C++ native test passed; 8/8 Java unit tests & 80/80 E2E tests passed. |
-| reviewer_m3_2_r3 | Reviewer 2 (R3) | APPROVE | `/Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m3_2_r3/handoff.md` | `TouchpadController.java` relative delta tracking & DEC SGR 1006 formatting verified; `VsockTerminalClient` socket frame transmission verified. |
-| challenger_m3_1_r3 | Challenger 1 (R3) | APPROVE | `/Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_1_r3/handoff.md` | Empirical execution of `javac`, `TerminalAppUnitTest`, C++ `m3_native_terminal_test`, and `python3 tests/e2e/runner.py --filter F-R3` (100% pass rate). |
-| challenger_m3_2_r3 | Challenger 2 (R3) | APPROVE | `/Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2_r3/handoff.md` | Empirical stress testing across 5 boundary dimensions (1,000 rapid motions, coordinate clamping, tap vs long press timing, two-finger drag scroll, socket loopback stream parsing) passed 100%. |
-| auditor_m3_1_r3 | Forensic Auditor (R3) | CLEAN | `/Users/iml1s/Documents/mine/aosp-linux/.agents/auditor_m3_1_r3/handoff.md` | Zero facade classes, zero empty stubs, zero log-only pseudo-sends, 100% genuine implementation. |
+## Gate — Iteration 1
+| Agent | Role | Verdict | Source |
+|-------|------|---------|--------|
+| worker_1 (29315598) | teamwork_preview_worker | DONE (build passed) | handoff.md |
+| reviewer_1 (364b6580) | teamwork_preview_reviewer | APPROVE | handoff.md |
+| reviewer_2 (4c239075) | teamwork_preview_reviewer | APPROVE | handoff.md |
+| challenger_1 (aa4ecbc3) | teamwork_preview_challenger | APPROVE | handoff.md |
+| challenger_2 (43defbf5) | teamwork_preview_challenger | APPROVE | handoff.md |
+| auditor_1 (d849b3b1) | teamwork_preview_auditor | CLEAN | handoff.md |
 
 Gate Result: **PASS**

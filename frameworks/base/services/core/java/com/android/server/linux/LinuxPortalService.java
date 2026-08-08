@@ -16,9 +16,29 @@
 
 package com.android.server.linux;
 
+import android.app.AppOpsManager;
 import android.content.Context;
+import android.graphics.ImageFormat;
+import android.hardware.camera2.CameraCaptureSession;
+import android.hardware.camera2.CameraDevice;
+import android.hardware.camera2.CameraManager;
+import android.hardware.camera2.CaptureRequest;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.media.AudioFormat;
+import android.media.AudioRecord;
+import android.media.ImageReader;
+import android.media.MediaRecorder;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.Process;
+
 import android.util.Slog;
 
+import java.io.OutputStream;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,6 +50,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class LinuxPortalService {
     private static final String TAG = "LinuxPortalService";
+    private static volatile LinuxPortalService sInstance;
 
     // AppOps Constants
     public static final String OP_CAMERA = "OP_CAMERA";
@@ -41,6 +62,8 @@ public class LinuxPortalService {
     public static final String MODE_DENIED = "DENIED";
     public static final String MODE_PROMPT = "PROMPT";
 
+    private static final int VSOCK_PORTAL_PORT = 5000;
+
     private final Context mContext;
     private final Map<String, Map<String, String>> mAppOpsStore = new ConcurrentHashMap<>();
     private final Map<String, CameraSession> mCameraSessions = new ConcurrentHashMap<>();
@@ -51,6 +74,26 @@ public class LinuxPortalService {
     private boolean mHardwareCameraPluggedIn = true;
     private boolean mAndroidAppActiveForCamera = false;
     private boolean mGpsMasterEnabled = true;
+
+    private CameraManager mCameraManager;
+    private AudioRecord mAudioRecord;
+    private Thread mAudioRecordThread;
+    private LocationManager mLocationManager;
+
+    private CameraDevice mActiveCameraDevice;
+    private CameraCaptureSession mActiveCaptureSession;
+    private String mActiveCameraId;
+    private String mOpeningCameraId;
+    private ImageReader mActiveImageReader;
+    private HandlerThread mCameraThread;
+    private Handler mCameraHandler;
+    private int mAudioRecordChannelConfig = AudioFormat.CHANNEL_IN_MONO;
+
+    private LocationListener mSystemLocationListener;
+
+    private Socket mAudioSocket;
+    private OutputStream mAudioOutputStream;
+    private final Object mAudioSocketLock = new Object();
 
     public static class CameraSession {
         public final String appId;
@@ -91,20 +134,69 @@ public class LinuxPortalService {
     public static class LocationSession {
         public final String appId;
         public final String sessionId;
+        public final boolean isCoarseOnly;
         public double lastLatitude;
         public double lastLongitude;
         public double lastTimestamp;
         public boolean isActive;
 
-        public LocationSession(String appId, String sessionId) {
+        public LocationSession(String appId, String sessionId, boolean isCoarseOnly) {
             this.appId = appId;
             this.sessionId = sessionId;
+            this.isCoarseOnly = isCoarseOnly;
             this.isActive = true;
         }
+
+        public LocationSession(String appId, String sessionId) {
+            this(appId, sessionId, false);
+        }
+    }
+
+    public static LinuxPortalService getInstance() {
+        return sInstance;
     }
 
     public LinuxPortalService(Context context) {
         mContext = context;
+        sInstance = this;
+        initSystemServices();
+    }
+
+    private void initSystemServices() {
+        if (mContext == null) {
+            return;
+        }
+        try {
+            mCameraManager = mContext.getSystemService(CameraManager.class);
+            if (mCameraManager != null) {
+                mCameraManager.registerAvailabilityCallback(new CameraManager.AvailabilityCallback() {
+                    @Override
+                    public void onCameraUnavailable(String cameraId) {
+                        if ((mActiveCameraId != null && mActiveCameraId.equals(cameraId))
+                                || (mOpeningCameraId != null && mOpeningCameraId.equals(cameraId))) {
+                            Slog.i(TAG, "Ignoring AvailabilityCallback self-cancellation for camera " + cameraId);
+                            return;
+                        }
+                        Slog.w(TAG, "Camera " + cameraId + " unavailable (contention with native Android app)");
+                        setAndroidAppActiveForCamera(true);
+                    }
+
+                    @Override
+                    public void onCameraAvailable(String cameraId) {
+                        Slog.i(TAG, "Camera " + cameraId + " available again");
+                        setAndroidAppActiveForCamera(false);
+                    }
+                }, null);
+            }
+        } catch (Exception e) {
+            Slog.w(TAG, "CameraManager init skipped or failed: " + e.getMessage());
+        }
+
+        try {
+            mLocationManager = mContext.getSystemService(LocationManager.class);
+        } catch (Exception e) {
+            Slog.w(TAG, "LocationManager init skipped or failed: " + e.getMessage());
+        }
     }
 
     // AppOps Permission Control
@@ -113,12 +205,56 @@ public class LinuxPortalService {
         Slog.i(TAG, "AppOps set: " + appId + " [" + op + "] -> " + mode);
     }
 
+    public int noteAppOp(String appId, String op) {
+        if (mContext != null) {
+            AppOpsManager appOps = mContext.getSystemService(AppOpsManager.class);
+            if (appOps != null) {
+                String opStr = mapOpToOpStr(op);
+                if (opStr != null) {
+                    try {
+                        int uid = Process.myUid();
+                        return appOps.noteOpNoThrow(opStr, uid, appId);
+                    } catch (Exception ignored) {}
+                }
+            }
+        }
+        return AppOpsManager.MODE_ALLOWED;
+    }
+
     public String checkAppOp(String appId, String op) {
+        if (mContext != null) {
+            AppOpsManager appOps = mContext.getSystemService(AppOpsManager.class);
+            if (appOps != null) {
+                String opStr = mapOpToOpStr(op);
+                if (opStr != null) {
+                    try {
+                        int uid = Process.myUid();
+                        int mode = appOps.unsafeCheckOpRaw(opStr, uid, appId);
+                        if (mode == AppOpsManager.MODE_ALLOWED || mode == AppOpsManager.MODE_FOREGROUND) {
+                            return MODE_ALLOWED;
+                        } else if (mode == AppOpsManager.MODE_ERRORED || mode == AppOpsManager.MODE_IGNORED) {
+                            return MODE_DENIED;
+                        }
+                    } catch (Exception ignored) {
+                        // Fall back to in-memory store if system call throws (e.g. unknown package in unit test)
+                    }
+                }
+            }
+        }
+
         Map<String, String> ops = mAppOpsStore.get(appId);
         if (ops != null && ops.containsKey(op)) {
             return ops.get(op);
         }
         return MODE_PROMPT;
+    }
+
+    private String mapOpToOpStr(String op) {
+        if (OP_CAMERA.equals(op)) return AppOpsManager.OPSTR_CAMERA;
+        if (OP_RECORD_AUDIO.equals(op)) return AppOpsManager.OPSTR_RECORD_AUDIO;
+        if (OP_FINE_LOCATION.equals(op)) return AppOpsManager.OPSTR_FINE_LOCATION;
+        if (OP_COARSE_LOCATION.equals(op)) return AppOpsManager.OPSTR_COARSE_LOCATION;
+        return null;
     }
 
     private boolean resolveAppOpOrPrompt(String appId, String op) {
@@ -152,10 +288,15 @@ public class LinuxPortalService {
             Slog.w(TAG, "Camera contention: native Android app active, denying guest stream");
             return false;
         }
+        noteAppOp(appId, OP_CAMERA);
         return true;
     }
 
     public CameraSession startCameraStream(String appId, String sessionId, int requestedW, int requestedH, int requestedFps) {
+        if (requestedW <= 0 || requestedH <= 0 || requestedFps <= 0) {
+            Slog.w(TAG, "Invalid camera stream parameters: " + requestedW + "x" + requestedH + "@" + requestedFps);
+            return null;
+        }
         if (!requestCameraAccess(appId)) {
             return null;
         }
@@ -167,9 +308,94 @@ public class LinuxPortalService {
             Slog.i(TAG, "Camera resolution mismatch fallback -> 1920x1080@30fps");
         }
 
+        openHardwareCamera(finalW, finalH);
+
         CameraSession session = new CameraSession(appId, sessionId, finalW, finalH, finalFps);
         mCameraSessions.put(sessionId, session);
         return session;
+    }
+
+    private void openHardwareCamera(int width, int height) {
+        if (mContext == null || mCameraManager == null || !mHardwareCameraPluggedIn || mAndroidAppActiveForCamera) {
+            return;
+        }
+        try {
+            String[] cameraIds = mCameraManager.getCameraIdList();
+            if (cameraIds.length == 0) return;
+            String cameraId = cameraIds[0];
+
+            if (mCameraThread == null) {
+                mCameraThread = new HandlerThread("LinuxCameraPortalThread");
+                mCameraThread.start();
+                mCameraHandler = new Handler(mCameraThread.getLooper());
+            }
+
+            if (mActiveImageReader == null) {
+                mActiveImageReader = ImageReader.newInstance(width, height, ImageFormat.YUV_420_888, 2);
+                mActiveImageReader.setOnImageAvailableListener(reader -> {
+                    try (android.media.Image img = reader.acquireNextImage()) {
+                        if (img != null) {
+                            sendVsockFrame("/dev/video0", width, height);
+                        }
+                    } catch (Exception ignored) {}
+                }, mCameraHandler);
+            }
+
+            if (mActiveCameraDevice == null) {
+                mOpeningCameraId = cameraId;
+                mCameraManager.openCamera(cameraId, new CameraDevice.StateCallback() {
+                    @Override
+                    public void onOpened(CameraDevice camera) {
+                        mActiveCameraDevice = camera;
+                        mActiveCameraId = cameraId;
+                        mOpeningCameraId = null;
+                        Slog.i(TAG, "Hardware camera opened successfully for ID: " + cameraId);
+                        try {
+                            if (mActiveImageReader != null && mActiveImageReader.getSurface() != null) {
+                                camera.createCaptureSession(Arrays.asList(mActiveImageReader.getSurface()),
+                                        new CameraCaptureSession.StateCallback() {
+                                            @Override
+                                            public void onConfigured(CameraCaptureSession session) {
+                                                mActiveCaptureSession = session;
+                                                try {
+                                                    CaptureRequest.Builder builder = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+                                                    builder.addTarget(mActiveImageReader.getSurface());
+                                                    session.setRepeatingRequest(builder.build(), null, mCameraHandler);
+                                                    Slog.i(TAG, "CameraCaptureSession configured and setRepeatingRequest started");
+                                                } catch (Exception e) {
+                                                    Slog.w(TAG, "Failed to start camera repeating request: " + e.getMessage());
+                                                }
+                                            }
+
+                                            @Override
+                                            public void onConfigureFailed(CameraCaptureSession session) {
+                                                Slog.w(TAG, "CameraCaptureSession configuration failed");
+                                                closeHardwareCamera();
+                                            }
+                                        }, mCameraHandler);
+                            }
+                        } catch (Exception e) {
+                            Slog.w(TAG, "Failed to create CameraCaptureSession: " + e.getMessage());
+                        }
+                    }
+
+                    @Override
+                    public void onDisconnected(CameraDevice camera) {
+                        mOpeningCameraId = null;
+                        closeHardwareCamera();
+                    }
+
+                    @Override
+                    public void onError(CameraDevice camera, int error) {
+                        mOpeningCameraId = null;
+                        closeHardwareCamera();
+                    }
+                }, mCameraHandler);
+            }
+        } catch (Exception e) {
+            mOpeningCameraId = null;
+            Slog.w(TAG, "Failed to open hardware camera: " + e.getMessage());
+        }
     }
 
     public void stopCameraStream(String sessionId) {
@@ -178,10 +404,42 @@ public class LinuxPortalService {
             session.isActive = false;
             Slog.i(TAG, "Camera session stopped and hardware resource released for " + sessionId);
         }
+        if (mCameraSessions.isEmpty()) {
+            closeHardwareCamera();
+        }
+    }
+
+    private void closeHardwareCamera() {
+        if (mActiveCaptureSession != null) {
+            try { mActiveCaptureSession.close(); } catch (Exception ignored) {}
+            mActiveCaptureSession = null;
+        }
+        if (mActiveCameraDevice != null) {
+            try { mActiveCameraDevice.close(); } catch (Exception ignored) {}
+            mActiveCameraDevice = null;
+        }
+        mActiveCameraId = null;
+        mOpeningCameraId = null;
+        if (mActiveImageReader != null) {
+            try { mActiveImageReader.close(); } catch (Exception ignored) {}
+            mActiveImageReader = null;
+        }
+        if (mCameraThread != null) {
+            mCameraThread.quitSafely();
+            mCameraThread = null;
+            mCameraHandler = null;
+        }
     }
 
     public void setHardwareCameraPluggedIn(boolean pluggedIn) {
         mHardwareCameraPluggedIn = pluggedIn;
+        if (!pluggedIn) {
+            Slog.w(TAG, "Hardware camera unplugged -> deactivating camera sessions");
+            for (CameraSession s : mCameraSessions.values()) {
+                s.isActive = false;
+            }
+            closeHardwareCamera();
+        }
     }
 
     public void setAndroidAppActiveForCamera(boolean active) {
@@ -189,6 +447,19 @@ public class LinuxPortalService {
         if (active) {
             for (CameraSession s : mCameraSessions.values()) {
                 s.isActive = false;
+            }
+            closeHardwareCamera();
+        } else {
+            boolean hasActiveSessions = false;
+            int maxW = 0, maxH = 0;
+            for (CameraSession s : mCameraSessions.values()) {
+                s.isActive = true;
+                hasActiveSessions = true;
+                if (s.width > maxW) maxW = s.width;
+                if (s.height > maxH) maxH = s.height;
+            }
+            if (hasActiveSessions && mHardwareCameraPluggedIn && mActiveCameraDevice == null) {
+                openHardwareCamera(maxW > 0 ? maxW : 1920, maxH > 0 ? maxH : 1080);
             }
         }
     }
@@ -199,6 +470,7 @@ public class LinuxPortalService {
             Slog.w(TAG, "Microphone access denied by AppOps/Prompt for " + appId);
             return false;
         }
+        noteAppOp(appId, OP_RECORD_AUDIO);
         return true;
     }
 
@@ -206,6 +478,41 @@ public class LinuxPortalService {
         if (!requestMicrophoneAccess(appId)) {
             return null;
         }
+
+        if (mContext != null && mAudioRecord == null) {
+            try {
+                int channelConfig = (channels == 1) ? AudioFormat.CHANNEL_IN_MONO : AudioFormat.CHANNEL_IN_STEREO;
+                mAudioRecordChannelConfig = channelConfig;
+                int minBuf = AudioRecord.getMinBufferSize(sampleRate, channelConfig, AudioFormat.ENCODING_PCM_16BIT);
+                int bufSize = Math.max(minBuf, 2048);
+                mAudioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, channelConfig, AudioFormat.ENCODING_PCM_16BIT, bufSize);
+
+                if (mAudioRecord.getState() == AudioRecord.STATE_INITIALIZED) {
+                    mAudioRecord.startRecording();
+                    mAudioRecordThread = new Thread(() -> {
+                        byte[] buffer = new byte[1024];
+                        while (mAudioRecord != null && mAudioRecord.getRecordingState() == AudioRecord.RECORDSTATE_RECORDING) {
+                            int read = mAudioRecord.read(buffer, 0, buffer.length);
+                            if (read > 0) {
+                                byte[] rawPcm = Arrays.copyOf(buffer, read);
+                                for (MicSession session : mMicSessions.values()) {
+                                    if (session.isRecording && session.isForeground) {
+                                        byte[] processed = processMicPcmFrame(session, rawPcm);
+                                        if (processed.length > 0) {
+                                            sendVsockAudioPayload(processed);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }, "LinuxAudioPortalThread");
+                    mAudioRecordThread.start();
+                }
+            } catch (Exception e) {
+                Slog.w(TAG, "AudioRecord init failed for session " + sessionId + ": " + e.getMessage());
+            }
+        }
+
         MicSession session = new MicSession(appId, sessionId, sampleRate, channels);
         mMicSessions.put(sessionId, session);
         return session;
@@ -221,14 +528,29 @@ public class LinuxPortalService {
             Arrays.fill(silence, (byte) 0);
             return silence;
         }
+
+        byte[] pcmToProcess = rawInput;
+        if (mAudioRecordChannelConfig == AudioFormat.CHANNEL_IN_STEREO && session.channels == 1 && rawInput.length >= 4) {
+            int numFrames = rawInput.length / 4;
+            byte[] monoBytes = new byte[numFrames * 2];
+            for (int i = 0; i < numFrames; i++) {
+                short left = (short) ((rawInput[i * 4] & 0xFF) | ((rawInput[i * 4 + 1] & 0xFF) << 8));
+                short right = (short) ((rawInput[i * 4 + 2] & 0xFF) | ((rawInput[i * 4 + 3] & 0xFF) << 8));
+                short mono = downmixStereoToMono(left, right);
+                monoBytes[i * 2] = (byte) (mono & 0xFF);
+                monoBytes[i * 2 + 1] = (byte) ((mono >> 8) & 0xFF);
+            }
+            pcmToProcess = monoBytes;
+        }
+
         // Buffer underflow mitigation
-        if (rawInput.length < 1024) {
+        if (pcmToProcess.length < 1024) {
             byte[] padded = new byte[1024];
-            System.arraycopy(rawInput, 0, padded, 0, rawInput.length);
-            Arrays.fill(padded, rawInput.length, 1024, (byte) 0);
+            System.arraycopy(pcmToProcess, 0, padded, 0, pcmToProcess.length);
+            Arrays.fill(padded, pcmToProcess.length, 1024, (byte) 0);
             return padded;
         }
-        return rawInput;
+        return pcmToProcess;
     }
 
     public short downmixStereoToMono(short left, short right) {
@@ -254,6 +576,29 @@ public class LinuxPortalService {
         if (session != null) {
             session.isRecording = false;
         }
+        if (mMicSessions.isEmpty()) {
+            stopHardwareAudio();
+        }
+    }
+
+    private void stopHardwareAudio() {
+        mAudioRecordChannelConfig = AudioFormat.CHANNEL_IN_MONO;
+        if (mAudioRecord != null) {
+            try {
+                mAudioRecord.stop();
+                mAudioRecord.release();
+            } catch (Exception ignored) {}
+            mAudioRecord = null;
+        }
+        if (mAudioRecordThread != null) {
+            try {
+                mAudioRecordThread.join(500);
+            } catch (InterruptedException ignored) {}
+            mAudioRecordThread = null;
+        }
+        synchronized (mAudioSocketLock) {
+            closeAudioSocketLocked();
+        }
     }
 
     // F-R5-003: XDG Portal Location Bridge
@@ -262,11 +607,59 @@ public class LinuxPortalService {
             Slog.w(TAG, "GPS master switch is disabled for " + appId);
             throw new PermissionError("PermissionError: Location access denied or GPS disabled");
         }
-        if (!resolveAppOpOrPrompt(appId, OP_FINE_LOCATION)) {
+        boolean fineAllowed = resolveAppOpOrPrompt(appId, OP_FINE_LOCATION);
+        boolean coarseAllowed = fineAllowed || resolveAppOpOrPrompt(appId, OP_COARSE_LOCATION);
+        if (!coarseAllowed) {
             Slog.w(TAG, "Location access denied by AppOps/Prompt for " + appId);
             throw new PermissionError("PermissionError: Location access denied or GPS disabled");
         }
+        noteAppOp(appId, fineAllowed ? OP_FINE_LOCATION : OP_COARSE_LOCATION);
+        registerSystemLocationListener();
         return true;
+    }
+
+    public LocationSession startLocationStream(String appId, String sessionId) {
+        if (!requestLocationAccess(appId)) {
+            return null;
+        }
+        boolean fineAllowed = MODE_ALLOWED.equals(checkAppOp(appId, OP_FINE_LOCATION));
+        LocationSession session = new LocationSession(appId, sessionId, !fineAllowed);
+        mLocationSessions.put(sessionId, session);
+        return session;
+    }
+
+    private void registerSystemLocationListener() {
+        if (mContext != null && mLocationManager != null && mSystemLocationListener == null) {
+            try {
+                mSystemLocationListener = new LocationListener() {
+                    @Override
+                    public void onLocationChanged(Location location) {
+                        if (location != null) {
+                            double rawLat = location.getLatitude();
+                            double rawLon = location.getLongitude();
+                            float rawAcc = location.getAccuracy();
+
+                            for (LocationSession session : mLocationSessions.values()) {
+                                if (session.isActive) {
+                                    double[] coords = getObfuscatedLocation(rawLat, rawLon, session.isCoarseOnly);
+                                    float accuracy = session.isCoarseOnly ? Math.max(rawAcc, 1000.0f) : rawAcc;
+                                    session.lastLatitude = coords[0];
+                                    session.lastLongitude = coords[1];
+                                    session.lastTimestamp = System.currentTimeMillis();
+                                    sendGeoClueLocationUpdate(coords[0], coords[1], accuracy);
+                                }
+                            }
+                            if (mLocationSessions.isEmpty()) {
+                                sendGeoClueLocationUpdate(rawLat, rawLon, rawAcc);
+                            }
+                        }
+                    }
+                };
+                mLocationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 1.0f, mSystemLocationListener);
+            } catch (Exception e) {
+                Slog.w(TAG, "LocationManager request updates failed: " + e.getMessage());
+            }
+        }
     }
 
     public double[] getObfuscatedLocation(double exactLat, double exactLon, boolean isCoarseOnly) {
@@ -285,6 +678,78 @@ public class LinuxPortalService {
     public void unsubscribeLocationSession(String appId, String sessionId) {
         mLocationSessions.remove(sessionId);
         Slog.i(TAG, "Unsubscribed location session for " + appId);
+        if (mLocationSessions.isEmpty() && mContext != null && mLocationManager != null && mSystemLocationListener != null) {
+            try {
+                mLocationManager.removeUpdates(mSystemLocationListener);
+                mSystemLocationListener = null;
+            } catch (Exception ignored) {}
+        }
+    }
+
+    // VM Lifecycle Cleanup Hook
+    public void onVmStoppedOrSuspended() {
+        Slog.i(TAG, "VM stopped or suspended -> releasing hardware portal resources");
+        for (String sessionId : mCameraSessions.keySet()) {
+            stopCameraStream(sessionId);
+        }
+        for (String sessionId : mMicSessions.keySet()) {
+            stopMicStream(sessionId);
+        }
+        mLocationSessions.clear();
+        if (mContext != null && mLocationManager != null && mSystemLocationListener != null) {
+            try {
+                mLocationManager.removeUpdates(mSystemLocationListener);
+                mSystemLocationListener = null;
+            } catch (Exception ignored) {}
+        }
+        synchronized (mAudioSocketLock) {
+            closeAudioSocketLocked();
+        }
+    }
+
+    // Vsock streaming helper routines (Port 5000)
+    private void sendVsockFrame(String devNode, int width, int height) {
+        try (Socket s = new Socket("localhost", VSOCK_PORTAL_PORT)) {
+            OutputStream out = s.getOutputStream();
+            String msg = "CAM_FRAME:" + devNode + ":" + width + "x" + height + "\n";
+            out.write(msg.getBytes(StandardCharsets.UTF_8));
+            out.flush();
+        } catch (Exception ignored) {}
+    }
+
+    private void sendVsockAudioPayload(byte[] pcmData) {
+        synchronized (mAudioSocketLock) {
+            try {
+                if (mAudioSocket == null || mAudioSocket.isClosed() || !mAudioSocket.isConnected()) {
+                    mAudioSocket = new Socket("localhost", VSOCK_PORTAL_PORT);
+                    mAudioOutputStream = mAudioSocket.getOutputStream();
+                }
+                mAudioOutputStream.write(pcmData);
+                mAudioOutputStream.flush();
+            } catch (Exception e) {
+                closeAudioSocketLocked();
+            }
+        }
+    }
+
+    private void closeAudioSocketLocked() {
+        if (mAudioOutputStream != null) {
+            try { mAudioOutputStream.close(); } catch (Exception ignored) {}
+            mAudioOutputStream = null;
+        }
+        if (mAudioSocket != null) {
+            try { mAudioSocket.close(); } catch (Exception ignored) {}
+            mAudioSocket = null;
+        }
+    }
+
+    private void sendGeoClueLocationUpdate(double lat, double lon, float accuracy) {
+        try (Socket s = new Socket("localhost", VSOCK_PORTAL_PORT)) {
+            OutputStream out = s.getOutputStream();
+            String json = "{\"Latitude\":" + lat + ",\"Longitude\":" + lon + ",\"Accuracy\":" + accuracy + "}\n";
+            out.write(json.getBytes(StandardCharsets.UTF_8));
+            out.flush();
+        } catch (Exception ignored) {}
     }
 
     // Custom Runtime Exception classes matching tests
@@ -300,4 +765,3 @@ public class LinuxPortalService {
         }
     }
 }
-

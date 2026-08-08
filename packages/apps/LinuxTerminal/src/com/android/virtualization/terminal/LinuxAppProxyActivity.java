@@ -31,12 +31,14 @@ import android.os.Bundle;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.MotionEvent;
+import android.view.SurfaceControl;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 
+import com.android.server.linux.LinuxWindowBridgeService;
 import com.android.virtualization.terminal.window.WindowResizePacer;
 
 import java.io.DataOutputStream;
@@ -217,26 +219,41 @@ public class LinuxAppProxyActivity extends Activity implements SurfaceHolder.Cal
     public void surfaceCreated(SurfaceHolder holder) {
         Log.i(TAG, "Surface created for LinuxAppProxyActivity surfaceId: " + mSurfaceId);
         updateWindowDimensions();
+
+        SurfaceControl surfaceControl = mSurfaceView.getSurfaceControl();
+        if (surfaceControl != null && surfaceControl.isValid()) {
+            Log.i(TAG, "Registering SurfaceControl to LinuxWindowBridgeService for surfaceId: " + mSurfaceId);
+            attachSurfaceControlToBridge(mSurfaceId, surfaceControl);
+        } else {
+            Log.w(TAG, "SurfaceControl is null or invalid on surfaceCreated for surfaceId: " + mSurfaceId);
+        }
     }
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-        Log.i(TAG, "Surface changed width: " + width + " height: " + height);
+        Log.i(TAG, "Surface changed width: " + width + " height: " + height + " for surfaceId: " + mSurfaceId);
         mWidth = width;
         mHeight = height;
         if (mResizePacer != null) {
             mResizePacer.requestResize(width, height);
+        }
+
+        SurfaceControl surfaceControl = mSurfaceView.getSurfaceControl();
+        if (surfaceControl != null && surfaceControl.isValid()) {
+            attachSurfaceControlToBridge(mSurfaceId, surfaceControl);
         }
     }
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
         Log.i(TAG, "Surface destroyed for LinuxAppProxyActivity surfaceId: " + mSurfaceId);
+        detachSurfaceControlFromBridge(mSurfaceId);
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        detachSurfaceControlFromBridge(mSurfaceId);
         Log.i(TAG, "LinuxAppProxyActivity destroyed for task " + getTaskId());
     }
 
@@ -244,6 +261,71 @@ public class LinuxAppProxyActivity extends Activity implements SurfaceHolder.Cal
     public String getAppId() { return mAppId; }
     public int getTargetWidth() { return mWidth; }
     public int getTargetHeight() { return mHeight; }
+
+    private void attachSurfaceControlToBridge(int surfaceId, SurfaceControl surfaceControl) {
+        if (surfaceId <= 0) {
+            Log.w(TAG, "Invalid surfaceId: " + surfaceId + ", skipping attachSurfaceControl");
+            return;
+        }
+
+        // Path 1: Direct Class Access (when LinuxWindowBridgeService is in current classpath)
+        try {
+            LinuxWindowBridgeService service = LinuxWindowBridgeService.getInstance();
+            if (service != null) {
+                service.attachSurfaceControl(surfaceId, surfaceControl);
+                Log.i(TAG, "Successfully attached SurfaceControl via direct instance call for surfaceId: " + surfaceId);
+                return;
+            }
+        } catch (Throwable t) {
+            Log.d(TAG, "Direct LinuxWindowBridgeService access failed, attempting reflection fallback: " + t.getMessage());
+        }
+
+        // Path 2: Reflection Fallback Access (for decoupled process/package environments)
+        try {
+            Class<?> bridgeClass = Class.forName("com.android.server.linux.LinuxWindowBridgeService");
+            java.lang.reflect.Method getInstanceMethod = bridgeClass.getMethod("getInstance");
+            Object instance = getInstanceMethod.invoke(null);
+            if (instance != null) {
+                java.lang.reflect.Method attachMethod = bridgeClass.getMethod("attachSurfaceControl", int.class, SurfaceControl.class);
+                attachMethod.invoke(instance, surfaceId, surfaceControl);
+                Log.i(TAG, "Successfully attached SurfaceControl via reflection for surfaceId: " + surfaceId);
+            } else {
+                Log.w(TAG, "LinuxWindowBridgeService.getInstance() returned null via reflection");
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to attach SurfaceControl to LinuxWindowBridgeService for surfaceId " + surfaceId + ": " + e.getMessage());
+        }
+    }
+
+    private void detachSurfaceControlFromBridge(int surfaceId) {
+        if (surfaceId <= 0) return;
+
+        // Path 1: Direct Class Access
+        try {
+            LinuxWindowBridgeService service = LinuxWindowBridgeService.getInstance();
+            if (service != null) {
+                service.attachSurfaceControl(surfaceId, null);
+                Log.i(TAG, "Successfully detached SurfaceControl via direct instance call for surfaceId: " + surfaceId);
+                return;
+            }
+        } catch (Throwable t) {
+            Log.d(TAG, "Direct LinuxWindowBridgeService detach failed, attempting reflection fallback: " + t.getMessage());
+        }
+
+        // Path 2: Reflection Fallback Access
+        try {
+            Class<?> bridgeClass = Class.forName("com.android.server.linux.LinuxWindowBridgeService");
+            java.lang.reflect.Method getInstanceMethod = bridgeClass.getMethod("getInstance");
+            Object instance = getInstanceMethod.invoke(null);
+            if (instance != null) {
+                java.lang.reflect.Method attachMethod = bridgeClass.getMethod("attachSurfaceControl", int.class, SurfaceControl.class);
+                attachMethod.invoke(instance, surfaceId, (Object) null);
+                Log.i(TAG, "Successfully detached SurfaceControl via reflection for surfaceId: " + surfaceId);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to detach SurfaceControl from LinuxWindowBridgeService for surfaceId " + surfaceId + ": " + e.getMessage());
+        }
+    }
 
     private void sendVsockConfigureFrame(int surfaceId, int width, int height) {
         try {

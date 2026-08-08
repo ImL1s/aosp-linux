@@ -1,90 +1,109 @@
-# Handoff Report: Explorer 1 — Milestone M3 (F-R3-001 & F-R3-002)
+# Handoff Report — Explorer 1 for Milestone M3 (Real Vsock Socket Connect & Session ID - R3)
 
-**Working Directory**: `/Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_1`  
-**Target Milestone**: Milestone M3 (Native Touch Terminal & IME)  
-**Assigned Features**: F-R3-001 (Native Surface Canvas Renderer) & F-R3-002 (libvterm Parser Integration)  
-**Date**: 2026-08-06  
+**From**: Explorer 1 (`explorer_m3_1`)  
+**To**: Implementer 1 / Orchestrator  
+**Milestone**: M3 (Real Vsock Socket Connect & Session ID - R3)  
+**Date**: 2026-08-08  
+**Artifact Path**: `/Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_1/handoff.md`
 
 ---
 
 ## 1. Observation
 
-1. **Existing Application Code**:
-   - Application path: `/Users/iml1s/Documents/mine/aosp-linux/packages/apps/LinuxTerminal/`
-   - Existing activity: `TerminalActivity.java` (Lines 1–50) sets up a basic layout with `TerminalView`.
-   - Existing View: `TerminalView.java` (Lines 1–99) uses standard View `onDraw` with basic paint properties.
-   - Build file: `packages/apps/LinuxTerminal/Android.bp` (Lines 1–19) defines the `LinuxTerminal` platform module linked against `android.system.linux`.
+1. **`VsockTerminalClient.java` Socket Connection Defect**:
+   - **Path**: `packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/net/VsockTerminalClient.java`
+   - **Lines 31-36**:
+     ```java
+     public synchronized void connect(int guestCid, byte[] sessionId, TerminalStreamListener listener) throws IOException {
+         try {
+             mSocketFd = Os.socket(AF_VSOCK, OsConstants.SOCK_STREAM, 0);
+             mInputStream = new FileInputStream(mSocketFd);
+             mOutputStream = new FileOutputStream(mSocketFd);
+             mRunning = true;
+     ```
+   - **Observation**: `Os.socket(AF_VSOCK, OsConstants.SOCK_STREAM, 0)` allocates a socket descriptor `mSocketFd`, but `Os.connect(...)` (or native AF_VSOCK syscall `connect(fd, sockaddr_vm)`) is **never called**. `mInputStream` and `mOutputStream` wrap an unconnected file descriptor. Attempting to read or write on a real kernel vsock driver fails with `ENOTCONN` (*Transport endpoint is not connected*).
 
-2. **Existing Test Infrastructure**:
-   - `tests/e2e/tier1_feature_coverage/test_m3_tier1.py` defines functional test cases `T1-51` through `T1-60` for F-R3-001 and F-R3-002.
-   - `tests/e2e/tier2_boundary_corner/test_m3_tier2.py` defines boundary test cases `T2-51` through `T2-60` for F-R3-001 and F-R3-002.
-   - `tests/e2e/tier3_cross_feature/test_pairwise_matrix.py` defines cross-feature integration test `T3-PAIR-19` verifying libvterm screen updates trigger 60 FPS surface redraws.
+2. **`TerminalView.java` Hardcoded Session ID Defect**:
+   - **Path**: `packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/TerminalView.java`
+   - **Line 49 & Line 82**:
+     ```java
+     private byte[] mSessionId = "0123456789abcdef".getBytes();
+     ...
+     @Override
+     protected void onAttachedToWindow() {
+         super.onAttachedToWindow();
+         connectVsock(GUEST_CID, mSessionId);
+     }
+     ```
+   - **Observation**: `mSessionId` is statically initialized to `"0123456789abcdef"`. The view attaches to the window and connects using this hardcoded ID without requesting a dynamic session ID from `LinuxManagerService`.
 
-3. **System Requirements & Architecture**:
-   - Documented in `PROJECT.md` (Lines 53–54), `SCOPE.md` (Lines 11–13), and `aosp_linux_system_architecture_plan.md` (Lines 308–315).
-   - High-throughput terminal parsing requires C99 `libvterm` integration to eliminate Java String/Regex GC overhead.
-   - Low-latency touch input rendering requires a dedicated `SurfaceView` `RenderThread` aligned with `Choreographer` VSync.
+3. **`LinuxManagerService.java` Session ID Length Defect**:
+   - **Path**: `frameworks/base/services/core/java/com/android/server/linux/LinuxManagerService.java`
+   - **Lines 391-393**:
+     ```java
+     String sessionId = "session_" + (++mNextSessionId);
+     TerminalSession session = new TerminalSession(sessionId, width, height, callback);
+     ```
+   - **Observation**: `createTerminalSession` produces strings such as `"session_1001"` (12 bytes). However, `VsockPtyFramer.java` lines 49 and 67 strictly enforce that `sessionId` must be **exactly 16 bytes**. Passing a 12-byte session ID triggers `IllegalArgumentException: Session ID must be exactly 16 bytes`.
+
+4. **Available Android AF_VSOCK API**:
+   - **Observation**: `android.system.SocketAddressVmSockets` (constructor `SocketAddressVmSockets(int port, int cid)`) combined with `android.system.Os.connect(mSocketFd, address)` is available in Android platform APIs when `platform_apis: true` is set in `Android.bp`.
 
 ---
 
 ## 2. Logic Chain
 
-1. **Premise 1**: The legacy prototype used WebView + xterm.js which consumes ~150MB RAM and adds 45–90ms input latency due to IPC and DOM layout overhead.
-2. **Premise 2**: A native `SurfaceView` with hardware acceleration off the main thread allows lock canvas rendering within a 16.66ms (60 FPS) or 8.33ms (120 FPS) frame budget, reducing rendering latency to <12ms.
-3. **Premise 3**: Standard C99 `libvterm` provides an allocation-free VT100/xterm parser. Binding `libvterm` via JNI (`libvterm_jni.cpp`) allows raw PTY byte streams from vsock Port 5001 to be parsed efficiently directly into a 2D screen cell matrix.
-4. **Premise 4**: Connecting `libvterm` damage callbacks to a double-buffered Java/C++ `TerminalScreenMatrix` enables dirty region updates (`surfaceHolder.lockCanvas(dirtyRect)`), minimizing redrawn pixels and CPU/GPU usage.
-5. **Conclusion**: Designing `NativeSurfaceCanvasRenderer.java` alongside `VTermParser.java` and `libvterm_jni.cpp` fulfills all functional, performance, and memory constraints for F-R3-001 and F-R3-002.
+1. **Observation 1** (`VsockTerminalClient.java:33`) shows `Os.socket(AF_VSOCK, ...)` creates a file descriptor, but omitting `Os.connect(...)` leaves the descriptor unconnected.
+2. Therefore, when `VsockTerminalClient` attempts to read/write via `FileInputStream` or `FileOutputStream`, the kernel returns `ENOTCONN` error.
+3. To fix this, `VsockTerminalClient.connect(...)` must invoke `Os.connect(mSocketFd, new SocketAddressVmSockets(5001, guestCid))` before opening `FileInputStream`/`FileOutputStream`.
+4. **Observation 2** (`TerminalView.java:49`) shows `TerminalView` hardcodes `mSessionId` to `"0123456789abcdef"`, bypassing dynamic session management.
+5. **Observation 3** (`LinuxManagerService.java:392`) shows `createTerminalSession` generates 12-byte session IDs (`"session_1001"`), which violates `VsockPtyFramer`'s requirement of 16-byte binary tokens.
+6. Therefore, `LinuxManagerService` must be updated to generate 16-byte random tokens (or 32 hex character strings representing 16 bytes), and `TerminalView` must dynamically request a session ID from `LinuxManagerService` upon connection.
 
 ---
 
 ## 3. Caveats
 
-- **External C Library Packaging**: `libvterm` C sources (`libvterm/src/*.c` and `libvterm/include/*.h`) should be embedded under `packages/apps/LinuxTerminal/jni/libvterm/` or placed in `external/libvterm/` if shared across other platform native daemons.
-- **Font Fallback**: On devices lacking built-in Monospace bold/italic glyph variants, `Paint.setTextSkewX()` and `Paint.setFakeBoldText()` are used as synthetic fallbacks.
-- **CJK Font Metrics**: CJK ideographs require double-width grid math (`width = 2`). The renderer handles glyph advancement by $2 \times \text{cellWidth}$ for primary cells while skipping continuation dummy cells.
+- **No caveats**: Code locations, line numbers, API signatures (`SocketAddressVmSockets`, `Os.connect`), framing requirements (`VsockPtyFramer`), and test targets were completely verified.
 
 ---
 
-## 4. Conclusion
+## 4. Conclusion & Actionable Recommendations
 
-1. **F-R3-001 (Native Surface Canvas Renderer)**:
-   - File path: `packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/renderer/NativeSurfaceCanvasRenderer.java`
-   - Class hierarchy: Extends `SurfaceView`, implements `SurfaceHolder.Callback`, `Choreographer.FrameCallback`.
-   - Core components: `TerminalSurfaceView`, `GlyphCache` (LRU bitmap cache), `ColorPalette` (16 ANSI / 256 xterm / 24-bit TrueColor), `TerminalScreenMatrix` (double-buffered cell grid).
-   - Performance: Damaged bounding rect partial redrawing, 60/120 FPS VSync alignment, memory reclamation on view detachment.
-
-2. **F-R3-002 (libvterm Parser Integration)**:
-   - Java File path: `packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/parser/VTermParser.java`
-   - Native JNI path: `packages/apps/LinuxTerminal/jni/libvterm_jni.cpp`
-   - Key JNI methods: `nativeInit`, `nativeWrite`, `nativeResize`, `nativeGetScreenMatrix`, `nativeDestroy`.
-   - Parsing Features: 10,000-line ring scrollback buffer (`sb_pushline`), split multi-byte UTF-8 packet reassembly, malformed sequence resilience, alternate screen buffer switching (`\e[?1049h`).
-
-3. **Build Target**:
-   - Shared JNI library `libvterm_jni` compiled via `Android.bp` and linked into `LinuxTerminal` app package.
+### Action Plan for Implementer:
+1. **Modify `VsockTerminalClient.java`**:
+   - Add `import android.system.SocketAddressVmSockets;` and `import java.net.SocketAddress;`.
+   - In `connect(int guestCid, byte[] sessionId, TerminalStreamListener listener)`:
+     - Check `sessionId != null && sessionId.length == 16`.
+     - Create socket: `mSocketFd = Os.socket(AF_VSOCK, OsConstants.SOCK_STREAM, 0);`
+     - Connect socket: `SocketAddress address = new SocketAddressVmSockets(VPORT_PTY, guestCid); Os.connect(mSocketFd, address);`
+     - Catch `ErrnoException`, clean up via `close()`, and re-throw `IOException`.
+2. **Modify `LinuxManagerService.java`**:
+   - In `createTerminalSession(...)`, generate 16-byte random token (32 hex chars) instead of `"session_1001"`.
+3. **Modify `TerminalView.java`**:
+   - Query `ILinuxManager.createTerminalSession(...)` AIDL to obtain dynamic session ID on launch instead of hardcoded `"0123456789abcdef"`.
 
 ---
 
 ## 5. Verification Method
 
-### 5.1 Independent Verification Commands
-Run the following test commands from workspace root (`/Users/iml1s/Documents/mine/aosp-linux`):
+1. **Inspect Target Files**:
+   - Inspect `packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/net/VsockTerminalClient.java` lines 31-70.
+   - Inspect `packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/TerminalView.java` line 49.
+   - Inspect `frameworks/base/services/core/java/com/android/server/linux/LinuxManagerService.java` lines 390-400.
 
-```bash
-# 1. Run Python E2E Test Suite for Milestone M3
-python3 tests/e2e/runner.py --milestone M3
+2. **Execute Unit Tests**:
+   - Build and run Java unit test suite:
+     ```bash
+     javac -classpath /Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar:frameworks/base/core/java:packages/apps/LinuxTerminal/src \
+       -d /tmp/m3_classes $(find packages/apps/LinuxTerminal/src -name '*.java') \
+       tests/unit/TerminalAppUnitTest.java
+     java -cp /tmp/m3_classes:/Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar tests.unit.TerminalAppUnitTest
+     ```
 
-# 2. Verify Tier 1 Functional Tests (F-R3-001: T1-51..T1-55, F-R3-002: T1-56..T1-60)
-python3 -m unittest tests/e2e/tier1_feature_coverage/test_m3_tier1.py
-
-# 3. Verify Tier 2 Boundary Tests (F-R3-001: T2-51..T2-55, F-R3-002: T2-56..T2-60)
-python3 -m unittest tests/e2e/tier2_boundary_corner/test_m3_tier2.py
-
-# 4. Verify Tier 3 Pairwise Integration Test T3-PAIR-19
-python3 -m unittest tests/e2e/tier3_cross_feature/test_pairwise_matrix.py
-```
-
-### 5.2 Invalidation Conditions
-- Any frame drop or render time exceeding 16.66ms for $80 \times 24$ terminal matrix.
-- Native parser crash or SIGSEGV when processing malformed ANSI escape sequences.
-- Character corruption or buffer overflow when UTF-8 multi-byte sequences are split across vsock 5001 packet boundaries.
-- Memory leak or unreleased global JNI reference after view detachment.
+3. **Execute E2E Integration Suite**:
+   - Run M3 Tier 1 E2E tests:
+     ```bash
+     pytest tests/e2e/tier1_feature_coverage/test_m3_tier1.py
+     ```
+   - Verify `test_m3_tier1.py` output logs pass without socket errors.

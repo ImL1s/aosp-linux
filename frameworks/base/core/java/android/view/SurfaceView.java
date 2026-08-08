@@ -26,4 +26,8 @@ public class SurfaceView extends View {
     public SurfaceHolder getHolder() {
         return mHolder;
     }
+
+    public SurfaceControl getSurfaceControl() {
+        return new SurfaceControl();
+    }
 }

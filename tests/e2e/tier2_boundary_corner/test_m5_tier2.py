@@ -182,9 +182,7 @@ class TestR5_003_T2_126_CoarseLocationApproximate(BaseTestCase):
         exact_lat = 25.0330123
         exact_lon = 121.5654987
 
-        # Coarse location obfuscates to 2 decimal places
-        coarse_lat = round(exact_lat, 2)
-        coarse_lon = round(exact_lon, 2)
+        coarse_lat, coarse_lon = self.mock_env.portal.format_coarse_location(exact_lat, exact_lon)
 
         CustomAssertions.assert_equal(coarse_lat, 25.03)
         CustomAssertions.assert_equal(coarse_lon, 121.57)
@@ -747,8 +745,8 @@ class TestR5_009_T2_160_EnforcingVsPermissiveCheck(BaseTestCase):
     tier = 2
 
     def run_test(self):
-        selinux_enforcing = True
-        CustomAssertions.assert_true(selinux_enforcing, "SELinux must operate in Enforcing mode")
+        selinux_mode = getattr(self.mock_env.system_server, "selinux_mode", "Enforcing")
+        CustomAssertions.assert_equal(selinux_mode, "Enforcing", "SELinux must operate in Enforcing mode")
 
 
 # -----------------------------------------------------------------------------
@@ -820,9 +818,7 @@ class TestR5_010_T2_165_ValidateNeverallowAllBoards(BaseTestCase):
     tier = 2
 
     def run_test(self):
-        board_configs = ["target/board/generic_arm64/sepolicy", "target/board/db845c/sepolicy"]
-        validated_boards = len(board_configs)
-
+        validated_boards = self.mock_env.validate_sepolicy_boards()
         CustomAssertions.assert_equal(validated_boards, 2)
 
 
@@ -836,7 +832,7 @@ class TestR5_011_T2_166_CtsAidlModificationRegression(BaseTestCase):
     tier = 2
 
     def run_test(self):
-        cts = self.mock_env.cts_results
+        cts = dict(self.mock_env.cts_results)
         breaking_change_introduced = True
 
         if breaking_change_introduced:
@@ -863,7 +859,7 @@ class TestR5_011_T2_168_GsiBootCompatibility(BaseTestCase):
     tier = 2
 
     def run_test(self):
-        gsi_boot_success = True
+        gsi_boot_success = self.mock_env.system_server.verify_gsi_boot_compatibility()
         CustomAssertions.assert_true(gsi_boot_success)
 
 
@@ -887,7 +883,7 @@ class TestR5_011_T2_170_CtsIdlePowerOverhead(BaseTestCase):
     tier = 2
 
     def run_test(self):
-        idle_battery_drop_pct = 1.4
+        idle_battery_drop_pct = self.mock_env.system_server.measure_cts_idle_power_drop()
         MAX_BATTERY_DROP = 2.0
 
         CustomAssertions.assert_true(idle_battery_drop_pct < MAX_BATTERY_DROP)
@@ -948,7 +944,7 @@ class TestR5_012_T2_174_ErofsReadThroughput(BaseTestCase):
     tier = 2
 
     def run_test(self):
-        simulated_throughput_mb_s = 245.0
+        simulated_throughput_mb_s = self.mock_env.measure_erofs_read_throughput()
         MIN_THROUGHPUT = 200.0
 
         CustomAssertions.assert_true(simulated_throughput_mb_s >= MIN_THROUGHPUT)

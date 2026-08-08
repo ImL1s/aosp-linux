@@ -33,10 +33,16 @@ BootWatchdogEngine::BootWatchdogEngine(const std::string& metadataPath)
     loadMetadata();
 }
 
-BootWatchdogEngine::~BootWatchdogEngine() {
+void BootWatchdogEngine::stopWatchdogThread() {
+    mStopRequested = true;
+    mCv.notify_all();
     if (mTimerThread.joinable()) {
-        mTimerThread.detach();
+        mTimerThread.join();
     }
+}
+
+BootWatchdogEngine::~BootWatchdogEngine() {
+    stopWatchdogThread();
 }
 
 void BootWatchdogEngine::loadMetadata() {
@@ -130,23 +136,23 @@ void BootWatchdogEngine::saveMetadata() {
 }
 
 void BootWatchdogEngine::startWatchdog(const std::string& currentSlot) {
+    stopWatchdogThread();
+    mStopRequested = false;
     mHeartbeatReceived = false;
     mMetadata.bootAttempts += 1;
     saveMetadata();
 
     uint64_t gen = ++mWatchdogGen;
 
-    if (mTimerThread.joinable()) {
-        mTimerThread.detach();
-    }
-
     mTimerThread = std::thread([this, currentSlot, gen]() {
         auto start = std::chrono::steady_clock::now();
-        while (std::chrono::duration_cast<std::chrono::seconds>(
-                   std::chrono::steady_clock::now() - start).count() < mMaxTimeoutSec) {
-            if (gen != mWatchdogGen) return;
+        while (!mStopRequested) {
+            std::unique_lock<std::mutex> lock(mCvMutex);
+            mCv.wait_for(lock, std::chrono::milliseconds(200), [this]() {
+                return mStopRequested.load() || mHeartbeatReceived.load();
+            });
+            if (mStopRequested || gen != mWatchdogGen) return;
             if (mHeartbeatReceived) {
-                if (gen != mWatchdogGen) return;
                 mMetadata.bootAttempts = 0;
                 if (currentSlot == "slot_a") mMetadata.slotA.successfulBoot = 1;
                 else mMetadata.slotB.successfulBoot = 1;
@@ -154,9 +160,12 @@ void BootWatchdogEngine::startWatchdog(const std::string& currentSlot) {
                 std::cout << "[Watchdog] Heartbeat received from guest. Reset boot attempts to 0." << std::endl;
                 return;
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            if (std::chrono::duration_cast<std::chrono::seconds>(
+                    std::chrono::steady_clock::now() - start).count() >= mMaxTimeoutSec) {
+                break;
+            }
         }
-        if (gen != mWatchdogGen) return;
+        if (mStopRequested || gen != mWatchdogGen) return;
         std::cout << "[Watchdog] 60-second timeout reached! Triggering boot failure handling." << std::endl;
         handleBootTimeout(currentSlot);
     });
@@ -166,6 +175,7 @@ void BootWatchdogEngine::startWatchdog(const std::string& currentSlot) {
 void BootWatchdogEngine::onHeartbeatReceived() {
     mHeartbeatReceived = true;
     mMetadata.bootAttempts = 0;
+    mCv.notify_all();
 }
 
 void BootWatchdogEngine::handleBootTimeout(const std::string& failedSlot) {

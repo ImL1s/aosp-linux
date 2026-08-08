@@ -1,17 +1,25 @@
-## 2026-08-06T10:57:52Z
-You are Explorer 1 for Milestone M3 (Native Touch Terminal & IME).
+## 2026-08-08T14:11:53Z
 
-Working Directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_1
+<USER_REQUEST>
+You are Explorer 1 for Milestone M3 (Real Vsock Socket Connect & Session ID - R3).
+Your working directory is /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_1.
 
-Mandatory Reference Files:
-- ORIGINAL_REQUEST.md: /Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md (READ THIS FIRST!)
-- PROJECT.md: /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
-- SCOPE.md: /Users/iml1s/Documents/mine/aosp-linux/.agents/sub_orch_m3/SCOPE.md
-- Architecture Plan: /Users/iml1s/.gemini/antigravity-cli/brain/29f720f6-2fc4-4aa4-af7a-b720fbb0d62a/aosp_linux_system_architecture_plan.md
+Task:
+Investigate VsockTerminalClient.java implementation details for replacing unconnected socket creation with real AF_VSOCK connect(guestCid, 5001) syscall invocation.
 
-Objective:
-Investigate existing codebase in /Users/iml1s/Documents/mine/aosp-linux (specifically under packages/apps/TerminalApp/ or related framework components) and design the complete technical implementation strategy for:
-1. F-R3-001: Native Surface Canvas Renderer - Low-latency Android Native Canvas Surface renderer for terminal (`packages/apps/TerminalApp/`).
-2. F-R3-002: libvterm Parser Integration - C/C++ `libvterm` / `vte` state parser integration with JNI wrappers.
+Paths to read before starting:
+- /Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md
+- /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/teamwork_preview_explorer_survey_2/handoff.md
 
-Provide precise class structures, file locations, method signatures, build configurations (Android.bp / CMakeLists.txt), and test strategies in your report (`/Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_1/analysis.md` and `handoff.md`). Write report to files, then send a concise message back.
+Scope of Investigation:
+1. Examine packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/net/VsockTerminalClient.java and any related socket/net classes.
+2. Determine how VsockTerminalClient currently initializes sockets (unconnected socket / mock socket).
+3. Find the exact method and APIs needed for real AF_VSOCK socket creation and connect(guestCid, 5001) syscall invocation in Android/Java (e.g. android.system.Os, OsConstants.AF_VSOCK, SocketAddressVmSockets, FileDescriptor, etc.).
+4. Identify guestCid resolution/passing mechanism and port 5001 setup.
+5. Identify error handling, exception handling, and socket closing behavior.
+6. Verify build command and test targets for VsockTerminalClient.
+
+Write your full investigation report to /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_1/analysis.md and handoff report to /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_1/handoff.md.
+When finished, send a message to parent with a summary and artifact path.
+</USER_REQUEST>

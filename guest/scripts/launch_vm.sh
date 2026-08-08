@@ -84,9 +84,9 @@ CMDLINE="console=ttyS0 root=/dev/vda ro init=/sbin/init android_bridge.token=${A
 echo "[Launch Script] Launching crosvm Non-Protected VM (CID: ${CID}, CPUs: ${CPUS}, RAM: ${REQ_RAM_MB}MB)..."
 echo "[Launch Script] Kernel Params: ${CMDLINE}"
 
-# Execution template (in live environment, invokes crosvm binary)
+# Execution template (in live environment, invokes crosvm binary with exec for PID tracking)
 if command -v crosvm >/dev/null 2>&1; then
-    crosvm run \
+    exec crosvm run \
       --cid "$CID" \
       --cpus "$CPUS" \
       --mem "$REQ_RAM_MB" \
@@ -99,6 +99,9 @@ if command -v crosvm >/dev/null 2>&1; then
       --rwdisk "$HOME_MAPPER"
 else
     echo "[Launch Script] crosvm binary not in PATH (Simulated execution mode)"
+    if [ "${TEST_MODE:-0}" = "1" ]; then
+        exec sleep 3600
+    fi
 fi
 
 echo "[Launch Script] VM launch script completed successfully."

@@ -12,7 +12,11 @@ import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
+import android.os.IBinder;
+import android.os.ServiceManager;
+import android.system.linux.ILinuxManager;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 import com.android.virtualization.terminal.ime.TerminalInputConnection;
 import com.android.virtualization.terminal.net.PtySender;
@@ -46,7 +50,7 @@ public class TerminalView extends View implements PtySender {
     private int mCellWidth = 20;
     private int mCellHeight = 40;
 
-    private byte[] mSessionId = "0123456789abcdef".getBytes();
+    private byte[] mSessionId = "0123456789abcdef".getBytes(StandardCharsets.US_ASCII);
 
     public TerminalView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -79,6 +83,30 @@ public class TerminalView extends View implements PtySender {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
+        initDynamicSessionAndConnect();
+    }
+
+    private void initDynamicSessionAndConnect() {
+        String sessionIdStr = null;
+        try {
+            IBinder binder = ServiceManager.getService("linux_service");
+            if (binder != null) {
+                ILinuxManager service = ILinuxManager.Stub.asInterface(binder);
+                if (service != null) {
+                    sessionIdStr = service.createTerminalSession(mColumns, mRows, null);
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Could not acquire dynamic session ID from LinuxManagerService: " + e.getMessage());
+        }
+
+        if (sessionIdStr != null && sessionIdStr.length() == 16) {
+            mSessionId = sessionIdStr.getBytes(StandardCharsets.US_ASCII);
+            Log.i(TAG, "Acquired dynamic terminal session ID from LinuxManagerService: " + sessionIdStr);
+        } else {
+            Log.w(TAG, "Using default 16-byte fallback session ID: " + new String(mSessionId, StandardCharsets.US_ASCII));
+        }
+
         connectVsock(GUEST_CID, mSessionId);
     }
 

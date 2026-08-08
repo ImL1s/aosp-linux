@@ -28,9 +28,9 @@ jobs:
           echo "Verifying linux_manager.te NEVERALLOW rules..."
           grep "neverallow linux_manager" system/sepolicy/private/linux_manager.te
 
-      - name: Verify Architecture Blueprints & Test Specs
+      - name: Run Real E2E Test Suite (Tier 1 & Tier 2)
         run: |
-          python3 -c "import json; data=json.load(open('tests/e2e_report.json')); print('E2E Verification Total:', data['summary']['total']); assert data['summary']['failed'] == 0"
+          python3 tests/e2e/runner.py --tier 1 --tier 2
 
       - name: Build Guest Bridge Agent (Rust)
         run: |

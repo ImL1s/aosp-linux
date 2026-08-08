@@ -17,6 +17,7 @@
 #ifndef WAYLAND_BUFFER_SHARING_H
 #define WAYLAND_BUFFER_SHARING_H
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -66,11 +67,11 @@ public:
     // Release buffer resources and avoid memory leaks
     void releaseBuffer(void* hardwareBufferPtr);
 
-    uint32_t getActiveBufferCount() const { return mActiveBuffers; }
+    size_t getActiveBufferCount() const { return mActiveBuffers.load(std::memory_order_relaxed); }
 
 private:
-    uint32_t mActiveBuffers{0};
-    bool mGpuHealthy{true};
+    std::atomic<size_t> mActiveBuffers{0};
+    std::atomic<bool> mGpuHealthy{true};
 };
 
 } // namespace linux_bridge

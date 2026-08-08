@@ -1,45 +1,58 @@
-# BRIEFING — 2026-08-06T12:16:05Z
+# BRIEFING — 2026-08-08T06:21:15Z
 
 ## Mission
-Empirical stress verification for SELinux policies, AVB signature verification, EROFS immutability, and 3-boot attempt watchdog fallback (Features F-R5-009 through F-R5-014).
+Empirically verify LinuxStorageProvider SAF storage provider lifecycle, read-only vs read-write mount exposure under LUKS2, ContentResolver notifications, and run M5 verification scripts/tests.
 
 ## 🔒 My Identity
-- Archetype: EMPIRICAL CHALLENGER
+- Archetype: empirical_challenger
 - Roles: critic, specialist
 - Working directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m5_2
-- Original parent: c0222b94-a684-468f-9e93-049a3c394fd0
+- Original parent: a0a5cd7b-a1b9-4e75-a26a-4fe83a6ef27f
 - Milestone: M5
-- Instance: Challenger 2
+- Instance: 2 of 2
 
 ## 🔒 Key Constraints
-- Review-only — do NOT modify implementation code (run empirical tests and report findings)
-- Must empirically run test harness / verification scripts
-- Require reproducible evidence for any pass or fail claim
-- Traditional Chinese (繁體中文) output
+- Review-only — do NOT modify implementation code (report findings as findings, do NOT fix code yourself)
+- Perform empirical verification through code inspection and executing tests/verification scripts
+- Verify SAF queryRoots / queryChildDocuments rejection when VM is stopped or CE key is unavailable
+- Verify read-only vs read-write mount exposure under LUKS2 mount states
+- Verify ContentResolver notification on state change listeners
+- Output final report to /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m5_2/handoff.md with APPROVE or REJECT verdict
 
 ## Current Parent
-- Conversation ID: c0222b94-a684-468f-9e93-049a3c394fd0
-- Updated: 2026-08-06T12:16:05Z
+- Conversation ID: a0a5cd7b-a1b9-4e75-a26a-4fe83a6ef27f
+- Updated: 2026-08-08T06:21:15Z
 
 ## Review Scope
 - **Files to review**:
-  - `/Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md`
-  - `/Users/iml1s/Documents/mine/aosp-linux/PROJECT.md`
-  - `/Users/iml1s/Documents/mine/aosp-linux/.agents/sub_orch_m5/SCOPE.md`
-  - `/Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m5_1/handoff.md`
-- **Features to verify**:
-  - F-R5-009: SELinux Domain Policy Rules (PASS)
-  - F-R5-010: SELinux neverallow Rules (PASS)
-  - F-R5-011: CTS / VTS Compatibility (PASS)
-  - F-R5-012: EROFS Base Image A/B Dual Slot Layout & Immutability (PASS)
-  - F-R5-013: AVB Key Signature Validation & Tampered Payload Rejection (PASS)
-  - F-R5-014: 3-Boot Attempt Watchdog Engine & Fallback Rollback (PASS)
-- **Review criteria**: Empirical test verification with pass/fail guarantees and compliance.
+  - frameworks/base/services/core/java/com/android/server/linux/storage/LinuxStorageProvider.java
+  - frameworks/base/services/core/java/com/android/server/linux/LinuxManagerInternal.java
+  - frameworks/base/services/core/java/com/android/server/linux/LinuxManagerService.java
+  - tests/unit/LinuxStorageProviderTest.java
+  - scripts/run_m5_verification.sh
+  - tests/e2e/tier1_feature_coverage/test_m5_tier1.py
+  - tests/e2e/tier2_boundary_corner/test_m5_tier2.py
+- **Interface contracts**: PROJECT.md
+- **Review criteria**: Correctness, edge cases, lifecycle enforcement, empirical test passing.
+
+## Attack Surface
+- **Hypotheses tested**:
+  - H1: SAF queryRoots & queryChildDocuments reject calls when VM is stopped or CE key is locked -> CONFIRMED PASS.
+  - H2: Read-only mount strips write/delete/create flags and blocks write openDocument -> CONFIRMED PASS.
+  - H3: State transition events (VM state, CE key, mount state) trigger ContentResolver notifyChange on roots URI -> CONFIRMED PASS.
+  - H4: Full M5 verification suite and unit tests pass without regressions -> CONFIRMED PASS.
+- **Vulnerabilities found**: None.
+- **Untested angles**: Hardware storage throughput benchmarking under heavy I/O stress on physical ARM64 device (out of simulated scope).
+
+## Loaded Skills
+- None loaded
 
 ## Key Decisions Made
-- Constructed and executed `challenger_m5_2_empirical_test.cpp` testing invalid headers, bad magic, anti-rollback index downgrade, EROFS immutability, watchdog 3-boot timeouts, and data preservation.
-- Verdict: **APPROVE**.
+- Executed `./scripts/run_m5_verification.sh` and confirmed 14/14 features pass.
+- Executed `LinuxStorageProviderDeepTest` verifying all state transitions, exception throwing, flag adjustments, and `ContentResolver.notifyChange` notifications.
+- Verdict: APPROVE.
 
 ## Artifact Index
-- `/Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m5_2/analysis.md` — Detailed empirical analysis and stress test results
-- `/Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m5_2/handoff.md` — Final handoff report with explicit APPROVE verdict
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m5_2/DISPATCH.md — Dispatch log
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m5_2/BRIEFING.md — Working memory briefing
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m5_2/handoff.md — Handoff report with APPROVE verdict

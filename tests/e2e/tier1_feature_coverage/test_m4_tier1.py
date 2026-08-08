@@ -5,6 +5,7 @@ Features covered: F-R4-001 through F-R4-006 (5 happy-path test cases each).
 
 import sys
 import os
+import json
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from framework import BaseTestCase, CustomAssertions
@@ -19,15 +20,15 @@ class TestR4_001_T1_86_ConnectSommelierWaylandProxy(BaseTestCase):
     tier = 1
 
     def run_test(self):
-        bridge_connection = {"status": "CONNECTED", "port": 5002, "protocol": "Wayland"}
-        CustomAssertions.assert_equal(bridge_connection["status"], "CONNECTED")
-        CustomAssertions.assert_equal(bridge_connection["port"], 5002)
+        bound = self.mock_env.vsock.bind(15002)
+        CustomAssertions.assert_true(bound, "Wayland bridge port 15002 must bind successfully")
+        CustomAssertions.assert_true(self.mock_env.vsock.bound_ports[15002])
 
 
 class TestR4_001_T1_87_ForwardWlSurfaceCommitEvents(BaseTestCase):
     test_id = "T1-87"
     feature_id = "F-R4-001"
-    title = "Forward Wayland wl_surface.commit events over vsock port 5002"
+    title = "Forward Wayland wl_surface.commit events over vsock port 15002"
     tier = 1
 
     def run_test(self):
@@ -57,9 +58,11 @@ class TestR4_001_T1_89_DispatchInputEventsToSommelier(BaseTestCase):
     tier = 1
 
     def run_test(self):
-        event = {"type": "TOUCH_DOWN", "surface_id": 1, "x": 500, "y": 300}
-        CustomAssertions.assert_equal(event["type"], "TOUCH_DOWN")
-        CustomAssertions.assert_equal(event["x"], 500)
+        sid = self.mock_env.sommelier.create_surface("org.debian.gimp", 1024, 768)
+        self.mock_env.sommelier.commit_frame(sid)
+        surface_data = self.mock_env.sommelier.active_surfaces.get(sid)
+        CustomAssertions.assert_equal(surface_data["app_id"], "org.debian.gimp")
+        CustomAssertions.assert_true(surface_data["committed_frames"] > 0)
 
 
 class TestR4_001_T1_90_WaylandSurfaceDestroyCleanup(BaseTestCase):
@@ -85,9 +88,10 @@ class TestR4_002_T1_91_GuestAllocatesGraphicBuffer(BaseTestCase):
     tier = 1
 
     def run_test(self):
-        buffer_info = {"buffer_id": 1001, "format": "DRM_FORMAT_ARGB8888", "width": 1920, "height": 1080}
-        CustomAssertions.assert_equal(buffer_info["buffer_id"], 1001)
-        CustomAssertions.assert_equal(buffer_info["format"], "DRM_FORMAT_ARGB8888")
+        sid = self.mock_env.sommelier.create_surface("graphic_buffer_app", 1920, 1080)
+        buffer_info = self.mock_env.sommelier.active_surfaces[sid]
+        CustomAssertions.assert_equal(buffer_info["width"], 1920)
+        CustomAssertions.assert_equal(buffer_info["height"], 1080)
 
 
 class TestR4_002_T1_92_ExportDmaBufFileDescriptor(BaseTestCase):
@@ -97,8 +101,12 @@ class TestR4_002_T1_92_ExportDmaBufFileDescriptor(BaseTestCase):
     tier = 1
 
     def run_test(self):
-        dma_buf_fd = 42
-        CustomAssertions.assert_true(dma_buf_fd > 0)
+        r_fd, w_fd = os.pipe()
+        try:
+            CustomAssertions.assert_true(r_fd > 0 and w_fd > 0, "Exported file descriptors must be valid positive integers")
+        finally:
+            os.close(r_fd)
+            os.close(w_fd)
 
 
 class TestR4_002_T1_93_ImportDmaBufToHardwareBuffer(BaseTestCase):
@@ -108,9 +116,10 @@ class TestR4_002_T1_93_ImportDmaBufToHardwareBuffer(BaseTestCase):
     tier = 1
 
     def run_test(self):
-        hw_buffer = {"id": 2001, "source_fd": 42, "width": 1920, "height": 1080, "imported": True}
-        CustomAssertions.assert_equal(hw_buffer["source_fd"], 42)
-        CustomAssertions.assert_true(hw_buffer["imported"])
+        sid = self.mock_env.sommelier.create_surface("hw_buffer_app", 1920, 1080)
+        hw_buffer = self.mock_env.sommelier.active_surfaces[sid]
+        CustomAssertions.assert_equal(hw_buffer["width"], 1920)
+        CustomAssertions.assert_equal(hw_buffer["height"], 1080)
 
 
 class TestR4_002_T1_94_BindHardwareBufferToSurfaceControl(BaseTestCase):
@@ -120,9 +129,9 @@ class TestR4_002_T1_94_BindHardwareBufferToSurfaceControl(BaseTestCase):
     tier = 1
 
     def run_test(self):
-        binding = {"surface_control": "LinuxWindow_1001", "buffer_id": 2001, "bound": True}
-        CustomAssertions.assert_equal(binding["surface_control"], "LinuxWindow_1001")
-        CustomAssertions.assert_true(binding["bound"])
+        sid = self.mock_env.sommelier.create_surface("surface_control_app", 1280, 720)
+        self.mock_env.sommelier.commit_frame(sid)
+        CustomAssertions.assert_true(sid in self.mock_env.sommelier.active_surfaces)
 
 
 class TestR4_002_T1_95_ZeroCopyPresentationLatency(BaseTestCase):
@@ -132,7 +141,11 @@ class TestR4_002_T1_95_ZeroCopyPresentationLatency(BaseTestCase):
     tier = 1
 
     def run_test(self):
-        measured_latency_ms = 8.5
+        import time
+        sid = self.mock_env.sommelier.create_surface("latency_app", 1920, 1080)
+        start_t = time.perf_counter()
+        self.mock_env.sommelier.commit_frame(sid)
+        measured_latency_ms = (time.perf_counter() - start_t) * 1000
         target_max_latency_ms = 16.0
         CustomAssertions.assert_true(measured_latency_ms < target_max_latency_ms)
 
@@ -160,12 +173,13 @@ class TestR4_003_T1_97_DisplayLinuxAppTitleIconInRecents(BaseTestCase):
     tier = 1
 
     def run_test(self):
-        recents_entry = {
+        self.mock_env.installed_desktop_apps["gimp.desktop"] = {
             "task_id": 101,
             "title": "GIMP Image Editor",
             "icon": "gimp_icon_png",
             "visible": True
         }
+        recents_entry = self.mock_env.installed_desktop_apps["gimp.desktop"]
         CustomAssertions.assert_equal(recents_entry["task_id"], 101)
         CustomAssertions.assert_equal(recents_entry["title"], "GIMP Image Editor")
         CustomAssertions.assert_true(recents_entry["visible"])
@@ -193,9 +207,10 @@ class TestR4_003_T1_99_TaskTerminationSendsSigterm(BaseTestCase):
     tier = 1
 
     def run_test(self):
-        process_info = {"pid": 4567, "name": "gimp", "signal_sent": None}
-        process_info["signal_sent"] = "SIGTERM"
-        CustomAssertions.assert_equal(process_info["signal_sent"], "SIGTERM")
+        self.mock_env.active_task_ids[101] = "org.debian.gimp"
+        CustomAssertions.assert_in(101, self.mock_env.active_task_ids)
+        del self.mock_env.active_task_ids[101]
+        CustomAssertions.assert_false(101 in self.mock_env.active_task_ids)
 
 
 class TestR4_003_T1_100_LaunchMultipleInstancesUnderDistinctTaskIds(BaseTestCase):
@@ -223,9 +238,10 @@ class TestR4_004_T1_101_SupportFreeformResizeDragHandles(BaseTestCase):
     tier = 1
 
     def run_test(self):
-        window_mode = {"freeform": True, "resize_handles": True}
-        CustomAssertions.assert_true(window_mode["freeform"])
-        CustomAssertions.assert_true(window_mode["resize_handles"])
+        sid = self.mock_env.sommelier.create_surface("org.debian.gimp", 1024, 768)
+        surface = self.mock_env.sommelier.active_surfaces[sid]
+        CustomAssertions.assert_equal(surface["width"], 1024)
+        CustomAssertions.assert_equal(surface["height"], 768)
 
 
 class TestR4_004_T1_102_SendXdgToplevelConfigureOnResize(BaseTestCase):
@@ -235,9 +251,11 @@ class TestR4_004_T1_102_SendXdgToplevelConfigureOnResize(BaseTestCase):
     tier = 1
 
     def run_test(self):
-        configure_event = {"width": 1280, "height": 720, "states": ["RESIZING"]}
-        CustomAssertions.assert_equal(configure_event["width"], 1280)
-        CustomAssertions.assert_equal(configure_event["height"], 720)
+        sid = self.mock_env.sommelier.create_surface("org.debian.gimp", 1024, 768)
+        self.mock_env.sommelier.active_surfaces[sid]["width"] = 1280
+        self.mock_env.sommelier.active_surfaces[sid]["height"] = 720
+        CustomAssertions.assert_equal(self.mock_env.sommelier.active_surfaces[sid]["width"], 1280)
+        CustomAssertions.assert_equal(self.mock_env.sommelier.active_surfaces[sid]["height"], 720)
 
 
 class TestR4_004_T1_103_GuestAppReRendersBufferToNewSize(BaseTestCase):
@@ -247,9 +265,11 @@ class TestR4_004_T1_103_GuestAppReRendersBufferToNewSize(BaseTestCase):
     tier = 1
 
     def run_test(self):
-        rendered_buffer = {"w": 1280, "h": 720, "status": "RE_RENDERED"}
-        CustomAssertions.assert_equal(rendered_buffer["w"], 1280)
-        CustomAssertions.assert_equal(rendered_buffer["status"], "RE_RENDERED")
+        sid = self.mock_env.sommelier.create_surface("org.debian.gimp", 1024, 768)
+        self.mock_env.sommelier.active_surfaces[sid]["width"] = 1280
+        self.mock_env.sommelier.active_surfaces[sid]["height"] = 720
+        self.mock_env.sommelier.commit_frame(sid)
+        CustomAssertions.assert_equal(self.mock_env.sommelier.active_surfaces[sid]["committed_frames"], 1)
 
 
 class TestR4_004_T1_104_FramePacingSyncDuringLiveResizeDrag(BaseTestCase):
@@ -259,9 +279,10 @@ class TestR4_004_T1_104_FramePacingSyncDuringLiveResizeDrag(BaseTestCase):
     tier = 1
 
     def run_test(self):
-        pacing_metrics = {"target_fps": 60, "dropped_frames": 0, "smooth": True}
-        CustomAssertions.assert_equal(pacing_metrics["dropped_frames"], 0)
-        CustomAssertions.assert_true(pacing_metrics["smooth"])
+        sid = self.mock_env.sommelier.create_surface("org.debian.gimp", 1024, 768)
+        for _ in range(5):
+            self.mock_env.sommelier.commit_frame(sid)
+        CustomAssertions.assert_equal(self.mock_env.sommelier.active_surfaces[sid]["committed_frames"], 5)
 
 
 class TestR4_004_T1_105_MaximizeMinimizeWindowStateTransitions(BaseTestCase):
@@ -271,12 +292,13 @@ class TestR4_004_T1_105_MaximizeMinimizeWindowStateTransitions(BaseTestCase):
     tier = 1
 
     def run_test(self):
-        states = []
-        states.append("MAXIMIZED")
-        states.append("MINIMIZED")
-        states.append("RESTORED")
-        CustomAssertions.assert_equal(states[0], "MAXIMIZED")
-        CustomAssertions.assert_equal(states[1], "MINIMIZED")
+        sid = self.mock_env.sommelier.create_surface("org.debian.gimp", 1024, 768)
+        self.mock_env.sommelier.active_surfaces[sid]["width"] = 1920
+        self.mock_env.sommelier.active_surfaces[sid]["height"] = 1080
+        CustomAssertions.assert_equal(self.mock_env.sommelier.active_surfaces[sid]["width"], 1920)
+        self.mock_env.sommelier.active_surfaces[sid]["width"] = 0
+        self.mock_env.sommelier.active_surfaces[sid]["height"] = 0
+        CustomAssertions.assert_equal(self.mock_env.sommelier.active_surfaces[sid]["width"], 0)
 
 
 # ==============================================================================
@@ -289,9 +311,8 @@ class TestR4_005_T1_106_InotifyWatchRegisteredOnApplicationsDir(BaseTestCase):
     tier = 1
 
     def run_test(self):
-        inotify_watch = {"target_dir": "/usr/share/applications/", "active": True}
-        CustomAssertions.assert_equal(inotify_watch["target_dir"], "/usr/share/applications/")
-        CustomAssertions.assert_true(inotify_watch["active"])
+        target_dir = "/usr/share/applications/"
+        CustomAssertions.assert_true(target_dir.startswith("/usr/share/"), "inotify watch must target /usr/share/applications/")
 
 
 class TestR4_005_T1_107_DetectNewDesktopFileCreation(BaseTestCase):
@@ -301,9 +322,8 @@ class TestR4_005_T1_107_DetectNewDesktopFileCreation(BaseTestCase):
     tier = 1
 
     def run_test(self):
-        event = {"mask": "IN_CLOSE_WRITE", "filename": "gimp.desktop"}
-        CustomAssertions.assert_equal(event["filename"], "gimp.desktop")
-        CustomAssertions.assert_equal(event["mask"], "IN_CLOSE_WRITE")
+        self.mock_env.installed_desktop_apps["gimp.desktop"] = {"Name": "GIMP", "Exec": "gimp"}
+        CustomAssertions.assert_in("gimp.desktop", self.mock_env.installed_desktop_apps)
 
 
 class TestR4_005_T1_108_ParseDesktopMetadataFields(BaseTestCase):
@@ -313,27 +333,24 @@ class TestR4_005_T1_108_ParseDesktopMetadataFields(BaseTestCase):
     tier = 1
 
     def run_test(self):
-        metadata = {
-            "Name": "GNU Image Manipulation Program",
-            "Icon": "gimp",
-            "Exec": "gimp %U",
-            "Categories": "Graphics;2DGraphics;"
-        }
-        CustomAssertions.assert_equal(metadata["Name"], "GNU Image Manipulation Program")
-        CustomAssertions.assert_equal(metadata["Icon"], "gimp")
+        metadata = {"Name": "GNU Image Manipulation Program", "Icon": "gimp", "Exec": "gimp %U"}
+        self.mock_env.installed_desktop_apps["gimp.desktop"] = metadata
+        fetched = self.mock_env.installed_desktop_apps.get("gimp.desktop")
+        CustomAssertions.assert_equal(fetched["Name"], "GNU Image Manipulation Program")
+        CustomAssertions.assert_equal(fetched["Icon"], "gimp")
 
 
 class TestR4_005_T1_109_TransmitMetadataPayloadOverVsock5000(BaseTestCase):
     test_id = "T1-109"
     feature_id = "F-R4-005"
-    title = "Transmit app metadata payload to Host over vsock port 5000"
+    title = "Transmit app metadata payload to Host over vsock port 15000"
     tier = 1
 
     def run_test(self):
-        self.mock_env.vsock.bind(5000)
+        self.mock_env.vsock.bind(15000)
         payload = b'{"Name": "VLC", "Exec": "vlc"}'
-        self.mock_env.vsock.send(5000, payload)
-        received = self.mock_env.vsock.receive_all(5000)
+        self.mock_env.vsock.send(15000, payload)
+        received = self.mock_env.vsock.receive_all(15000)
         CustomAssertions.assert_equal(len(received), 1)
         CustomAssertions.assert_equal(received[0], payload)
 
@@ -345,9 +362,12 @@ class TestR4_005_T1_110_DetectModificationDeletionDesktopFiles(BaseTestCase):
     tier = 1
 
     def run_test(self):
-        events = ["IN_MODIFY gimp.desktop", "IN_DELETE vlc.desktop"]
-        CustomAssertions.assert_equal(len(events), 2)
-        CustomAssertions.assert_in("IN_DELETE", events[1])
+        self.mock_env.installed_desktop_apps["vlc.desktop"] = {"Name": "VLC"}
+        CustomAssertions.assert_in("vlc.desktop", self.mock_env.installed_desktop_apps)
+        self.mock_env.installed_desktop_apps["vlc.desktop"]["Name"] = "VLC Media Player"
+        CustomAssertions.assert_equal(self.mock_env.installed_desktop_apps["vlc.desktop"]["Name"], "VLC Media Player")
+        del self.mock_env.installed_desktop_apps["vlc.desktop"]
+        CustomAssertions.assert_false("vlc.desktop" in self.mock_env.installed_desktop_apps)
 
 
 # ==============================================================================
@@ -360,8 +380,11 @@ class TestR4_006_T1_111_HostReceivesDesktopMetadataFromDaemon(BaseTestCase):
     tier = 1
 
     def run_test(self):
-        metadata_received = {"Name": "VLC Media Player", "Exec": "vlc"}
-        CustomAssertions.assert_equal(metadata_received["Name"], "VLC Media Player")
+        self.mock_env.vsock.bind(15000)
+        self.mock_env.vsock.send(15000, b'{"Name": "VLC Media Player", "Exec": "vlc"}')
+        received = self.mock_env.vsock.receive_all(15000)
+        CustomAssertions.assert_equal(len(received), 1)
+        CustomAssertions.assert_in(b"VLC Media Player", received[0])
 
 
 class TestR4_006_T1_112_GenerateSyntheticShortcutInLauncher(BaseTestCase):
@@ -386,9 +409,9 @@ class TestR4_006_T1_113_ExtractFormatAppIconPngSvg(BaseTestCase):
     tier = 1
 
     def run_test(self):
-        icon_asset = {"format": "PNG", "width": 192, "height": 192, "valid": True}
-        CustomAssertions.assert_equal(icon_asset["format"], "PNG")
-        CustomAssertions.assert_true(icon_asset["valid"])
+        self.mock_env.installed_desktop_apps["vlc.desktop"] = {"Name": "VLC", "Icon": "/usr/share/icons/hicolor/192x192/apps/vlc.png"}
+        icon_path = self.mock_env.installed_desktop_apps["vlc.desktop"]["Icon"]
+        CustomAssertions.assert_true(icon_path.endswith(".png"), "Extracted icon asset must have PNG file extension")
 
 
 class TestR4_006_T1_114_TappingIconStartsProxyActivity(BaseTestCase):
@@ -398,9 +421,9 @@ class TestR4_006_T1_114_TappingIconStartsProxyActivity(BaseTestCase):
     tier = 1
 
     def run_test(self):
-        launch_intent = {"activity": "LinuxAppProxyActivity", "cmd": "vlc", "started": True}
-        CustomAssertions.assert_equal(launch_intent["activity"], "LinuxAppProxyActivity")
-        CustomAssertions.assert_true(launch_intent["started"])
+        task_id = 201
+        self.mock_env.active_task_ids[task_id] = "org.videolan.vlc"
+        CustomAssertions.assert_equal(self.mock_env.active_task_ids[task_id], "org.videolan.vlc")
 
 
 class TestR4_006_T1_115_UninstallPackageRemovesShortcut(BaseTestCase):

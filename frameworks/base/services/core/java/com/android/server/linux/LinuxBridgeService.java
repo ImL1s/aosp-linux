@@ -52,6 +52,7 @@ public class LinuxBridgeService {
     public static final short CMD_VM_START = 0x0001;
     public static final short CMD_VM_STOP = 0x0002;
     public static final short CMD_HANDSHAKE_COMPLETE = 0x0003;
+    public static final short CMD_VM_START_FAILED = 0x0004;
     public static final short CMD_PTY_DATA = 0x0100;
     public static final short CMD_PTY_RESIZE = 0x0101;
     public static final short CMD_PTY_OPEN = 0x0102;
@@ -74,6 +75,7 @@ public class LinuxBridgeService {
         void onVmDisconnected();
         void onPtyDataReceived(String sessionId, byte[] data);
         void onError(int errorCode, String message);
+        default void onVmStartFailed(int errorCode, String message) {}
     }
 
     private final Context mContext;
@@ -173,6 +175,23 @@ public class LinuxBridgeService {
 
     private void handleIncomingPacket(short cmdType, int transId, byte[] payload) {
         switch (cmdType) {
+            case CMD_VM_START_FAILED:
+                Slog.e(TAG, "Received CMD_VM_START_FAILED from linux_bridge daemon");
+                int errCode = 100;
+                String errMsg = "VM Launch Failed";
+                if (payload != null && payload.length >= 4) {
+                    ByteBuffer buf = ByteBuffer.wrap(payload);
+                    errCode = buf.getInt();
+                    if (buf.remaining() > 0) {
+                        byte[] msgBytes = new byte[buf.remaining()];
+                        buf.get(msgBytes);
+                        errMsg = new String(msgBytes, StandardCharsets.UTF_8);
+                    }
+                }
+                if (mCallback != null) {
+                    mCallback.onVmStartFailed(errCode, errMsg);
+                }
+                break;
             case CMD_HANDSHAKE_COMPLETE:
                 Slog.i(TAG, "Received CMD_HANDSHAKE_COMPLETE from linux_bridge daemon");
                 if (mCallback != null) {
@@ -268,8 +287,12 @@ public class LinuxBridgeService {
         }
     }
 
+    public boolean notifyVmStarting(byte[] authToken) {
+        return sendPacket(CMD_VM_START, 0, authToken != null ? authToken : new byte[0]);
+    }
+
     public boolean notifyVmStarting() {
-        return sendPacket(CMD_VM_START, 0, new byte[0]);
+        return notifyVmStarting(new byte[0]);
     }
 
     public void sendStopSignal(boolean force) {

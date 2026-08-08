@@ -8,22 +8,27 @@
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
+ * distributed under the License is distributed on an AS IS BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
 
 #include "socket_server.h"
+#include "hmac_auth.h"
 #include <iostream>
 #include <cstring>
 #include <cerrno>
 #include <climits>
+#include <csignal>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/wait.h>
 #include <arpa/inet.h>
 #include <algorithm>
+#include <chrono>
+#include <thread>
 
 namespace android {
 namespace system {
@@ -50,6 +55,57 @@ SocketServer::SocketServer(const std::string& socketPath)
 
 SocketServer::~SocketServer() {
     stop();
+}
+
+void SocketServer::setVsockServer(VsockServer* vsockServer) {
+    std::lock_guard<std::mutex> lock(mVmMutex);
+    mVsockServer = vsockServer;
+    if (mVsockServer) {
+        mVsockServer->setOnHandshakeSuccessCallback([this](uint32_t cid) {
+            this->onVsockHandshakeSuccess(cid);
+        });
+    }
+}
+
+void SocketServer::onVsockHandshakeSuccess(uint32_t cid) {
+    (void)cid;
+    std::lock_guard<std::mutex> lock(mVmMutex);
+    if (mVmState == VmState::STARTING && mPendingClientFd >= 0) {
+        mVmState = VmState::RUNNING;
+        std::vector<uint8_t> response = serializePacket(0x0003, mPendingTransactionId, {});
+        write(mPendingClientFd, response.data(), response.size());
+        std::cout << "[linux_bridge] Real VM Vsock handshake complete. CMD_HANDSHAKE_COMPLETE sent to framework." << std::endl;
+        mPendingClientFd = -1;
+        mPendingTransactionId = 0;
+    }
+}
+
+void SocketServer::stopVmProcess(bool force) {
+    std::lock_guard<std::mutex> lock(mVmMutex);
+    if (mVmPid > 0) {
+        std::cout << "[linux_bridge] Stopping VM child process PID: " << mVmPid << " (force=" << force << ")" << std::endl;
+        kill(mVmPid, SIGTERM);
+        int status = 0;
+        int ret = 0;
+        for (int i = 0; i < 20; i++) {
+            ret = waitpid(mVmPid, &status, WNOHANG);
+            if (ret > 0) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        if (ret == 0 && force) {
+            kill(mVmPid, SIGKILL);
+            waitpid(mVmPid, &status, 0);
+        }
+        mVmPid = -1;
+    }
+    if (mVsockServer) {
+        mVsockServer->resetSession();
+    }
+    mVmState = VmState::STOPPED;
+    if (mPendingClientFd >= 0) {
+        mPendingClientFd = -1;
+        mPendingTransactionId = 0;
+    }
 }
 
 bool SocketServer::start() {
@@ -89,6 +145,8 @@ bool SocketServer::start() {
 
 void SocketServer::stop() {
     if (!mRunning.exchange(false)) return;
+
+    stopVmProcess(true);
 
     int serverFd = mServerFd.exchange(-1);
     if (serverFd >= 0) {
@@ -169,10 +227,60 @@ void SocketServer::clientLoop(int clientFd) {
             if (!readFull(clientFd, payload.data(), header.length)) break;
         }
 
-        // Echo/Handle framing logic or reply
         if (header.cmdType == 0x0001) { // CMD_VM_START
-            // Respond with CMD_HANDSHAKE_COMPLETE
-            std::vector<uint8_t> response = serializePacket(0x0003, header.transactionId, {});
+            std::lock_guard<std::mutex> lock(mVmMutex);
+            if (mVmState != VmState::STOPPED) {
+                std::cerr << "[linux_bridge] CMD_VM_START received while VM state is not STOPPED" << std::endl;
+                std::vector<uint8_t> errResp = serializePacket(0x0004, header.transactionId, {0x00, 0x00, 0x00, 0x01});
+                write(clientFd, errResp.data(), errResp.size());
+                continue;
+            }
+
+            std::vector<uint8_t> token;
+            if (payload.size() >= 32) {
+                token.assign(payload.begin(), payload.begin() + 32);
+            } else {
+                token = HmacAuth::generateRandomToken();
+            }
+            // Extract dynamic HMAC key provided by LinuxManagerService authToken or generate securely
+            std::vector<uint8_t> secret;
+            if (payload.size() >= 64) {
+                secret.assign(payload.begin() + 32, payload.begin() + 64);
+            } else {
+                secret = HmacAuth::generateRandomToken();
+            }
+            std::string tokenHex = HmacAuth::hexEncode(token);
+
+            if (mVsockServer) {
+                mVsockServer->setAuthToken(token, secret);
+            }
+
+            mPendingClientFd = clientFd;
+            mPendingTransactionId = header.transactionId;
+            mVmState = VmState::STARTING;
+
+            pid_t pid = fork();
+            if (pid < 0) {
+                std::cerr << "[linux_bridge] Failed to fork process for launch_vm.sh" << std::endl;
+                mVmState = VmState::STOPPED;
+                mPendingClientFd = -1;
+                mPendingTransactionId = 0;
+                std::vector<uint8_t> errResp = serializePacket(0x0004, header.transactionId, {0x00, 0x00, 0x00, 0x02});
+                write(clientFd, errResp.data(), errResp.size());
+            } else if (pid == 0) {
+                const char* scriptPath = "guest/scripts/launch_vm.sh";
+                const char* configPath = "/data/misc/linux/vm_config.json";
+                execlp("bash", "bash", scriptPath, configPath, tokenHex.c_str(), nullptr);
+                _exit(127);
+            } else {
+                mVmPid = pid;
+                std::cout << "[linux_bridge] Spawned VM launch script PID: " << mVmPid << std::endl;
+            }
+            // Defer CMD_HANDSHAKE_COMPLETE response until Vsock auth succeeds
+        } else if (header.cmdType == 0x0002) { // CMD_VM_STOP
+            bool force = (!payload.empty() && payload[0] == 1);
+            stopVmProcess(force);
+            std::vector<uint8_t> response = serializePacket(0x0002, header.transactionId, {0x00});
             write(clientFd, response.data(), response.size());
         }
     }

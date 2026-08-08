@@ -1,0 +1,8 @@
+[package]
+name = "challenger-harness"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bridge-agent = { path = "../../../guest/bridge-agent-m2" }
+libc = "0.2"

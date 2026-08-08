@@ -8,7 +8,7 @@
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
+ * distributed under the License is distributed on an AS IS BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
@@ -189,20 +189,33 @@ bool VsockServer::isAuthenticated() const {
     return mAuthenticated;
 }
 
-bool VsockServer::processHandshake(uint32_t cid, const AuthHandshakePayload& payload) {
+void VsockServer::setOnHandshakeSuccessCallback(std::function<void(uint32_t)> cb) {
     std::lock_guard<std::mutex> lock(mMutex);
-    if (cid != ALLOWED_GUEST_CID) {
-        std::cerr << "[VsockServer] SecurityException: Connection from unauthorized CID " << cid << " rejected" << std::endl;
-        return false;
-    }
+    mOnHandshakeSuccessCb = cb;
+}
 
-    bool ok = HmacAuth::verifyHandshake(mSharedSecret, mActiveToken, payload, mTokenCreatedAt);
-    if (ok) {
-        mAuthenticated = true;
-        std::cout << "[VsockServer] HMAC-SHA256 Auth Handshake SUCCESS for CID " << cid << std::endl;
-    } else {
-        mAuthenticated = false;
-        std::cerr << "[VsockServer] HMAC-SHA256 Auth Handshake FAILED for CID " << cid << std::endl;
+bool VsockServer::processHandshake(uint32_t cid, const AuthHandshakePayload& payload) {
+    std::function<void(uint32_t)> cbCopy;
+    bool ok = false;
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+        if (cid != ALLOWED_GUEST_CID) {
+            std::cerr << "[VsockServer] SecurityException: Connection from unauthorized CID " << cid << " rejected" << std::endl;
+            return false;
+        }
+
+        ok = HmacAuth::verifyHandshake(mSharedSecret, mActiveToken, payload, mTokenCreatedAt);
+        if (ok) {
+            mAuthenticated = true;
+            cbCopy = mOnHandshakeSuccessCb;
+            std::cout << "[VsockServer] HMAC-SHA256 Auth Handshake SUCCESS for CID " << cid << std::endl;
+        } else {
+            mAuthenticated = false;
+            std::cerr << "[VsockServer] HMAC-SHA256 Auth Handshake FAILED for CID " << cid << std::endl;
+        }
+    }
+    if (ok && cbCopy) {
+        cbCopy(cid);
     }
     return ok;
 }

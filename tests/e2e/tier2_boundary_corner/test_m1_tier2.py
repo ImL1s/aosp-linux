@@ -381,6 +381,7 @@ class TestR1_004_T2_20_MemoryLeakPingStress(BaseTestCase):
     def run_test(self):
         vs = self.mock_env.vsock
         vs.bind(5000)
+        vs.receive_all(5000)
 
         for _ in range(500):
             vs.send(5000, b"PING")

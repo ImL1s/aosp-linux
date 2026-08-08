@@ -1,14 +1,14 @@
 /*
  * Copyright (C) 2026 The Android Open Source Project
  *
- * Licensed under the Apache License, Version 2.0 (Compliance);
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
+ * distributed under the License is distributed on an "IS AS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
@@ -22,6 +22,7 @@
 #include <cassert>
 #include <vector>
 #include <cstring>
+#include <cstdlib>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -79,10 +80,17 @@ int testVsockFramingPacking() {
 }
 
 int testSocketServerLifecycle() {
-    std::cout << "[TEST] SocketServer Lifecycle & Client Request Handling... " << std::flush;
+    std::cout << "[TEST] SocketServer Deferred Handshake & Real VM Lifecycle... " << std::flush;
+
+    setenv("TEST_MODE", "1", 1);
+    HmacAuth::clearUsedTokens();
 
     std::string testSockPath = "/tmp/linux_bridge_test_server.sock";
     SocketServer server(testSockPath);
+    VsockServer vsockServer;
+    vsockServer.start();
+    server.setVsockServer(&vsockServer);
+
     bool started = server.start();
     assert(started);
     assert(server.isRunning());
@@ -99,23 +107,46 @@ int testSocketServerLifecycle() {
     int res = connect(clientFd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr));
     assert(res == 0);
 
-    // Send CMD_VM_START
+    // Send CMD_VM_START (0x0001)
     std::vector<uint8_t> startPacket = SocketServer::serializePacket(0x0001, 100, {});
     ssize_t written = write(clientFd, startPacket.data(), startPacket.size());
     assert(written == static_cast<ssize_t>(startPacket.size()));
 
-    // Read response (expected CMD_HANDSHAKE_COMPLETE 0x0003)
+    // Verify VM state is STARTING and child PID was spawned
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    assert(server.getVmState() == VmState::STARTING);
+    assert(server.getVmPid() > 0);
+
+    // Trigger Vsock handshake callback (simulating Vsock HMAC authentication success from Guest CID 3)
+    server.onVsockHandshakeSuccess(3);
+
+    // Read response on clientFd (expected CMD_HANDSHAKE_COMPLETE 0x0003)
     SocketPacketHeader respHeader;
     assert(SocketServer::readFull(clientFd, &respHeader, sizeof(respHeader)));
     assert(ntohl(respHeader.magic) == LNXB_MAGIC);
     assert(ntohs(respHeader.cmdType) == 0x0003); // CMD_HANDSHAKE_COMPLETE
+    assert(server.getVmState() == VmState::RUNNING);
+
+    // Send CMD_VM_STOP (0x0002)
+    std::vector<uint8_t> stopPacket = SocketServer::serializePacket(0x0002, 101, {0x01});
+    written = write(clientFd, stopPacket.data(), stopPacket.size());
+    assert(written == static_cast<ssize_t>(stopPacket.size()));
+
+    SocketPacketHeader stopRespHeader;
+    assert(SocketServer::readFull(clientFd, &stopRespHeader, sizeof(stopRespHeader)));
+    assert(ntohl(stopRespHeader.magic) == LNXB_MAGIC);
+    assert(ntohs(stopRespHeader.cmdType) == 0x0002); // CMD_VM_STOP
+    assert(server.getVmState() == VmState::STOPPED);
+    assert(server.getVmPid() == -1);
 
     close(clientFd);
     server.stop();
+    vsockServer.stop();
     assert(!server.isRunning());
 
     std::cout << "PASS" << std::endl;
     return 0;
+
 }
 
 int testPartialReadAndPayloadSanitization() {
@@ -150,8 +181,8 @@ int testPartialReadAndPayloadSanitization() {
     std::memcpy(invalidRaw.data(), &hugeHeader, sizeof(SocketPacketHeader));
 
     SocketPacketHeader parsedHeader;
-    std::vector<uint8_t> parsedPayload;
-    bool result = SocketServer::parsePacket(invalidRaw, parsedHeader, parsedPayload);
+    std::vector<uint8_t> payload;
+    bool result = SocketServer::parsePacket(invalidRaw, parsedHeader, payload);
     assert(!result);
 
     std::cout << "PASS" << std::endl;
@@ -159,7 +190,7 @@ int testPartialReadAndPayloadSanitization() {
 }
 
 int testVsockServerAuthenticationAndBinding() {
-    std::cout << "[TEST] VsockServer Handshake & Unauthenticated Binding Restriction... " << std::flush;
+    std::cout << "[TEST] VsockServer Handshake & UnauthenticatedBinding Restriction... " << std::flush;
 
     HmacAuth::clearUsedTokens();
 
@@ -210,7 +241,7 @@ int main() {
     failures += testPartialReadAndPayloadSanitization();
     failures += testVsockServerAuthenticationAndBinding();
 
-    std::cout << "===================================================" << std::endl;
+    std::cout << "=====================================================" << std::endl;
     if (failures == 0) {
         std::cout << "NATIVE TEST RESULT: ALL TESTS PASSED SUCCESSFULLY" << std::endl;
         return 0;

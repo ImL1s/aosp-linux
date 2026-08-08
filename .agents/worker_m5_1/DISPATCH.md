@@ -1,33 +1,41 @@
-## 2026-08-06T12:06:03Z
-You are Worker 1 for Milestone M5 (Hardware Portals, Virtiofs Bi-directional File Sharing, SELinux Policies & Guest A/B Base Image Rollback OTA).
+## 2026-08-08T06:15:07Z
+You are Worker 1 for Milestone M5 (Real System Hardware Portals - R5).
+Working directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m5_1
 
-Working Directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m5_1
+Mandatory context files to read:
+1. /Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md
+2. /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
+3. /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m5_1/handoff.md
+4. /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m5_2/handoff.md
+5. /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m5_3/handoff.md
+
+Write Ownership:
+- frameworks/base/services/core/java/com/android/server/linux/LinuxPortalService.java
+- frameworks/base/services/core/java/com/android/server/linux/storage/LinuxStorageProvider.java
+(and related internal service helper interfaces in frameworks/base/services/core/java/com/android/server/linux/ if needed).
+
+Task Objective:
+Implement Milestone M5 requirements:
+1. LinuxPortalService.java:
+   - Replace mAppOpsStore ConcurrentHashMap with real AppOpsManager system calls (unsafeCheckOpRaw, noteOpNoThrow) using OPSTR_CAMERA, OPSTR_RECORD_AUDIO, OPSTR_FINE_LOCATION, OPSTR_COARSE_LOCATION. Include null-checks for mContext/mAppOpsManager for unit test compatibility.
+   - Replace in-memory dummy models for Camera, Audio, Location with real system APIs:
+     * Camera: CameraManager, AvailabilityCallback for contention, openCamera, ImageReader (YUV_420_888), streaming frames over vsock port 5000 to /dev/video0.
+     * Audio: AudioRecord (PCM 16-bit), background thread, privacy zero-filling, channel downmix, streaming PCM audio over vsock port 5000 to virtio-snd.
+     * Location: LocationManager.requestLocationUpdates(), GeoClue D-Bus JSON updates over vsock port 5000, coarse location obfuscation support.
+     * Cleanup: Register lifecycle hooks with LinuxManagerService to release hardware on VM stop/suspend.
+
+2. LinuxStorageProvider.java:
+   - Remove manual boolean setters (setVmRunning, setCeKeyAvailable, setReadOnlyMount) and manual state fields.
+   - Link SAF provider dynamically to LocalServices.getService(LinuxManagerInternal.class) VM state (STATE_RUNNING) and vold/LinuxCeKeyManager LUKS2 mount lifecycle (isCeKeyAvailable(), isReadOnlyMount()).
+   - Trigger ContentResolver.notifyChange(DocumentsContract.buildRootsUri(AUTHORITY), null) on VM state and storage unlock transitions.
+   - Ensure unit tests (LinuxStorageProviderTest) work seamlessly via mock/fake LocalServices.
 
 MANDATORY INTEGRITY WARNING:
 DO NOT CHEAT. All implementations must be genuine. DO NOT hardcode test results, create dummy/facade implementations, or circumvent the intended task. A teamwork_preview_auditor will independently verify your work. Integrity violations WILL be detected and your work WILL be rejected.
 
-MANDATORY Context & Reference Files (You MUST read these files first):
-- ORIGINAL_REQUEST.md: /Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md
-- PROJECT.md: /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
-- Scope Document: /Users/iml1s/Documents/mine/aosp-linux/.agents/sub_orch_m5/SCOPE.md
-- Full Technical Architecture Plan: /Users/iml1s/.gemini/antigravity-cli/brain/29f720f6-2fc4-4aa4-af7a-b720fbb0d62a/aosp_linux_system_architecture_plan.md
-- Explorer 1 Analysis & Handoff (Portals & Audio): /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m5_1/analysis.md and /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m5_1/handoff.md
-- Explorer 2 Analysis & Handoff (Virtiofs & Storage SAF): /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m5_2/analysis.md and /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m5_2/handoff.md
-- Explorer 3 Analysis & Handoff (SELinux & OTA Rollback): /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m5_3/analysis.md and /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m5_3/handoff.md
+Verification Requirements:
+After making edits, run the build and test verification script:
+`./scripts/run_m5_verification.sh`
+and any unit test runners. Document all build/test commands and exact output in your report.
 
-Your Task:
-Implement, build, and verify all 14 features of Milestone M5:
-1. F-R5-001: XDG Portal Camera Bridge (`LinuxPortalService.java`, `org.freedesktop.portal.Camera` -> Camera2 HAL).
-2. F-R5-002: XDG Portal Microphone Bridge (`org.freedesktop.portal.Microphone` -> Host AudioRecord).
-3. F-R5-003: XDG Portal Location Bridge (`org.freedesktop.portal.Location` -> Host LocationManager).
-4. F-R5-004: AppOps Permission Prompt (`LinuxPermissionActivity.java`, `AppOpsManager` enforcement).
-5. F-R5-005: virtio-snd Audio Mapping (`virtio-snd` guest driver -> Host AudioService / AudioTrack).
-6. F-R5-006: AudioFocus Policy Handler (`LinuxAudioPolicyHandler.java` for phone call / alarm ducking and pausing).
-7. F-R5-007: virtiofs Bi-directional Sharing (`/data/media/0/LinuxShared` <-> `/mnt/shared` zero-copy page cache mount).
-8. F-R5-008: LinuxStorageProvider SAF Provider (`DocumentsProvider` integration for `/home/user`).
-9. F-R5-009: SELinux Domain Policy Rules (`linux_manager.te`, `linux_bridge.te`, `linux_portal.te`, file_contexts).
-10. F-R5-010: SELinux neverallow Rules (strict neverallow assertions for `efs_file` and system partition writes).
-11. F-R5-011: CTS / VTS Compatibility (`CtsSELinuxHostTestCases`, `CtsSecurityTestCases` compliance).
-12. F-R5-012: EROFS Base Image A/B Layout (immutable read-only EROFS `base_a.img` / `base_b.img` dual slot layout).
-13. F-R5-013: AVB Key Signature Validation (AVB key chain verification engine).
-14. F-R5-014: Boot Watchdog Rollback Engine (3-boot attempt watchdog fallback in `guest_ota_rollback_watchdog.cpp` / `ota_rollback.rs`).
+Write your report to /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m5_1/handoff.md and notify orchestrator via send_message when done.

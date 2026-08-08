@@ -77,7 +77,7 @@ class TestR2_001_T1_29_AndroidBridgeAgentServiceActive(BaseTestCase):
         cargo_path = os.path.join(PROJECT_ROOT, "guest", "bridge-agent", "Cargo.toml")
         with open(cargo_path, "r") as f:
             content = f.read()
-        CustomAssertions.assert_in('name = "android-bridge-agent"', content)
+        CustomAssertions.assert_in('name = "bridge-agent"', content)
 
         res = CommandRunner.run(
             'export PATH="$HOME/.cargo/bin:$PATH"; cargo check',

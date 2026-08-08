@@ -19,6 +19,8 @@
 #include <string>
 #include <atomic>
 #include <thread>
+#include <condition_variable>
+#include <mutex>
 
 namespace android {
 namespace linux_bridge {
@@ -42,11 +44,17 @@ struct SlotMetadata {
 class BootWatchdogEngine {
 private:
     std::atomic<bool> mHeartbeatReceived{false};
+    std::atomic<bool> mStopRequested{false};
     std::atomic<uint64_t> mWatchdogGen{0};
     std::thread mTimerThread;
+    std::condition_variable mCv;
+    std::mutex mCvMutex;
     int mMaxTimeoutSec = 60;
     std::string mMetadataPath = "/data/system/linux/slot_metadata.json";
     SlotMetadata mMetadata;
+
+    void stopWatchdogThread();
+
 
 
 public:

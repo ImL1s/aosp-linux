@@ -8,7 +8,7 @@
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
+ * distributed under the License is distributed on an AS IS BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
@@ -34,6 +34,7 @@ public:
     static constexpr double HANDSHAKE_TIMEOUT_SEC = 5.0;
 
     static std::vector<uint8_t> generateRandomToken();
+    static std::string hexEncode(const std::vector<uint8_t>& bytes);
     static std::vector<uint8_t> computeHmacSha256(const std::vector<uint8_t>& secret, const std::vector<uint8_t>& token);
     
     static bool verifyHandshake(

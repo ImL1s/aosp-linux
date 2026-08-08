@@ -30,9 +30,27 @@ public abstract class Context {
     public static final String INPUT_METHOD_SERVICE = "input_method";
     public static final String ACTIVITY_SERVICE = "activity";
     public static final String AUDIO_SERVICE = "audio";
+    public static final String APP_OPS_SERVICE = "appops";
+    public static final String CAMERA_SERVICE = "camera";
+    public static final String LOCATION_SERVICE = "location";
     public static final int MODE_PRIVATE = 0;
 
     public abstract Object getSystemService(String name);
+
+    @SuppressWarnings("unchecked")
+    public <T> T getSystemService(Class<T> serviceClass) {
+        String serviceName = getSystemServiceName(serviceClass);
+        return serviceName != null ? (T) getSystemService(serviceName) : null;
+    }
+
+    public String getSystemServiceName(Class<?> serviceClass) {
+        if ("android.app.AppOpsManager".equals(serviceClass.getName())) return APP_OPS_SERVICE;
+        if ("android.hardware.camera2.CameraManager".equals(serviceClass.getName())) return CAMERA_SERVICE;
+        if ("android.location.LocationManager".equals(serviceClass.getName())) return LOCATION_SERVICE;
+        if ("android.media.AudioManager".equals(serviceClass.getName())) return AUDIO_SERVICE;
+        return null;
+    }
+
     public SharedPreferences getSharedPreferences(String name, int mode) { return null; }
     public abstract void enforceCallingOrSelfPermission(String permission, String message);
     public abstract Executor getMainExecutor();

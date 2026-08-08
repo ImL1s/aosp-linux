@@ -3,7 +3,7 @@
 AOSP Dual-OS E2E Test Suite Runner CLI (`tests/e2e/runner.py`).
 
 Usage:
-  python3 runner.py [--tier {1,2,3,4}] [--feature FEATURE_ID] [--report REPORT_PATH] [--verbose] [--list]
+  python3 runner.py [--tier TIER ...] [--feature FEATURE_ID] [--report REPORT_PATH] [--verbose] [--list]
 """
 
 import sys
@@ -12,13 +12,14 @@ import time
 import argparse
 import inspect
 import importlib
+from typing import List, Set, Union
 
 # Ensure current directory is in sys.path
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
-from framework import BaseTestCase, TestResult, TestStatus, MockEnvironment, ReportFormatter
+from framework import BaseTestCase, TestResult, TestStatus, SystemEnvironment, ReportFormatter
 
 # Mapping of tier numbers to candidate directory names
 TIER_DIRS = {
@@ -28,18 +29,26 @@ TIER_DIRS = {
     4: ["tier4_real_world", "tier4"],
 }
 
-DEFAULT_REPORT_PATH = "/Users/iml1s/Documents/mine/aosp-linux/tests/e2e_report.json"
+DEFAULT_REPORT_PATH = os.path.abspath(os.path.join(BASE_DIR, "..", "e2e_report.json"))
 
-def discover_test_classes(tier_filter: int = None) -> list:
+def discover_test_classes(tier_filter: Union[int, List[int], Set[int], None] = None) -> list:
     """
     Dynamically discover all BaseTestCase subclasses from tier directories
     (tier1, tier2, tier3, tier4 or their feature coverage aliases).
+    Supports a single tier int or a list/set of tier ints.
     """
     discovered_classes = []
     seen_class_keys = set()
     scanned_realpaths = set()
 
-    target_tiers = [tier_filter] if tier_filter in TIER_DIRS else sorted(TIER_DIRS.keys())
+    if tier_filter is None:
+        target_tiers = sorted(TIER_DIRS.keys())
+    elif isinstance(tier_filter, int):
+        target_tiers = [tier_filter] if tier_filter in TIER_DIRS else []
+    elif isinstance(tier_filter, (list, set, tuple)):
+        target_tiers = sorted([t for t in tier_filter if t in TIER_DIRS])
+    else:
+        target_tiers = sorted(TIER_DIRS.keys())
 
     for tier_num in target_tiers:
         dir_candidates = TIER_DIRS[tier_num]
@@ -90,7 +99,12 @@ def list_tests(tests: list):
 
 def main():
     parser = argparse.ArgumentParser(description="AOSP Dual-OS E2E Test Suite Runner")
-    parser.add_argument("--tier", type=int, choices=[1, 2, 3, 4], help="Run tests for specific tier (1, 2, 3, 4)")
+    parser.add_argument(
+        "--tier",
+        action="append",
+        nargs="*",
+        help="Specify tier(s) to run (e.g. --tier 1 --tier 2, or --tier 1 2, or --tier 1,2)"
+    )
     parser.add_argument("--feature", type=str, help="Filter tests by Feature ID (e.g. F-R1-001)")
     parser.add_argument("--filter", type=str, help="Filter tests by substring in test_id, feature_id, or title")
     parser.add_argument(
@@ -105,9 +119,24 @@ def main():
 
     args = parser.parse_args()
 
+    # Parse multi-value --tier arguments
+    selected_tiers = set()
+    if args.tier:
+        for group in args.tier:
+            if isinstance(group, list):
+                for item in group:
+                    for part in str(item).split(','):
+                        if part.strip().isdigit():
+                            selected_tiers.add(int(part.strip()))
+            elif isinstance(group, (int, str)):
+                for part in str(group).split(','):
+                    if part.strip().isdigit():
+                        selected_tiers.add(int(part.strip()))
+    tier_filter = list(selected_tiers) if selected_tiers else None
+
     report_path = args.output_json if args.output_json else args.report
 
-    test_classes = discover_test_classes(tier_filter=args.tier)
+    test_classes = discover_test_classes(tier_filter=tier_filter)
 
     if args.feature:
         feat_pattern = args.feature.lower()
@@ -137,27 +166,31 @@ def main():
     start_time = time.time()
     results = []
 
-    # Shared mock environment for test execution
-    mock_env = MockEnvironment()
+    # Real system environment with socket harness server
+    env = SystemEnvironment()
+    env.start_harness()
 
-    for test_cls in test_classes:
-        test_instance = test_cls(mock_env=mock_env)
-        result = test_instance.execute()
-        results.append(result)
+    try:
+        for test_cls in test_classes:
+            test_instance = test_cls(mock_env=env)
+            result = test_instance.execute()
+            results.append(result)
 
-        status_symbol = {
-            TestStatus.PASS: "[PASS]",
-            TestStatus.FAIL: "[FAIL]",
-            TestStatus.ERROR: "[ERR ]",
-            TestStatus.SKIP: "[SKIP]",
-        }.get(result.status, "[????]")
+            status_symbol = {
+                TestStatus.PASS: "[PASS]",
+                TestStatus.FAIL: "[FAIL]",
+                TestStatus.ERROR: "[ERR ]",
+                TestStatus.SKIP: "[SKIP]",
+            }.get(result.status, "[????]")
 
-        print(f"{status_symbol} Tier {result.tier} | {result.feature_id:<10} | {result.test_id:<12} | {result.name}")
+            print(f"{status_symbol} Tier {result.tier} | {result.feature_id:<10} | {result.test_id:<12} | {result.name}")
 
-        if args.verbose and result.status in (TestStatus.FAIL, TestStatus.ERROR):
-            print(f"       └── Failure Details for {result.test_id}: {result.error_message}")
-            if result.stack_trace:
-                print(f"{result.stack_trace}")
+            if args.verbose and result.status in (TestStatus.FAIL, TestStatus.ERROR):
+                print(f"       └── Failure Details for {result.test_id}: {result.error_message}")
+                if result.stack_trace:
+                    print(f"{result.stack_trace}")
+    finally:
+        env.stop_harness()
 
     elapsed = time.time() - start_time
 

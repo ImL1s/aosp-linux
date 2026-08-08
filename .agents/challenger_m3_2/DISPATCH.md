@@ -1,17 +1,19 @@
-## 2026-08-06T11:02:46Z
+## 2026-08-08T06:22:37Z
+You are Challenger 2 for Milestone M3 (Real Vsock Socket Connect & Session ID - R3).
+Your working directory is /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2.
 
-You are Challenger 2 for Milestone M3 (Native Touch Terminal & IME).
+Paths to read before starting:
+- /Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md
+- /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m3_1/changes.md
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m3_1/handoff.md
 
-Working Directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2
+Challenge Task:
+1. Empirically stress-test dynamic session ID generation and 16-byte framing alignment.
+2. Verify that LinuxManagerService generates session IDs that are strictly 16 bytes in length and format.
+3. Test VsockPtyFramer under sequential and rapid session ID creation.
+4. Execute test suites and empirical validation routines.
+5. Render a clear verdict: APPROVE or REJECT.
 
-Mandatory Reference Files:
-- ORIGINAL_REQUEST.md: /Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md (READ THIS FIRST!)
-- PROJECT.md: /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
-- SCOPE.md: /Users/iml1s/Documents/mine/aosp-linux/.agents/sub_orch_m3/SCOPE.md
-- Technical Architecture Plan: /Users/iml1s/.gemini/antigravity-cli/brain/29f720f6-2fc4-4aa4-af7a-b720fbb0d62a/aosp_linux_system_architecture_plan.md
-- Worker Handoff: /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m3/handoff.md
-
-Objective:
-Perform adversarial validation of CJK IME handling, vsock framing boundary conditions, malformed packet injections, and multi-byte UTF-8 socket fragmentation handling across all 7 features of M3.
-
-Provide your verdict (`APPROVE` or `REJECT`) with detailed findings in `/Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2/challenge_report.md` and `handoff.md`, then send a message back.
+Write your findings report to /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2/challenge.md and handoff report to /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2/handoff.md.
+When finished, send a message to parent with your verdict, summary, and artifact path.

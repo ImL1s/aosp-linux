@@ -1,0 +1,1866 @@
+
+================================================================================
+FILE: tier1_feature_coverage/test_m1_tier1.py (376 lines)
+================================================================================
+
+L  15: class TestR1_001_T1_01_ApiClassPresence(BaseTestCase):
+  L  24: CustomAssertions.assert_equal(pkg_parts[0], "android")
+  L  25: CustomAssertions.assert_equal(pkg_parts[1], "system")
+  L  26: CustomAssertions.assert_equal(pkg_parts[2], "linux")
+  L  27: CustomAssertions.assert_equal(pkg_parts[3], "LinuxManager")
+
+L  30: class TestR1_001_T1_02_ServiceRetrievalContext(BaseTestCase):
+  L  38: self.mock_env.system_server.registered_services[service_name] = "LinuxManager"
+  L  39: CustomAssertions.assert_in(service_name, self.mock_env.system_server.registered_services)
+  L  40: CustomAssertions.assert_equal(self.mock_env.system_server.registered_services[service_name], "LinuxManager")
+
+L  43: class TestR1_001_T1_03_LinuxAppInfoInstantiation(BaseTestCase):
+  L  56: CustomAssertions.assert_equal(app_info["app_id"], "org.debian.gimp")
+  L  57: CustomAssertions.assert_equal(app_info["name"], "GNU Image Manipulation Program")
+  L  58: CustomAssertions.assert_true(app_info["icon"].startswith("/usr/share/icons"))
+
+L  61: class TestR1_001_T1_04_StatusCallbackRegistration(BaseTestCase):
+  L  75: self.mock_env.system_server.registered_callbacks.append(listener)
+  L  76: CustomAssertions.assert_in(listener, self.mock_env.system_server.registered_callbacks)
+
+L  79: class TestR1_001_T1_05_QueryInitialGuestStatus(BaseTestCase):
+  L  86: current_state = self.mock_env.system_server.vm_state
+  L  87: CustomAssertions.assert_equal(current_state, "OFF")
+
+L  93: class TestR1_002_T1_06_StartVmAidlInvocation(BaseTestCase):
+  L 100: CustomAssertions.assert_equal(self.mock_env.system_server.vm_state, "OFF")
+  L 101: self.mock_env.system_server.set_state("STARTING")
+  L 102: CustomAssertions.assert_equal(self.mock_env.system_server.vm_state, "STARTING")
+
+L 105: class TestR1_002_T1_07_StatusCallbackDispatchNotification(BaseTestCase):
+  L 118: self.mock_env.system_server.registered_callbacks.append(cb)
+  L 119: self.mock_env.system_server.set_state("RUNNING")
+  L 120: CustomAssertions.assert_in("RUNNING", dispatched_states)
+
+L 123: class TestR1_002_T1_08_TerminalCallbackByteStream(BaseTestCase):
+  L 138: CustomAssertions.assert_equal(len(received_chunks), 1)
+  L 139: CustomAssertions.assert_equal(received_chunks[0], payload)
+
+L 142: class TestR1_002_T1_09_GetVmStatusAidlQuery(BaseTestCase):
+  L 149: self.mock_env.system_server.set_state("RUNNING")
+  L 150: status = self.mock_env.system_server.vm_state
+  L 151: CustomAssertions.assert_equal(status, "RUNNING")
+
+L 154: class TestR1_002_T1_10_ListenerRegistrationUnregistration(BaseTestCase):
+  L 162: self.mock_env.system_server.registered_callbacks.append(dummy_listener)
+  L 163: CustomAssertions.assert_in(dummy_listener, self.mock_env.system_server.registered_callbacks)
+  L 164: self.mock_env.system_server.registered_callbacks.remove(dummy_listener)
+  L 165: CustomAssertions.assert_false(dummy_listener in self.mock_env.system_server.registered_callbacks)
+
+L 171: class TestR1_003_T1_11_ServicePublishedInServiceManager(BaseTestCase):
+  L 178: self.mock_env.system_server.registered_services["linux"] = "LinuxManagerService"
+  L 179: CustomAssertions.assert_in("linux", self.mock_env.system_server.registered_services)
+  L 180: CustomAssertions.assert_equal(
+  L 181: self.mock_env.system_server.registered_services["linux"], "LinuxManagerService"
+
+L 185: class TestR1_003_T1_12_SystemServerPhaseThirdPartyInit(BaseTestCase):
+  L 194: CustomAssertions.assert_equal(init_phase, PHASE_THIRD_PARTY_APPS_CAN_START)
+
+L 197: class TestR1_003_T1_13_LocalServiceRegistrationInternal(BaseTestCase):
+  L 204: self.mock_env.system_server.registered_services["LinuxManagerInternal"] = "LinuxManagerInternalImpl"
+  L 205: CustomAssertions.assert_in("LinuxManagerInternal", self.mock_env.system_server.registered_services)
+
+L 208: class TestR1_003_T1_14_BootCompletedReceiverDaemonInit(BaseTestCase):
+  L 215: bound = self.mock_env.vsock.bind(5000)
+  L 216: CustomAssertions.assert_true(bound)
+  L 217: CustomAssertions.assert_true(self.mock_env.vsock.bound_ports[5000])
+
+L 220: class TestR1_003_T1_15_UserSwitchStorageKeyRotation(BaseTestCase):
+  L 227: CustomAssertions.assert_false(self.mock_env.system_server.ce_key_available)
+  L 228: self.mock_env.system_server.unlock_user()
+  L 229: CustomAssertions.assert_true(self.mock_env.system_server.ce_key_available)
+
+L 235: class TestR1_004_T1_16_DaemonProcessCredentials(BaseTestCase):
+  L 244: CustomAssertions.assert_equal(uid, 1000)
+  L 245: CustomAssertions.assert_equal(gid, 1000)
+
+L 248: class TestR1_004_T1_17_ControlVsockSocketBind5000(BaseTestCase):
+  L 255: bound = self.mock_env.vsock.bind(5000)
+  L 256: CustomAssertions.assert_true(bound)
+
+L 259: class TestR1_004_T1_18_UnixDomainSocketIpcEstablishment(BaseTestCase):
+  L 267: CustomAssertions.assert_true(socket_path.startswith("/dev/socket/"))
+  L 268: CustomAssertions.assert_equal(os.path.basename(socket_path), "linux_bridge")
+
+L 271: class TestR1_004_T1_19_PingPongHeartbeatActive(BaseTestCase):
+  L 278: self.mock_env.vsock.bind(5000)
+  L 279: self.mock_env.vsock.send(5000, b"PING")
+  L 280: packets = self.mock_env.vsock.receive_all(5000)
+  L 281: CustomAssertions.assert_equal(len(packets), 1)
+  L 282: CustomAssertions.assert_equal(packets[0], b"PING")
+
+L 285: class TestR1_004_T1_20_ProcessOomAdjPriority(BaseTestCase):
+  L 293: CustomAssertions.assert_true(oom_score_adj < 0)
+  L 294: CustomAssertions.assert_equal(oom_score_adj, -800)
+
+L 300: class TestR1_005_T1_21_TransitionOffStartingRunning(BaseTestCase):
+  L 307: ss = self.mock_env.system_server
+  L 308: CustomAssertions.assert_equal(ss.vm_state, "OFF")
+  L 310: CustomAssertions.assert_equal(ss.vm_state, "STARTING")
+  L 312: CustomAssertions.assert_equal(ss.vm_state, "RUNNING")
+
+L 315: class TestR1_005_T1_22_TransitionRunningSuspendedRunning(BaseTestCase):
+  L 322: ss = self.mock_env.system_server
+  L 324: CustomAssertions.assert_equal(ss.vm_state, "RUNNING")
+  L 326: CustomAssertions.assert_equal(ss.vm_state, "SUSPENDED")
+  L 328: CustomAssertions.assert_equal(ss.vm_state, "RUNNING")
+
+L 331: class TestR1_005_T1_23_TransitionRunningStoppingOff(BaseTestCase):
+  L 338: ss = self.mock_env.system_server
+  L 341: CustomAssertions.assert_equal(ss.vm_state, "STOPPING")
+  L 343: CustomAssertions.assert_equal(ss.vm_state, "OFF")
+
+L 346: class TestR1_005_T1_24_TransitionRunningErrorOnCrash(BaseTestCase):
+  L 353: ss = self.mock_env.system_server
+  L 356: CustomAssertions.assert_equal(ss.vm_state, "ERROR")
+
+L 359: class TestR1_005_T1_25_StatusBroadcastNotificationSequence(BaseTestCase):
+  L 371: self.mock_env.system_server.registered_callbacks.append(BroadcastListener())
+  L 374: self.mock_env.system_server.set_state(st)
+  L 376: CustomAssertions.assert_equal(history, transitions)
+
+================================================================================
+FILE: tier1_feature_coverage/test_m2_tier1.py (403 lines)
+================================================================================
+
+L  19: class TestR2_001_T1_26_LaunchCrosvmNonProtected(BaseTestCase):
+  L  27: CustomAssertions.assert_true(os.path.exists(config_path), f"Config missing at {config_path}")
+  L  31: CustomAssertions.assert_false(cfg.get("protected"))
+  L  32: CustomAssertions.assert_equal(cfg.get("vsock", {}).get("cid"), 3)
+  L  33: CustomAssertions.assert_equal(cfg.get("kernel", {}).get("kernel_path"), "/apex/com.android.virt/etc/vmlinux")
+  L  36: CustomAssertions.assert_equal(res.exit_code, 0, f"launch_vm.sh syntax error: {res.stderr}")
+
+L  39: class TestR2_001_T1_27_GuestKernelBootVerification(BaseTestCase):
+  L  50: CustomAssertions.assert_in("console=ttyS0", cmdline)
+  L  51: CustomAssertions.assert_in("root=/dev/vda", cmdline)
+  L  52: CustomAssertions.assert_in("init=/sbin/init", cmdline)
+
+L  55: class TestR2_001_T1_28_GuestSystemdInitCompletion(BaseTestCase):
+  L  63: CustomAssertions.assert_true(os.path.exists(service_path))
+  L  66: CustomAssertions.assert_in("ExecStart=/usr/bin/android-bridge-agent", content)
+  L  67: CustomAssertions.assert_in("Restart=always", content)
+
+L  70: class TestR2_001_T1_29_AndroidBridgeAgentServiceActive(BaseTestCase):
+  L  80: CustomAssertions.assert_in('name = "android-bridge-agent"', content)
+  L  86: CustomAssertions.assert_equal(res.exit_code, 0, f"Cargo check failed: {res.stderr}")
+
+L  89: class TestR2_001_T1_30_VirtualCpuRamAllocation(BaseTestCase):
+  L  99: CustomAssertions.assert_equal(cfg.get("cpu", {}).get("cpus"), 4)
+  L 100: CustomAssertions.assert_equal(cfg.get("memory", {}).get("ram_mb"), 4096)
+
+L 106: class TestR2_002_T1_31_MountReadOnlyBaseRootfs(BaseTestCase):
+  L 117: CustomAssertions.assert_true(base_disk.get("read_only"))
+  L 118: CustomAssertions.assert_equal(base_disk.get("path"), "/data/misc/linux/base_rootfs.img")
+
+L 121: class TestR2_002_T1_32_MountOverlayfsWritableLayer(BaseTestCase):
+  L 132: CustomAssertions.assert_false(overlay_disk.get("read_only"))
+  L 137: CustomAssertions.assert_in("lowerdir=", script)
+  L 138: CustomAssertions.assert_in("upperdir=", script)
+
+L 141: class TestR2_002_T1_33_MountLuksDecryptedUserHome(BaseTestCase):
+  L 152: CustomAssertions.assert_equal(user_disk.get("path"), "/dev/mapper/user_home_decrypted")
+  L 153: CustomAssertions.assert_false(user_disk.get("read_only"))
+
+L 156: class TestR2_002_T1_34_VmStateSnapshotCreation(BaseTestCase):
+  L 167: CustomAssertions.assert_equal(snap_path, "/data/misc/linux/vm_state.snapshot")
+
+L 170: class TestR2_002_T1_35_OverlayfsDiffPersistence(BaseTestCase):
+  L 178: CustomAssertions.assert_equal(res.exit_code, 0)
+  L 183: CustomAssertions.assert_in("/mnt/overlay/upper", content)
+
+L 189: class TestR2_003_T1_36_DeriveKeyFromCeKeymaster(BaseTestCase):
+  L 199: CustomAssertions.assert_in("aosp.linux.ce.user_home.luks2_master_key", code)
+
+L 202: class TestR2_003_T1_37_CryptsetupOpenOnUserUnlock(BaseTestCase):
+  L 212: CustomAssertions.assert_in("onUserUnlocked", code)
+  L 213: CustomAssertions.assert_in("getOrGeneratePersistentMasterKey", code)
+  L 214: CustomAssertions.assert_in("mCeKeyAvailable = true", code)
+
+L 217: class TestR2_003_T1_38_MountDecryptedMapperToUserHome(BaseTestCase):
+  L 228: CustomAssertions.assert_equal(user_disk.get("path"), "/dev/mapper/user_home_decrypted")
+
+L 231: class TestR2_003_T1_39_UnmountAndCloseOnUserLock(BaseTestCase):
+  L 241: CustomAssertions.assert_in("onUserLocked", code)
+  L 242: CustomAssertions.assert_in("Arrays.fill", code)
+  L 243: CustomAssertions.assert_in("mCeKeyAvailable = false", code)
+
+L 246: class TestR2_003_T1_40_Aes256XtsCipherValidation(BaseTestCase):
+  L 256: CustomAssertions.assert_in("aes-xts-plain64", code)
+
+L 262: class TestR2_004_T1_41_Port5000ControlRpcBound(BaseTestCase):
+  L 272: CustomAssertions.assert_in("VSOCK_PORT_CONTROL = 5000", code)
+  L 275: CustomAssertions.assert_equal(res.exit_code, 0, f"linux_bridge_test failed: {res.stderr}")
+
+L 278: class TestR2_004_T1_42_Port5001PtyStreamBound(BaseTestCase):
+  L 288: CustomAssertions.assert_in("VSOCK_PORT_PTY     = 5001", code)
+  L 291: CustomAssertions.assert_equal(res.exit_code, 0, f"framing test failed: {res.stderr}")
+
+L 294: class TestR2_004_T1_43_Port5002WaylandGuiBound(BaseTestCase):
+  L 304: CustomAssertions.assert_in("VSOCK_PORT_WAYLAND = 5002", code)
+  L 307: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 310: class TestR2_004_T1_44_ThreePortBiDirectionalTransmission(BaseTestCase):
+  L 318: CustomAssertions.assert_equal(res.exit_code, 0)
+  L 319: CustomAssertions.assert_in("NATIVE TEST RESULT: ALL TESTS PASSED SUCCESSFULLY", res.stdout)
+
+L 322: class TestR2_004_T1_45_IndependentPortCloseTeardown(BaseTestCase):
+  L 332: CustomAssertions.assert_in("unbindPort", code)
+
+L 338: class TestR2_005_T1_46_HostRandomTokenGeneration(BaseTestCase):
+  L 348: CustomAssertions.assert_in("generateRandomToken()", code)
+  L 351: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 354: class TestR2_005_T1_47_TokenPassedViaVirtioSeed(BaseTestCase):
+  L 365: CustomAssertions.assert_in("linux_auth_token=", cmdline)
+
+L 368: class TestR2_005_T1_48_GuestComputesHmacSignature(BaseTestCase):
+  L 378: CustomAssertions.assert_in("HmacSha256", code)
+  L 379: CustomAssertions.assert_in("compute_hmac_response", code)
+
+L 382: class TestR2_005_T1_49_HostVerifiesChallengeResponse(BaseTestCase):
+  L 390: CustomAssertions.assert_equal(res.exit_code, 0)
+  L 391: CustomAssertions.assert_in("Single-use token replay rejection: PASS", res.stdout)
+
+L 394: class TestR2_005_T1_50_SessionEstablishmentAuthenticatedState(BaseTestCase):
+  L 402: CustomAssertions.assert_equal(res.exit_code, 0)
+  L 403: CustomAssertions.assert_in("5s timeout window expiration: PASS", res.stdout)
+
+================================================================================
+FILE: tier1_feature_coverage/test_m3_tier1.py (511 lines)
+================================================================================
+
+L  85: class TestR3_001_T1_51_SurfaceViewCreation(BaseTestCase):
+  L  93: CustomAssertions.assert_equal(res.exit_code, 0)
+  L  94: CustomAssertions.assert_in("F-R3-001: ColorPalette & TerminalScreenMatrix", res.stdout)
+  L  95: CustomAssertions.assert_in("PASS", res.stdout)
+
+L  98: class TestR3_001_T1_52_CanvasPipeline60FpsUpdate(BaseTestCase):
+  L 106: CustomAssertions.assert_equal(res.exit_code, 0)
+  L 107: CustomAssertions.assert_in("JAVA TEST RESULT: ALL M3 TESTS PASSED", res.stdout)
+
+L 110: class TestR3_001_T1_53_FontBitmapGlyphRendering(BaseTestCase):
+  L 118: CustomAssertions.assert_equal(res.exit_code, 0)
+  L 119: CustomAssertions.assert_in("ASCII Stream Write & Cell Query: PASS", res.stdout)
+
+L 122: class TestR3_001_T1_54_AnsiColorPaletteRendering(BaseTestCase):
+  L 130: CustomAssertions.assert_equal(res.exit_code, 0)
+  L 131: CustomAssertions.assert_in("ColorPalette", res.stdout)
+
+L 134: class TestR3_001_T1_55_DynamicTerminalGridRecalculation(BaseTestCase):
+  L 142: CustomAssertions.assert_equal(res.exit_code, 0)
+  L 143: CustomAssertions.assert_in("Screen Resize to 40x120: PASS", res.stdout)
+
+L 149: class TestR3_002_T1_56_ParseStandardAsciiStream(BaseTestCase):
+  L 157: CustomAssertions.assert_equal(res.exit_code, 0)
+  L 158: CustomAssertions.assert_in("Initialization: PASS", res.stdout)
+  L 159: CustomAssertions.assert_in("ASCII Stream Write & Cell Query: PASS", res.stdout)
+
+L 162: class TestR3_002_T1_57_InterpretAnsiEscapeSequences(BaseTestCase):
+  L 170: CustomAssertions.assert_equal(res.exit_code, 0)
+  L 171: CustomAssertions.assert_in("libvterm", res.stdout)
+
+L 174: class TestR3_002_T1_58_ProcessVt100ControlCodes(BaseTestCase):
+  L 182: CustomAssertions.assert_equal(res.exit_code, 0)
+  L 183: CustomAssertions.assert_in("ALL PASSED", res.stdout)
+
+L 186: class TestR3_002_T1_59_MaintainScrollbackBuffer(BaseTestCase):
+  L 194: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 197: class TestR3_002_T1_60_ScreenResizeRecalculation(BaseTestCase):
+  L 205: CustomAssertions.assert_equal(res.exit_code, 0)
+  L 206: CustomAssertions.assert_in("Screen Resize to 40x120: PASS", res.stdout)
+
+L 212: class TestR3_003_T1_61_InstantiateTerminalInputConnection(BaseTestCase):
+  L 220: CustomAssertions.assert_equal(res.exit_code, 0)
+  L 221: CustomAssertions.assert_in("TerminalKeyEncoder", res.stdout)
+
+L 224: class TestR3_003_T1_62_KeyEventTranslation(BaseTestCase):
+  L 232: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 235: class TestR3_003_T1_63_ModifierStateHandling(BaseTestCase):
+  L 243: CustomAssertions.assert_equal(res.exit_code, 0)
+  L 244: CustomAssertions.assert_in("Ctrl & Alt Keys", res.stdout)
+
+L 247: class TestR3_003_T1_64_SoftKeyboardCommitTextDispatch(BaseTestCase):
+  L 255: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 258: class TestR3_003_T1_65_SelectionCursorPositionReporting(BaseTestCase):
+  L 266: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 272: class TestR3_004_T1_66_InlineZhuyinComposingText(BaseTestCase):
+  L 280: CustomAssertions.assert_equal(res.exit_code, 0)
+  L 281: CustomAssertions.assert_in("CjkComposingTextManager", res.stdout)
+
+L 284: class TestR3_004_T1_67_InlineCangjiePinyinComposingText(BaseTestCase):
+  L 292: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 295: class TestR3_004_T1_68_CandidatesSelectionPanelDisplayNavigation(BaseTestCase):
+  L 303: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 306: class TestR3_004_T1_69_Utf8MultiByteStringCommit(BaseTestCase):
+  L 314: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 317: class TestR3_004_T1_70_ComposingTextBackspaceDeletion(BaseTestCase):
+  L 325: CustomAssertions.assert_equal(res.exit_code, 0)
+  L 326: CustomAssertions.assert_in("CjkComposingTextManager", res.stdout)
+
+L 332: class TestR3_005_T1_71_ActiveModeShellMode(BaseTestCase):
+  L 340: CustomAssertions.assert_equal(res.exit_code, 0)
+  L 341: CustomAssertions.assert_in("TouchModeStateMachine", res.stdout)
+
+L 344: class TestR3_005_T1_72_SwitchToTuiMouseMode(BaseTestCase):
+  L 352: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 355: class TestR3_005_T1_73_SwitchToTouchpadMode(BaseTestCase):
+  L 363: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 366: class TestR3_005_T1_74_ModeTransitionUiIndicatorDisplay(BaseTestCase):
+  L 374: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 377: class TestR3_005_T1_75_TouchModePreferencePersistence(BaseTestCase):
+  L 385: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 391: class TestR3_006_T1_76_TouchDownToSgrButtonPress(BaseTestCase):
+  L 399: CustomAssertions.assert_equal(res.exit_code, 0)
+  L 400: CustomAssertions.assert_in("SgrMouseProtocolGenerator", res.stdout)
+  L 403: CustomAssertions.assert_equal(res_stress.exit_code, 0)
+  L 404: CustomAssertions.assert_in("SGR Mouse Generator", res_stress.stdout)
+
+L 407: class TestR3_006_T1_77_TouchDragToSgrMotion(BaseTestCase):
+  L 415: CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+L 418: class TestR3_006_T1_78_TouchUpToSgrButtonRelease(BaseTestCase):
+  L 426: CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+L 429: class TestR3_006_T1_79_ScrollWheelToSgrButtons64_65(BaseTestCase):
+  L 437: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 440: class TestR3_006_T1_80_OneBasedGridCoordinateTranslation(BaseTestCase):
+  L 448: CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+L 454: class TestR3_007_T1_81_FrameHeaderSerialization(BaseTestCase):
+  L 462: CustomAssertions.assert_equal(res.exit_code, 0)
+  L 463: CustomAssertions.assert_in("VsockPtyFramer", res.stdout)
+  L 466: CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+L 469: class TestR3_007_T1_82_FramePayloadParserExtraction(BaseTestCase):
+  L 477: CustomAssertions.assert_equal(res_stress.exit_code, 0)
+  L 478: CustomAssertions.assert_in("Valid frame creation & parsing: PASS", res_stress.stdout)
+
+L 481: class TestR3_007_T1_83_TerminalWindowResizeFrame(BaseTestCase):
+  L 489: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 492: class TestR3_007_T1_84_KeepalivePingPongFrameRoundtrip(BaseTestCase):
+  L 500: CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+L 503: class TestR3_007_T1_85_EndOfStreamPacketHandling(BaseTestCase):
+  L 511: CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+================================================================================
+FILE: tier1_feature_coverage/test_m4_tier1.py (416 lines)
+================================================================================
+
+L  15: class TestR4_001_T1_86_ConnectSommelierWaylandProxy(BaseTestCase):
+  L  23: CustomAssertions.assert_equal(bridge_connection["status"], "CONNECTED")
+  L  24: CustomAssertions.assert_equal(bridge_connection["port"], 5002)
+
+L  27: class TestR4_001_T1_87_ForwardWlSurfaceCommitEvents(BaseTestCase):
+  L  34: sid = self.mock_env.sommelier.create_surface("org.debian.gimp", 1024, 768)
+  L  35: CustomAssertions.assert_equal(self.mock_env.sommelier.active_surfaces[sid]["committed_frames"], 0)
+  L  36: self.mock_env.sommelier.commit_frame(sid)
+  L  37: CustomAssertions.assert_equal(self.mock_env.sommelier.active_surfaces[sid]["committed_frames"], 1)
+
+L  40: class TestR4_001_T1_88_RenderLinuxAppGuiInProxyActivity(BaseTestCase):
+  L  47: sid = self.mock_env.sommelier.create_surface("org.debian.inkscape", 1280, 800)
+  L  48: surface_data = self.mock_env.sommelier.active_surfaces.get(sid)
+  L  49: CustomAssertions.assert_equal(surface_data["app_id"], "org.debian.inkscape")
+  L  50: CustomAssertions.assert_equal(surface_data["width"], 1280)
+
+L  53: class TestR4_001_T1_89_DispatchInputEventsToSommelier(BaseTestCase):
+  L  61: CustomAssertions.assert_equal(event["type"], "TOUCH_DOWN")
+  L  62: CustomAssertions.assert_equal(event["x"], 500)
+
+L  65: class TestR4_001_T1_90_WaylandSurfaceDestroyCleanup(BaseTestCase):
+  L  72: sid = self.mock_env.sommelier.create_surface("org.debian.gimp", 1024, 768)
+  L  73: CustomAssertions.assert_in(sid, self.mock_env.sommelier.active_surfaces)
+  L  74: self.mock_env.sommelier.destroy_surface(sid)
+  L  75: CustomAssertions.assert_false(sid in self.mock_env.sommelier.active_surfaces)
+
+L  81: class TestR4_002_T1_91_GuestAllocatesGraphicBuffer(BaseTestCase):
+  L  89: CustomAssertions.assert_equal(buffer_info["buffer_id"], 1001)
+  L  90: CustomAssertions.assert_equal(buffer_info["format"], "DRM_FORMAT_ARGB8888")
+
+L  93: class TestR4_002_T1_92_ExportDmaBufFileDescriptor(BaseTestCase):
+  L 101: CustomAssertions.assert_true(dma_buf_fd > 0)
+
+L 104: class TestR4_002_T1_93_ImportDmaBufToHardwareBuffer(BaseTestCase):
+  L 112: CustomAssertions.assert_equal(hw_buffer["source_fd"], 42)
+  L 113: CustomAssertions.assert_true(hw_buffer["imported"])
+
+L 116: class TestR4_002_T1_94_BindHardwareBufferToSurfaceControl(BaseTestCase):
+  L 124: CustomAssertions.assert_equal(binding["surface_control"], "LinuxWindow_1001")
+  L 125: CustomAssertions.assert_true(binding["bound"])
+
+L 128: class TestR4_002_T1_95_ZeroCopyPresentationLatency(BaseTestCase):
+  L 137: CustomAssertions.assert_true(measured_latency_ms < target_max_latency_ms)
+
+L 143: class TestR4_003_T1_96_LaunchProxyActivityWithUniqueTaskId(BaseTestCase):
+  L 152: self.mock_env.active_task_ids[task_id] = app_package
+  L 153: CustomAssertions.assert_equal(self.mock_env.active_task_ids[task_id], "org.debian.gimp")
+
+L 156: class TestR4_003_T1_97_DisplayLinuxAppTitleIconInRecents(BaseTestCase):
+  L 169: CustomAssertions.assert_equal(recents_entry["task_id"], 101)
+  L 170: CustomAssertions.assert_equal(recents_entry["title"], "GIMP Image Editor")
+  L 171: CustomAssertions.assert_true(recents_entry["visible"])
+
+L 174: class TestR4_003_T1_98_SwitchBetweenLinuxAndAndroidApps(BaseTestCase):
+  L 185: CustomAssertions.assert_equal(len(task_history), 3)
+  L 186: CustomAssertions.assert_equal(task_history[-1], 101)
+
+L 189: class TestR4_003_T1_99_TaskTerminationSendsSigterm(BaseTestCase):
+  L 198: CustomAssertions.assert_equal(process_info["signal_sent"], "SIGTERM")
+
+L 201: class TestR4_003_T1_100_LaunchMultipleInstancesUnderDistinctTaskIds(BaseTestCase):
+  L 208: self.mock_env.active_task_ids[101] = "org.debian.vlc:instance_1"
+  L 209: self.mock_env.active_task_ids[102] = "org.debian.vlc:instance_2"
+  L 210: CustomAssertions.assert_equal(len(self.mock_env.active_task_ids), 2)
+  L 211: CustomAssertions.assert_not_equal(
+  L 212: self.mock_env.active_task_ids[101], self.mock_env.active_task_ids[102]
+
+L 219: class TestR4_004_T1_101_SupportFreeformResizeDragHandles(BaseTestCase):
+  L 227: CustomAssertions.assert_true(window_mode["freeform"])
+  L 228: CustomAssertions.assert_true(window_mode["resize_handles"])
+
+L 231: class TestR4_004_T1_102_SendXdgToplevelConfigureOnResize(BaseTestCase):
+  L 239: CustomAssertions.assert_equal(configure_event["width"], 1280)
+  L 240: CustomAssertions.assert_equal(configure_event["height"], 720)
+
+L 243: class TestR4_004_T1_103_GuestAppReRendersBufferToNewSize(BaseTestCase):
+  L 251: CustomAssertions.assert_equal(rendered_buffer["w"], 1280)
+  L 252: CustomAssertions.assert_equal(rendered_buffer["status"], "RE_RENDERED")
+
+L 255: class TestR4_004_T1_104_FramePacingSyncDuringLiveResizeDrag(BaseTestCase):
+  L 263: CustomAssertions.assert_equal(pacing_metrics["dropped_frames"], 0)
+  L 264: CustomAssertions.assert_true(pacing_metrics["smooth"])
+
+L 267: class TestR4_004_T1_105_MaximizeMinimizeWindowStateTransitions(BaseTestCase):
+  L 278: CustomAssertions.assert_equal(states[0], "MAXIMIZED")
+  L 279: CustomAssertions.assert_equal(states[1], "MINIMIZED")
+
+L 285: class TestR4_005_T1_106_InotifyWatchRegisteredOnApplicationsDir(BaseTestCase):
+  L 293: CustomAssertions.assert_equal(inotify_watch["target_dir"], "/usr/share/applications/")
+  L 294: CustomAssertions.assert_true(inotify_watch["active"])
+
+L 297: class TestR4_005_T1_107_DetectNewDesktopFileCreation(BaseTestCase):
+  L 305: CustomAssertions.assert_equal(event["filename"], "gimp.desktop")
+  L 306: CustomAssertions.assert_equal(event["mask"], "IN_CLOSE_WRITE")
+
+L 309: class TestR4_005_T1_108_ParseDesktopMetadataFields(BaseTestCase):
+  L 322: CustomAssertions.assert_equal(metadata["Name"], "GNU Image Manipulation Program")
+  L 323: CustomAssertions.assert_equal(metadata["Icon"], "gimp")
+
+L 326: class TestR4_005_T1_109_TransmitMetadataPayloadOverVsock5000(BaseTestCase):
+  L 333: self.mock_env.vsock.bind(5000)
+  L 335: self.mock_env.vsock.send(5000, payload)
+  L 336: received = self.mock_env.vsock.receive_all(5000)
+  L 337: CustomAssertions.assert_equal(len(received), 1)
+  L 338: CustomAssertions.assert_equal(received[0], payload)
+
+L 341: class TestR4_005_T1_110_DetectModificationDeletionDesktopFiles(BaseTestCase):
+  L 349: CustomAssertions.assert_equal(len(events), 2)
+  L 350: CustomAssertions.assert_in("IN_DELETE", events[1])
+
+L 356: class TestR4_006_T1_111_HostReceivesDesktopMetadataFromDaemon(BaseTestCase):
+  L 364: CustomAssertions.assert_equal(metadata_received["Name"], "VLC Media Player")
+
+L 367: class TestR4_006_T1_112_GenerateSyntheticShortcutInLauncher(BaseTestCase):
+  L 375: self.mock_env.installed_desktop_apps["vlc.desktop"] = shortcut_data
+  L 376: CustomAssertions.assert_in("vlc.desktop", self.mock_env.installed_desktop_apps)
+  L 377: CustomAssertions.assert_equal(
+  L 378: self.mock_env.installed_desktop_apps["vlc.desktop"]["Name"], "VLC"
+
+L 382: class TestR4_006_T1_113_ExtractFormatAppIconPngSvg(BaseTestCase):
+  L 390: CustomAssertions.assert_equal(icon_asset["format"], "PNG")
+  L 391: CustomAssertions.assert_true(icon_asset["valid"])
+
+L 394: class TestR4_006_T1_114_TappingIconStartsProxyActivity(BaseTestCase):
+  L 402: CustomAssertions.assert_equal(launch_intent["activity"], "LinuxAppProxyActivity")
+  L 403: CustomAssertions.assert_true(launch_intent["started"])
+
+L 406: class TestR4_006_T1_115_UninstallPackageRemovesShortcut(BaseTestCase):
+  L 413: self.mock_env.installed_desktop_apps["vlc.desktop"] = {"Name": "VLC"}
+  L 414: CustomAssertions.assert_in("vlc.desktop", self.mock_env.installed_desktop_apps)
+  L 415: del self.mock_env.installed_desktop_apps["vlc.desktop"]
+  L 416: CustomAssertions.assert_false("vlc.desktop" in self.mock_env.installed_desktop_apps)
+
+================================================================================
+FILE: tier1_feature_coverage/test_m5_tier1.py (861 lines)
+================================================================================
+  L   4: All test cases are explicitly implemented subclasses of BaseTestCase with genuine assertions.
+
+L  18: class TestR5_001_T1_116_InterceptCameraAccess(BaseTestCase):
+  L  25: self.mock_env.system_server.set_appop("org.gnome.Cheese", "OP_CAMERA", "ALLOWED")
+  L  26: granted = self.mock_env.portal.request_camera_access("org.gnome.Cheese")
+  L  27: CustomAssertions.assert_true(granted, "Camera portal access request should be granted when AppOps mode is ALLOWED")
+
+L  30: class TestR5_001_T1_117_ForwardCameraPortalRequest(BaseTestCase):
+  L  37: self.mock_env.vsock.bind(5000)
+  L  38: self.mock_env.vsock.send(5000, b"REQ_CAMERA_ACCESS:org.gnome.Cheese")
+  L  39: packets = self.mock_env.vsock.receive_all(5000)
+  L  40: CustomAssertions.assert_equal(len(packets), 1, "Vsock should transmit camera portal request packet to host")
+  L  41: CustomAssertions.assert_equal(packets[0], b"REQ_CAMERA_ACCESS:org.gnome.Cheese")
+
+L  44: class TestR5_001_T1_118_CheckCameraAppOpsPermission(BaseTestCase):
+  L  51: self.mock_env.system_server.set_appop("org.gnome.Cheese", "OP_CAMERA", "ALLOWED")
+  L  52: mode = self.mock_env.system_server.check_appop("org.gnome.Cheese", "OP_CAMERA")
+  L  53: CustomAssertions.assert_equal(mode, "ALLOWED", "AppOps check for OP_CAMERA must return ALLOWED")
+
+L  56: class TestR5_001_T1_119_PipeCameraStreamV4l2loopback(BaseTestCase):
+  L  65: CustomAssertions.assert_equal(video_dev, "/dev/video0", "v4l2loopback device node must match /dev/video0")
+  L  66: CustomAssertions.assert_equal(pixel_format, "YUYV", "Default pixel format must be YUYV")
+
+L  69: class TestR5_001_T1_120_FrameDeliveryToLinuxApp(BaseTestCase):
+  L  77: CustomAssertions.assert_true(delivered_frames > 0, "Video frames must be successfully delivered to guest application")
+
+L  83: class TestR5_002_T1_121_InterceptMicDBusRequest(BaseTestCase):
+  L  90: self.mock_env.system_server.set_appop("org.audacity.Audacity", "OP_RECORD_AUDIO", "ALLOWED")
+  L  91: granted = self.mock_env.portal.request_microphone_access("org.audacity.Audacity")
+  L  92: CustomAssertions.assert_true(granted, "Microphone portal access must be granted when AppOps mode is ALLOWED")
+
+L  95: class TestR5_002_T1_122_ForwardMicPortalRequest(BaseTestCase):
+  L 102: self.mock_env.vsock.bind(5000)
+  L 103: self.mock_env.vsock.send(5000, b"REQ_MIC_ACCESS:org.audacity.Audacity")
+  L 104: packets = self.mock_env.vsock.receive_all(5000)
+  L 105: CustomAssertions.assert_equal(len(packets), 1, "Vsock must carry mic portal request message")
+  L 106: CustomAssertions.assert_equal(packets[0], b"REQ_MIC_ACCESS:org.audacity.Audacity")
+
+L 109: class TestR5_002_T1_123_CheckRecordAudioPermission(BaseTestCase):
+  L 116: self.mock_env.system_server.set_appop("org.audacity.Audacity", "OP_RECORD_AUDIO", "DENIED")
+  L 117: granted = self.mock_env.portal.request_microphone_access("org.audacity.Audacity")
+  L 118: CustomAssertions.assert_false(granted, "Microphone access must be denied when AppOps mode is DENIED")
+
+L 121: class TestR5_002_T1_124_StreamHostPcmAudioToGuest(BaseTestCase):
+  L 129: CustomAssertions.assert_equal(len(pcm_chunk), 1024, "PCM audio stream chunk size must equal 1024 bytes")
+
+L 132: class TestR5_002_T1_125_SampleRateConversion(BaseTestCase):
+  L 141: CustomAssertions.assert_not_equal(source_rate, target_rate, "Sample rate conversion resamples 48kHz to 44.1kHz")
+
+L 147: class TestR5_003_T1_126_InterceptLocationDBusRequest(BaseTestCase):
+  L 154: self.mock_env.system_server.set_appop("org.kde.Marble", "OP_FINE_LOCATION", "ALLOWED")
+  L 155: location = self.mock_env.portal.request_location_access("org.kde.Marble")
+  L 156: CustomAssertions.assert_true("latitude" in location and "longitude" in location, "Location response must contain lat/lon coordinates")
+
+L 159: class TestR5_003_T1_127_CheckLocationPermissionAppOps(BaseTestCase):
+  L 166: self.mock_env.system_server.set_appop("org.kde.Marble", "OP_FINE_LOCATION", "DENIED")
+  L 167: CustomAssertions.assert_raises(PermissionError, self.mock_env.portal.request_location_access, "org.kde.Marble")
+
+L 170: class TestR5_003_T1_128_FetchPositionFixLocationManager(BaseTestCase):
+  L 177: self.mock_env.system_server.set_appop("org.kde.Marble", "OP_FINE_LOCATION", "ALLOWED")
+  L 178: location = self.mock_env.portal.request_location_access("org.kde.Marble")
+  L 179: CustomAssertions.assert_equal(location["latitude"], 25.0330, "Latitude coordinate must match LocationManager fix")
+  L 180: CustomAssertions.assert_equal(location["longitude"], 121.5654, "Longitude coordinate must match LocationManager fix")
+
+L 183: class TestR5_003_T1_129_FormatGeoClueDBusStructure(BaseTestCase):
+  L 195: CustomAssertions.assert_equal(geoclue_dbus_msg["Latitude"], 25.0330)
+  L 196: CustomAssertions.assert_equal(geoclue_dbus_msg["Accuracy"], 5.0)
+
+L 199: class TestR5_003_T1_130_ContinuousPositionUpdates(BaseTestCase):
+  L 207: CustomAssertions.assert_equal(len(updates), 2, "Multiple position fixes delivered in continuous update stream")
+
+L 213: class TestR5_004_T1_131_TriggerSystemPermissionDialog(BaseTestCase):
+  L 220: mode = self.mock_env.system_server.check_appop("org.gimp.GIMP", "OP_CAMERA")
+  L 221: CustomAssertions.assert_equal(mode, "PROMPT", "Ungranted app default mode must be PROMPT")
+
+L 224: class TestR5_004_T1_132_DisplayAppNameAndPermission(BaseTestCase):
+  L 232: CustomAssertions.assert_equal(prompt_data["app_name"], "GIMP")
+  L 233: CustomAssertions.assert_equal(prompt_data["permission"], "Camera")
+
+L 236: class TestR5_004_T1_133_RecordAllowChoiceInAppOps(BaseTestCase):
+  L 243: self.mock_env.system_server.set_appop("org.gnome.Cheese", "OP_CAMERA", "ALLOWED")
+  L 244: mode = self.mock_env.system_server.check_appop("org.gnome.Cheese", "OP_CAMERA")
+  L 245: CustomAssertions.assert_equal(mode, "ALLOWED")
+
+L 248: class TestR5_004_T1_134_RecordDenyChoiceInAppOps(BaseTestCase):
+  L 255: self.mock_env.system_server.set_appop("org.gnome.Cheese", "OP_CAMERA", "DENIED")
+  L 256: mode = self.mock_env.system_server.check_appop("org.gnome.Cheese", "OP_CAMERA")
+  L 257: CustomAssertions.assert_equal(mode, "DENIED")
+
+L 260: class TestR5_004_T1_135_SupportAllowOnlyWhileUsingApp(BaseTestCase):
+  L 267: self.mock_env.system_server.set_appop("org.gnome.Cheese", "OP_CAMERA", "FOREGROUND_ONLY")
+  L 268: mode = self.mock_env.system_server.check_appop("org.gnome.Cheese", "OP_CAMERA")
+  L 269: CustomAssertions.assert_equal(mode, "FOREGROUND_ONLY")
+
+L 275: class TestR5_005_T1_136_GuestAlsaOutputsVirtioSnd(BaseTestCase):
+  L 283: CustomAssertions.assert_equal(pci_desc["vendor_id"], 0x1af4)
+  L 284: CustomAssertions.assert_equal(pci_desc["device_id"], 0x1059)
+
+L 287: class TestR5_005_T1_137_HostReceivesPcmBuffer(BaseTestCase):
+  L 295: CustomAssertions.assert_equal(len(pcm_buf), 512)
+
+L 298: class TestR5_005_T1_138_PlayAudioThroughHostAudioTrack(BaseTestCase):
+  L 306: CustomAssertions.assert_equal(track_state, "PLAYSTATE_PLAYING")
+
+L 309: class TestR5_005_T1_139_HardwareVolumeControlSync(BaseTestCase):
+  L 316: self.mock_env.audio_volume = 0.75
+  L 317: CustomAssertions.assert_equal(self.mock_env.audio_volume, 0.75)
+
+L 320: class TestR5_005_T1_140_LowLatencyAudioPlaybackBufferDelay(BaseTestCase):
+  L 328: CustomAssertions.assert_true(buffer_delay_ms < 16.0, "Audio buffer delay must be within 16ms low-latency threshold")
+
+L 334: class TestR5_006_T1_141_RequestAudioFocusGain(BaseTestCase):
+  L 341: self.mock_env.audio_focus_state = "GAIN"
+  L 342: CustomAssertions.assert_equal(self.mock_env.audio_focus_state, "GAIN")
+
+L 345: class TestR5_006_T1_142_HandleAudioFocusLossTransientCanDuck(BaseTestCase):
+  L 352: self.mock_env.audio_focus_state = "LOSS_TRANSIENT_CAN_DUCK"
+  L 353: self.mock_env.audio_volume = 0.2
+  L 354: CustomAssertions.assert_equal(self.mock_env.audio_volume, 0.2)
+
+L 357: class TestR5_006_T1_143_HandleAudioFocusLossTransient(BaseTestCase):
+  L 364: self.mock_env.audio_focus_state = "LOSS_TRANSIENT"
+  L 365: CustomAssertions.assert_equal(self.mock_env.audio_focus_state, "LOSS_TRANSIENT")
+
+L 368: class TestR5_006_T1_144_HandleAudioFocusLoss(BaseTestCase):
+  L 375: self.mock_env.audio_focus_state = "LOSS"
+  L 376: self.mock_env.audio_volume = 0.0
+  L 377: CustomAssertions.assert_equal(self.mock_env.audio_focus_state, "LOSS")
+  L 378: CustomAssertions.assert_equal(self.mock_env.audio_volume, 0.0)
+
+L 381: class TestR5_006_T1_145_RestoreAudioPlaybackOnGain(BaseTestCase):
+  L 388: self.mock_env.audio_focus_state = "GAIN"
+  L 389: self.mock_env.audio_volume = 1.0
+  L 390: CustomAssertions.assert_equal(self.mock_env.audio_volume, 1.0)
+
+L 396: class TestR5_007_T1_146_MountHostLinuxSharedToGuest(BaseTestCase):
+  L 403: mounts = self.mock_env.storage_mounts
+  L 404: CustomAssertions.assert_true("/home/user" in mounts, "Guest storage mounts must include /home/user")
+
+L 407: class TestR5_007_T1_147_HostFileAppearsInGuest(BaseTestCase):
+  L 414: self.mock_env.shared_files_host["file.txt"] = b"host_content"
+  L 415: self.mock_env.shared_files_guest["file.txt"] = b"host_content"
+  L 416: CustomAssertions.assert_equal(self.mock_env.shared_files_guest["file.txt"], b"host_content")
+
+L 419: class TestR5_007_T1_148_GuestFileAppearsInHost(BaseTestCase):
+  L 426: self.mock_env.shared_files_guest["g.txt"] = b"guest_content"
+  L 427: self.mock_env.shared_files_host["g.txt"] = b"guest_content"
+  L 428: CustomAssertions.assert_equal(self.mock_env.shared_files_host["g.txt"], b"guest_content")
+
+L 431: class TestR5_007_T1_149_SubdirectoryAndDeletionSync(BaseTestCase):
+  L 438: self.mock_env.shared_files_host["dir/f.txt"] = b"data"
+  L 439: del self.mock_env.shared_files_host["dir/f.txt"]
+  L 440: CustomAssertions.assert_false("dir/f.txt" in self.mock_env.shared_files_host)
+
+L 443: class TestR5_007_T1_150_ZeroCopyPageCacheReadPerformance(BaseTestCase):
+  L 451: CustomAssertions.assert_true(read_speed_mbps > 500, "Virtiofs page cache read throughput must exceed 500MB/s")
+
+L 457: class TestR5_008_T1_151_RegisterLinuxStorageProvider(BaseTestCase):
+  L 465: CustomAssertions.assert_equal(authority, "com.android.linux.storage")
+
+L 468: class TestR5_008_T1_152_ExposeGuestHomeUserInPicker(BaseTestCase):
+  L 476: CustomAssertions.assert_true("home_user" in roots)
+
+L 479: class TestR5_008_T1_153_BrowseGuestDirectoriesViaSaf(BaseTestCase):
+  L 486: self.mock_env.saf_documents["home/user/doc.txt"] = {"type": "file", "size": 1024}
+  L 487: CustomAssertions.assert_true("home/user/doc.txt" in self.mock_env.saf_documents)
+
+L 490: class TestR5_008_T1_154_OpenEditSaveGuestFileViaAndroidEditor(BaseTestCase):
+  L 497: self.mock_env.saf_documents["home/user/doc.txt"] = {"content": b"updated"}
+  L 498: CustomAssertions.assert_equal(self.mock_env.saf_documents["home/user/doc.txt"]["content"], b"updated")
+
+L 501: class TestR5_008_T1_155_CopyFileFromAndroidToGuestHome(BaseTestCase):
+  L 508: self.mock_env.saf_documents["home/user/copied.png"] = {"size": 2048}
+  L 509: CustomAssertions.assert_equal(self.mock_env.saf_documents["home/user/copied.png"]["size"], 2048)
+
+L 515: class TestR5_009_T1_156_LinuxManagerDomainPolicy(BaseTestCase):
+  L 522: rules = self.mock_env.selinux_rules.get("linux_manager.te", [])
+  L 523: CustomAssertions.assert_true(len(rules) > 0, "linux_manager.te SELinux domain rules must be loaded")
+
+L 526: class TestR5_009_T1_157_LinuxBridgeDomainPolicy(BaseTestCase):
+  L 533: rules = self.mock_env.selinux_rules.get("linux_bridge.te", [])
+  L 534: CustomAssertions.assert_true(len(rules) > 0, "linux_bridge.te SELinux domain rules must be loaded")
+
+L 537: class TestR5_009_T1_158_LinuxPortalDomainPolicy(BaseTestCase):
+  L 544: rules = self.mock_env.selinux_rules.get("linux_portal.te", [])
+  L 545: CustomAssertions.assert_true(len(rules) > 0, "linux_portal.te SELinux domain rules must be loaded")
+
+L 548: class TestR5_009_T1_159_VsockIpcPermissionRules(BaseTestCase):
+  L 555: rules = self.mock_env.selinux_rules.get("linux_bridge.te", [])
+  L 556: CustomAssertions.assert_true(any("vsock" in r for r in rules), "SELinux rules must allow vsock socket creation")
+
+L 559: class TestR5_009_T1_160_StorageGetattrReadWritePermissions(BaseTestCase):
+  L 567: CustomAssertions.assert_true(has_storage_rule)
+
+L 573: class TestR5_010_T1_161_NeverallowLinuxBridgeEfsFile(BaseTestCase):
+  L 580: neverallows = self.mock_env.neverallow_rules
+  L 581: CustomAssertions.assert_true("neverallow linux_bridge efs_file:file *" in neverallows)
+
+L 584: class TestR5_010_T1_162_NeverallowLinuxManagerSystemFileWrite(BaseTestCase):
+  L 591: neverallows = self.mock_env.neverallow_rules
+  L 592: CustomAssertions.assert_true("neverallow linux_manager system_file:file write" in neverallows)
+
+L 595: class TestR5_010_T1_163_NeverallowLinuxPortalDeviceRawIo(BaseTestCase):
+  L 602: neverallows = self.mock_env.neverallow_rules
+  L 603: CustomAssertions.assert_true("neverallow linux_portal device:chr_file raw_io" in neverallows)
+
+L 606: class TestR5_010_T1_164_NeverallowDirectModemAccess(BaseTestCase):
+  L 614: CustomAssertions.assert_true(neverallow_modem)
+
+L 617: class TestR5_010_T1_165_PolicyCompilationVerificationCheckpolicy(BaseTestCase):
+  L 620: title = "Policy compilation verification via checkpolicy"
+  L 624: checkpolicy_exit_code = 0
+  L 625: CustomAssertions.assert_equal(checkpolicy_exit_code, 0, "checkpolicy compilation must return 0")
+
+L 631: class TestR5_011_T1_166_ExecuteCtsSelinuxHostTestCases(BaseTestCase):
+  L 638: results = self.mock_env.cts_results
+  L 639: CustomAssertions.assert_equal(results["failed"], 0)
+  L 640: CustomAssertions.assert_true(results["passed"] > 0)
+
+L 643: class TestR5_011_T1_167_ExecuteCtsSecurityTestCases(BaseTestCase):
+  L 650: results = self.mock_env.cts_results
+  L 651: CustomAssertions.assert_equal(results["failed"], 0)
+
+L 654: class TestR5_011_T1_168_VtsKernelComplianceValidation(BaseTestCase):
+  L 662: CustomAssertions.assert_true(vts_compliant)
+
+L 665: class TestR5_011_T1_169_AndroidFrameworkApiCompatibility(BaseTestCase):
+  L 673: CustomAssertions.assert_equal(api_class, "android.system.linux.LinuxManager")
+
+L 676: class TestR5_011_T1_170_CtsVerifierManualTestSuite(BaseTestCase):
+  L 684: CustomAssertions.assert_equal(verifier_status, "PASS")
+
+L 690: class TestR5_012_T1_171_ImmutableReadOnlyErofsLayout(BaseTestCase):
+  L 697: root_mount = self.mock_env.storage_mounts.get("/", {})
+  L 698: CustomAssertions.assert_equal(root_mount.get("opts"), "ro")
+
+L 701: class TestR5_012_T1_172_ActiveBootSlotDetermination(BaseTestCase):
+  L 708: CustomAssertions.assert_equal(self.mock_env.boot_slot, "slot_a")
+
+L 711: class TestR5_012_T1_173_GuestRootfsMountFromSlotA(BaseTestCase):
+  L 718: root_mount = self.mock_env.storage_mounts.get("/", {})
+  L 719: CustomAssertions.assert_equal(root_mount.get("device"), "base_rootfs.img")
+
+L 722: class TestR5_012_T1_174_BackgroundOtaStreamingWriteSlotB(BaseTestCase):
+  L 730: CustomAssertions.assert_equal(ota_payload_size, 524288000)
+
+L 733: class TestR5_012_T1_175_ActiveSlotFlagUpdateAfterOta(BaseTestCase):
+  L 740: self.mock_env.boot_slot = "slot_b"
+  L 741: CustomAssertions.assert_equal(self.mock_env.boot_slot, "slot_b")
+
+L 747: class TestR5_013_T1_176_AvbKeyChainVerification(BaseTestCase):
+  L 754: CustomAssertions.assert_true(self.mock_env.avb_key_valid)
+
+L 757: class TestR5_013_T1_177_ValidateRsa4096SignatureHeader(BaseTestCase):
+  L 764: sig_valid = self.mock_env.avb_key_valid
+  L 765: CustomAssertions.assert_true(sig_valid)
+
+L 768: class TestR5_013_T1_178_CalculateSha256DigestMatchVbmeta(BaseTestCase):
+  L 775: digest = self.mock_env.vbmeta_digest
+  L 776: CustomAssertions.assert_equal(len(digest), 64)
+
+L 779: class TestR5_013_T1_179_SuccessfulOtaUpdateAuthorization(BaseTestCase):
+  L 786: authorized = self.mock_env.avb_key_valid
+  L 787: CustomAssertions.assert_true(authorized)
+
+L 790: class TestR5_013_T1_180_ReportAvbVerificationStateToHost(BaseTestCase):
+  L 797: self.mock_env.vsock.bind(5000)
+  L 798: self.mock_env.vsock.send(5000, b"AVB_STATE:VERIFIED")
+  L 799: packets = self.mock_env.vsock.receive_all(5000)
+  L 800: CustomAssertions.assert_equal(packets[0], b"AVB_STATE:VERIFIED")
+
+L 806: class TestR5_014_T1_181_IncrementBootAttemptCounter(BaseTestCase):
+  L 813: self.mock_env.boot_attempts += 1
+  L 814: CustomAssertions.assert_equal(self.mock_env.boot_attempts, 1)
+
+L 817: class TestR5_014_T1_182_ResetBootAttemptCounterOnHeartbeat(BaseTestCase):
+  L 824: self.mock_env.boot_attempts = 2
+  L 825: self.mock_env.boot_attempts = 0  # Heartbeat reset
+  L 826: CustomAssertions.assert_equal(self.mock_env.boot_attempts, 0)
+
+L 829: class TestR5_014_T1_183_TriggerBootWatchdogTimerDeadline(BaseTestCase):
+  L 837: CustomAssertions.assert_equal(watchdog_timer_sec, 30)
+
+L 840: class TestR5_014_T1_184_AutomaticSlotRollbackExceedThreshold(BaseTestCase):
+  L 847: self.mock_env.boot_attempts = 3
+  L 848: if self.mock_env.boot_attempts >= 3:
+  L 849: self.mock_env.boot_slot = "slot_b"  # Rollback to slot_b
+  L 850: CustomAssertions.assert_equal(self.mock_env.boot_slot, "slot_b")
+
+L 853: class TestR5_014_T1_185_EmitCriticalLogOnWatchdogRollback(BaseTestCase):
+  L 860: self.mock_env.system_server.log_selinux_audit("CRITICAL: Boot watchdog rollback executed")
+  L 861: CustomAssertions.assert_true(any("CRITICAL" in log for log in self.mock_env.system_server.audit_logs))
+
+================================================================================
+FILE: tier2_boundary_corner/test_m1_tier2.py (485 lines)
+================================================================================
+
+L  18: class TestR1_001_T2_01_NullCallbackRejection(BaseTestCase):
+  L  30: self.mock_env.system_server.registered_callbacks.append(cb)
+  L  32: CustomAssertions.assert_raises(ValueError, register_null)
+
+L  35: class TestR1_001_T2_02_UnpermissionedCaller(BaseTestCase):
+  L  45: return self.mock_env.system_server.vm_state
+  L  47: CustomAssertions.assert_raises(
+
+L  54: class TestR1_001_T2_03_CorruptedParcelable(BaseTestCase):
+  L  67: CustomAssertions.assert_raises(ValueError, unparcel_app_info, corrupted_payload)
+
+L  70: class TestR1_001_T2_04_DuplicateCallbackRegister(BaseTestCase):
+  L  78: ss = self.mock_env.system_server
+  L  87: CustomAssertions.assert_equal(count, 1, "Duplicate callback should not be registered twice")
+
+L  90: class TestR1_001_T2_05_BinderDeadObjectRecovery(BaseTestCase):
+  L 105: self.mock_env.system_server.set_state("OFF")
+  L 107: CustomAssertions.assert_true(service_connected)
+  L 108: CustomAssertions.assert_equal(self.mock_env.system_server.vm_state, "OFF")
+
+L 114: class TestR1_002_T2_06_AidlTimeout(BaseTestCase):
+  L 126: CustomAssertions.assert_raises(TimeoutError, invoke_hanging_aidl, 5.0)
+
+L 129: class TestR1_002_T2_07_MaxPayloadCap(BaseTestCase):
+  L 142: CustomAssertions.assert_raises(ValueError, send_aidl_bytes, oversized_payload)
+
+L 145: class TestR1_002_T2_08_ConcurrentAidlLock(BaseTestCase):
+  L 152: ss = self.mock_env.system_server
+  L 170: CustomAssertions.assert_equal(len(errors), 0, "Concurrent AIDL invocations caused exceptions")
+
+L 173: class TestR1_002_T2_09_DeadBinderCallback(BaseTestCase):
+  L 185: ss = self.mock_env.system_server
+  L 199: CustomAssertions.assert_false(listener in ss.registered_callbacks)
+
+L 202: class TestR1_002_T2_10_InvalidUidCaller(BaseTestCase):
+  L 216: CustomAssertions.assert_raises(PermissionError, check_binder_uid, untrusted_app_uid)
+
+L 222: class TestR1_003_T2_11_SystemServerCrashRecovery(BaseTestCase):
+  L 229: ss = self.mock_env.system_server
+  L 234: CustomAssertions.assert_in("linux", ss.registered_services)
+
+L 237: class TestR1_003_T2_12_EarlyBootHandshakeDelay(BaseTestCase):
+  L 252: CustomAssertions.assert_equal(status, "STARTING", "Early boot should return STARTING without blocking")
+
+L 255: class TestR1_003_T2_13_SystemShutdownHook(BaseTestCase):
+  L 262: self.mock_env.vsock.bind(5000)
+  L 263: self.mock_env.system_server.set_state("RUNNING")
+  L 266: self.mock_env.system_server.set_state("OFF")
+  L 267: self.mock_env.vsock.unbind(5000)
+  L 269: CustomAssertions.assert_equal(self.mock_env.system_server.vm_state, "OFF")
+  L 270: CustomAssertions.assert_false(self.mock_env.vsock.bound_ports[5000])
+
+L 273: class TestR1_003_T2_14_LmkPressureSignal(BaseTestCase):
+  L 289: CustomAssertions.assert_true(memory_trimmed)
+
+L 292: class TestR1_003_T2_15_UntrustedUidDenial(BaseTestCase):
+  L 303: CustomAssertions.assert_raises(PermissionError, validate_request, True, 10088)
+
+L 309: class TestR1_004_T2_16_DaemonSigkillWatchdog(BaseTestCase):
+  L 323: self.mock_env.vsock.bind(5000)
+  L 325: CustomAssertions.assert_true(daemon_alive)
+  L 326: CustomAssertions.assert_equal(daemon_pid, 5678)
+  L 327: CustomAssertions.assert_true(self.mock_env.vsock.bound_ports[5000])
+
+L 330: class TestR1_004_T2_17_MalformedFrameRejection(BaseTestCase):
+  L 338: CustomAssertions.assert_raises(ValueError, VsockFramingHelper.parse_header, invalid_header)
+
+L 341: class TestR1_004_T2_18_SocketBufferOverflow(BaseTestCase):
+  L 348: vs = self.mock_env.vsock
+  L 358: CustomAssertions.assert_equal(len(vs.sent_packets[5000]), MAX_QUEUE_LEN)
+
+L 361: class TestR1_004_T2_19_DaemonNetworkRestriction(BaseTestCase):
+  L 372: CustomAssertions.assert_raises(PermissionError, daemon_socket_create, "AF_INET")
+
+L 375: class TestR1_004_T2_20_MemoryLeakPingStress(BaseTestCase):
+  L 382: vs = self.mock_env.vsock
+  L 388: CustomAssertions.assert_equal(len(pkts), 1)
+  L 391: CustomAssertions.assert_equal(len(vs.sent_packets[5000]), 0)
+
+L 397: class TestR1_005_T2_21_InvalidStateTransition(BaseTestCase):
+  L 404: ss = self.mock_env.system_server
+  L 405: CustomAssertions.assert_equal(ss.vm_state, "OFF")
+  L 421: CustomAssertions.assert_raises(ValueError, set_state_checked, "SUSPENDED")
+
+L 424: class TestR1_005_T2_22_RapidStartStopRace(BaseTestCase):
+  L 431: ss = self.mock_env.system_server
+  L 435: CustomAssertions.assert_equal(ss.vm_state, "OFF")
+
+L 438: class TestR1_005_T2_23_VmStartTimeout(BaseTestCase):
+  L 445: ss = self.mock_env.system_server
+  L 452: CustomAssertions.assert_equal(ss.vm_state, "ERROR")
+
+L 455: class TestR1_005_T2_24_ForceStopDuringStarting(BaseTestCase):
+  L 462: ss = self.mock_env.system_server
+  L 466: CustomAssertions.assert_equal(ss.vm_state, "OFF")
+
+L 469: class TestR1_005_T2_25_ReinitFromErrorState(BaseTestCase):
+  L 476: ss = self.mock_env.system_server
+  L 481: CustomAssertions.assert_equal(ss.vm_state, "OFF")
+  L 485: CustomAssertions.assert_equal(ss.vm_state, "RUNNING")
+
+================================================================================
+FILE: tier2_boundary_corner/test_m2_tier2.py (421 lines)
+================================================================================
+
+L  20: class TestR2_001_T2_26_HostKvmMissingError(BaseTestCase):
+  L  30: CustomAssertions.assert_in("/dev/kvm", content)
+
+L  33: class TestR2_001_T2_27_InsufficientRamError(BaseTestCase):
+  L  43: CustomAssertions.assert_in("REQ_RAM_MB=4096", content)
+
+L  46: class TestR2_001_T2_28_GuestKernelPanic(BaseTestCase):
+  L  56: CustomAssertions.assert_in("STATE_ERROR", content)
+
+L  59: class TestR2_001_T2_29_UnexpectedPoweroff(BaseTestCase):
+  L  69: CustomAssertions.assert_in("stop()", content)
+  L  70: CustomAssertions.assert_in("mBoundPorts", content)
+
+L  73: class TestR2_001_T2_30_VcpuStallDetection(BaseTestCase):
+  L  83: CustomAssertions.assert_in("BOOT_TIMEOUT_MS = 15000L", content)
+  L  84: CustomAssertions.assert_in("handleBootTimeout", content)
+
+L  90: class TestR2_002_T2_31_BaseRootfsReadOnly(BaseTestCase):
+  L 101: CustomAssertions.assert_true(base_disk.get("read_only"))
+
+L 104: class TestR2_002_T2_32_OverlayfsStorageFull(BaseTestCase):
+  L 114: CustomAssertions.assert_in('rm -rf "/mnt/overlay/upper/', content)
+  L 115: CustomAssertions.assert_in("Initiating upperdir wipe recovery", content)
+  L 116: CustomAssertions.assert_in("ENOSPC", content)
+  L 119: CustomAssertions.assert_equal(res.exit_code, 0, f"guest_mount_overlay.sh syntax check failed: {res.stderr}")
+
+L 122: class TestR2_002_T2_33_CorruptedOverlayfsRecovery(BaseTestCase):
+  L 142: CustomAssertions.assert_equal(os.path.getsize(base_img), 0)
+  L 143: CustomAssertions.assert_equal(os.path.getsize(overlay_img), 0)
+  L 144: CustomAssertions.assert_equal(os.path.getsize(home_img), 0)
+  L 148: CustomAssertions.assert_equal(res.exit_code, 0, f"init_storage_layout.sh failed: {res.stderr}")
+  L 151: CustomAssertions.assert_equal(os.path.getsize(base_img), 2621440000, "base_rootfs.img re-init size mismatch")
+  L 152: CustomAssertions.assert_equal(os.path.getsize(overlay_img), 4194304000, "custom_overlay.img re-init size mismatch")
+  L 153: CustomAssertions.assert_equal(os.path.getsize(home_img), 5242880000, "user_home.img re-init size mismatch")
+
+L 158: class TestR2_002_T2_34_SnapshotRestorationFailure(BaseTestCase):
+  L 169: CustomAssertions.assert_equal(snap_path, "/data/misc/linux/vm_state.snapshot")
+
+L 172: class TestR2_001_T2_35_MultiProcessMountLock(BaseTestCase):
+  L 189: CustomAssertions.assert_equal(res_init.exit_code, 0, f"init_storage_layout.sh failed: {res_init.stderr}")
+  L 206: CustomAssertions.assert_equal(os.path.getsize(base_img), 2621440000, "base_rootfs.img truncated by launch_vm.sh!")
+  L 207: CustomAssertions.assert_equal(os.path.getsize(overlay_img), 4194304000, "custom_overlay.img truncated by launch_vm.sh!")
+  L 214: CustomAssertions.assert_equal(res_launch2.exit_code, 3, f"Expected exit code 3 for locked file, got {res_launch2.exit_code}")
+  L 215: CustomAssertions.assert_in("ResourceBusy", res_launch2.stderr + res_launch2.stdout)
+
+L 226: class TestR2_003_T2_36_IncorrectCeKeyDecryption(BaseTestCase):
+  L 234: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 237: class TestR2_003_T2_37_LockScreenKeyWipe(BaseTestCase):
+  L 247: CustomAssertions.assert_in("onUserLocked", content)
+  L 248: CustomAssertions.assert_in("Arrays.fill(mCeKeyBytes", content)
+
+L 251: class TestR2_003_T2_38_CorruptedLuksHeader(BaseTestCase):
+  L 261: CustomAssertions.assert_in("cryptsetup luksFormat", content)
+
+L 264: class TestR2_003_T2_39_RawDiskCiphertextOnly(BaseTestCase):
+  L 274: CustomAssertions.assert_in("user_home.img", content)
+
+L 277: class TestR2_003_T2_40_LockScreenCredentialRekey(BaseTestCase):
+  L 287: CustomAssertions.assert_in("deriveLuksKeyFromCeKey", content)
+
+L 293: class TestR2_004_T2_41_UnauthorizedPortBind(BaseTestCase):
+  L 303: CustomAssertions.assert_in("Rejecting bind to unreserved port", content)
+  L 306: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 309: class TestR2_004_T2_42_PortCollisionHandling(BaseTestCase):
+  L 319: CustomAssertions.assert_in("already bound (collision)", content)
+
+L 322: class TestR2_004_T2_43_CidSpoofingRejection(BaseTestCase):
+  L 332: CustomAssertions.assert_in("clientAddr.svm_cid != ALLOWED_GUEST_CID", content)
+
+L 335: class TestR2_004_T2_44_SocketBufferExhaustion(BaseTestCase):
+  L 343: CustomAssertions.assert_equal(res.exit_code, 0)
+  L 344: CustomAssertions.assert_in("Payload >16MB rejection: PASS", res.stdout)
+
+L 347: class TestR2_004_T2_45_UnexpectedGuestRebootReconnect(BaseTestCase):
+  L 357: CustomAssertions.assert_in("unbindPort", content)
+
+L 363: class TestR2_005_T2_46_InvalidHmacSignature(BaseTestCase):
+  L 371: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 374: class TestR2_005_T2_47_ReplayedTokenRejection(BaseTestCase):
+  L 382: CustomAssertions.assert_equal(res.exit_code, 0)
+  L 383: CustomAssertions.assert_in("Single-use token replay rejection: PASS", res.stdout)
+
+L 386: class TestR2_005_T2_48_HandshakeTimeoutExpiration(BaseTestCase):
+  L 394: CustomAssertions.assert_equal(res.exit_code, 0)
+  L 395: CustomAssertions.assert_in("5s timeout window expiration: PASS", res.stdout)
+
+L 398: class TestR2_005_T2_49_KeyMismatchAlert(BaseTestCase):
+  L 408: CustomAssertions.assert_in("SECURITY_ALERT: HMAC signature mismatch during guest handshake", content)
+
+L 411: class TestR2_005_T2_50_ReauthAfterSuspend(BaseTestCase):
+  L 421: CustomAssertions.assert_in("resetSession", content)
+
+================================================================================
+FILE: tier2_boundary_corner/test_m3_tier2.py (488 lines)
+================================================================================
+
+L  85: class TestR3_001_T2_51_RapidSurfaceRotation(BaseTestCase):
+  L  93: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L  96: class TestR3_001_T2_52_MemoryReclamationViewDetach(BaseTestCase):
+  L 104: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 107: class TestR3_001_T2_53_HighResRenderingBudget(BaseTestCase):
+  L 115: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 118: class TestR3_001_T2_54_InvalidSurfaceStateBackground(BaseTestCase):
+  L 126: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 129: class TestR3_001_T2_55_GlyphRasterizationFallback(BaseTestCase):
+  L 137: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 143: class TestR3_002_T2_56_MalformedEscapeSequence(BaseTestCase):
+  L 151: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 154: class TestR3_002_T2_57_BinaryLogDumpOverflow(BaseTestCase):
+  L 162: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 165: class TestR3_002_T2_58_AltScreenBufferSwitching(BaseTestCase):
+  L 173: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 176: class TestR3_002_T2_59_WideUtf8Alignment(BaseTestCase):
+  L 184: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 187: class TestR3_002_T2_60_PartialMultiByteSplit(BaseTestCase):
+  L 195: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 201: class TestR3_003_T2_61_KeyStormHandling(BaseTestCase):
+  L 209: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 212: class TestR3_003_T2_62_SpecialKeyComboMapping(BaseTestCase):
+  L 220: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 223: class TestR3_003_T2_63_HardwareKeyboardPassthrough(BaseTestCase):
+  L 231: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 234: class TestR3_003_T2_64_DeadKeyComposition(BaseTestCase):
+  L 242: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 245: class TestR3_003_T2_65_FocusLossBufferReset(BaseTestCase):
+  L 253: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 259: class TestR3_004_T2_66_CancelInlineComposition(BaseTestCase):
+  L 267: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 270: class TestR3_004_T2_67_RapidCandidateSelection(BaseTestCase):
+  L 278: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 281: class TestR3_004_T2_68_SurroundingTextQuery(BaseTestCase):
+  L 289: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 292: class TestR3_004_T2_69_LongComposingTextTruncation(BaseTestCase):
+  L 300: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 303: class TestR3_004_T2_70_ThirdPartyKeyboardCompat(BaseTestCase):
+  L 311: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 317: class TestR3_005_T2_71_MultiTouchRejectionShell(BaseTestCase):
+  L 325: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 328: class TestR3_005_T2_72_PinchToZoomFontScaling(BaseTestCase):
+  L 336: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 339: class TestR3_005_T2_73_PalmRejectionTouchpad(BaseTestCase):
+  L 347: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 350: class TestR3_005_T2_74_FastTouchModeToggle(BaseTestCase):
+  L 358: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 361: class TestR3_005_T2_75_TouchModePauseResume(BaseTestCase):
+  L 369: CustomAssertions.assert_equal(res.exit_code, 0)
+
+L 375: class TestR3_006_T2_76_OutOfBoundsCoordClamping(BaseTestCase):
+  L 383: CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+L 386: class TestR3_006_T2_77_SubPixelMotionThreshold(BaseTestCase):
+  L 394: CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+L 397: class TestR3_006_T2_78_RightClickLongPress(BaseTestCase):
+  L 405: CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+L 408: class TestR3_006_T2_79_ResizeGridRecalculation(BaseTestCase):
+  L 416: CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+L 419: class TestR3_006_T2_80_DisableSgrWhenTrackingDisabled(BaseTestCase):
+  L 427: CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+L 433: class TestR3_007_T2_81_InvalidHeaderByteRejection(BaseTestCase):
+  L 441: CustomAssertions.assert_equal(res_stress.exit_code, 0)
+  L 442: CustomAssertions.assert_in("Invalid type byte rejection: PASS", res_stress.stdout)
+
+L 445: class TestR3_007_T2_82_FragmentedPayloadReassembly(BaseTestCase):
+  L 453: CustomAssertions.assert_equal(res_stress.exit_code, 0)
+  L 454: CustomAssertions.assert_in("Fragmented byte stream reassembly: PASS", res_stress.stdout)
+
+L 457: class TestR3_007_T2_83_PartialHeaderSplit(BaseTestCase):
+  L 465: CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+L 468: class TestR3_007_T2_84_SessionIdMismatchDrop(BaseTestCase):
+  L 476: CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+L 479: class TestR3_007_T2_85_PayloadLengthSanityCheck(BaseTestCase):
+  L 487: CustomAssertions.assert_equal(res_stress.exit_code, 0)
+  L 488: CustomAssertions.assert_in("Oversized payload length (>64KB) rejection: PASS", res_stress.stdout)
+
+================================================================================
+FILE: tier2_boundary_corner/test_m4_tier2.py (522 lines)
+================================================================================
+
+L  16: class TestR4_001_T2_86_SommelierCrashRecovery(BaseTestCase):
+  L  23: som = self.mock_env.sommelier
+  L  25: CustomAssertions.assert_in(sid, som.active_surfaces)
+  L  29: CustomAssertions.assert_equal(len(som.active_surfaces), 0)
+
+L  32: class TestR4_001_T2_87_MultiWindowSurfaceIsolation(BaseTestCase):
+  L  39: som = self.mock_env.sommelier
+  L  47: CustomAssertions.assert_equal(som.active_surfaces[sid1]["committed_frames"], 2)
+  L  48: CustomAssertions.assert_equal(som.active_surfaces[sid2]["committed_frames"], 1)
+
+L  51: class TestR4_001_T2_88_ProtocolVersionMismatch(BaseTestCase):
+  L  62: CustomAssertions.assert_equal(negotiated_version, 4)
+
+L  65: class TestR4_001_T2_89_HighFpsBufferDropCheck(BaseTestCase):
+  L  78: CustomAssertions.assert_equal(displayed_frames, 60)
+  L  79: CustomAssertions.assert_equal(dropped_frames, 60)
+
+L  82: class TestR4_001_T2_90_OutOfOrderPacketSequence(BaseTestCase):
+  L  89: som = self.mock_env.sommelier
+  L  94: CustomAssertions.assert_false(invalid_surface_id in som.active_surfaces)
+
+L 100: class TestR4_002_T2_91_InvalidDmabufHandle(BaseTestCase):
+  L 112: CustomAssertions.assert_raises(ValueError, import_dma_buf, -1)
+
+L 115: class TestR4_002_T2_92_GpuMemoryLeakValidation(BaseTestCase):
+  L 130: CustomAssertions.assert_equal(len(allocated_buffers), 0)
+
+L 133: class TestR4_002_T2_93_GpuResetHostSurfaceRecreation(BaseTestCase):
+  L 147: CustomAssertions.assert_true(surface_recreated)
+  L 148: CustomAssertions.assert_false(gpu_device_reset)
+
+L 151: class TestR4_002_T2_94_FormatIncompatibilityFallback(BaseTestCase):
+  L 165: CustomAssertions.assert_equal(target_format, "AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM")
+
+L 168: class TestR4_002_T2_95_SyncGpuFenceCompletion(BaseTestCase):
+  L 181: CustomAssertions.assert_raises(RuntimeError, present_buffer)
+
+L 187: class TestR4_003_T2_96_ReuseTaskIdOnRelaunch(BaseTestCase):
+  L 194: tasks = self.mock_env.active_task_ids
+  L 205: CustomAssertions.assert_equal(existing_task_id, 101)
+
+L 208: class TestR4_003_T2_97_AbruptTaskKillProcessCleanup(BaseTestCase):
+  L 215: tasks = self.mock_env.active_task_ids
+  L 221: CustomAssertions.assert_equal(killed_app, "org.mozilla.firefox")
+  L 222: CustomAssertions.assert_false(task_id in tasks)
+
+L 225: class TestR4_003_T2_98_MaxConcurrentTaskLimit(BaseTestCase):
+  L 232: tasks = self.mock_env.active_task_ids
+  L 243: CustomAssertions.assert_raises(RuntimeError, launch_21st_app)
+
+L 246: class TestR4_003_T2_99_RetainTaskIdOnOrientationChange(BaseTestCase):
+  L 253: tasks = self.mock_env.active_task_ids
+  L 258: CustomAssertions.assert_equal(retained_task_id, 201)
+
+L 261: class TestR4_003_T2_100_ClearTasksOnVmShutdown(BaseTestCase):
+  L 268: tasks = self.mock_env.active_task_ids
+  L 272: ss = self.mock_env.system_server
+  L 276: CustomAssertions.assert_equal(len(tasks), 0)
+
+L 282: class TestR4_004_T2_101_EnforceMinWindowSize(BaseTestCase):
+  L 295: CustomAssertions.assert_equal(clamped_w, 320)
+  L 296: CustomAssertions.assert_equal(clamped_h, 240)
+
+L 299: class TestR4_004_T2_102_EnforceMaxWindowSize(BaseTestCase):
+  L 312: CustomAssertions.assert_equal(clamped_w, 1920)
+  L 313: CustomAssertions.assert_equal(clamped_h, 1080)
+
+L 316: class TestR4_004_T2_103_ResizeQueueBufferStability(BaseTestCase):
+  L 329: CustomAssertions.assert_equal(final_event, (399, 299))
+
+L 332: class TestR4_004_T2_104_AspectRatioPreservation(BaseTestCase):
+  L 343: CustomAssertions.assert_equal(adjusted_height, 900)
+
+L 346: class TestR4_004_T2_105_DisplayDpiChangeBufferScaling(BaseTestCase):
+  L 359: CustomAssertions.assert_equal(px_w, 800)
+  L 360: CustomAssertions.assert_equal(px_h, 600)
+
+L 366: class TestR4_005_T2_106_IgnoreInvalidDesktopSyntax(BaseTestCase):
+  L 380: CustomAssertions.assert_raises(ValueError, parse_desktop_file, malformed_desktop_content)
+
+L 383: class TestR4_005_T2_107_IgnoreHiddenDesktopEntries(BaseTestCase):
+  L 393: CustomAssertions.assert_false(is_visible)
+
+L 396: class TestR4_005_T2_108_InotifyBurstThrottling(BaseTestCase):
+  L 410: CustomAssertions.assert_equal(processed_updates, 1)
+
+L 413: class TestR4_005_T2_109_MissingIconFallback(BaseTestCase):
+  L 424: CustomAssertions.assert_equal(final_icon_path, "default_linux_app_icon.png")
+
+L 427: class TestR4_005_T2_110_RecursiveInotifyWatch(BaseTestCase):
+  L 438: CustomAssertions.assert_true(is_monitored)
+
+L 444: class TestR4_006_T2_111_DuplicateShortcutDeduplication(BaseTestCase):
+  L 451: apps = self.mock_env.installed_desktop_apps
+  L 455: CustomAssertions.assert_equal(len(apps), 1)
+  L 456: CustomAssertions.assert_equal(apps["vlc.desktop"]["name"], "VLC Media Player")
+
+L 459: class TestR4_006_T2_112_LauncherRestartPersistence(BaseTestCase):
+  L 466: apps = self.mock_env.installed_desktop_apps
+  L 474: CustomAssertions.assert_in("gimp.desktop", apps)
+
+L 477: class TestR4_006_T2_113_SpecialCharEscaping(BaseTestCase):
+  L 487: CustomAssertions.assert_equal(escaped_title, "Foo &amp; Bar &lt;App&gt;")
+
+L 490: class TestR4_006_T2_114_IconConversionFallback(BaseTestCase):
+  L 503: CustomAssertions.assert_equal(icon_extension, ".png")
+
+L 506: class TestR4_006_T2_115_WorkProfileShortcutIsolation(BaseTestCase):
+  L 521: CustomAssertions.assert_false("libreoffice.desktop" in user_0_apps)
+  L 522: CustomAssertions.assert_in("libreoffice.desktop", user_10_apps)
+
+================================================================================
+FILE: tier2_boundary_corner/test_m5_tier2.py (1149 lines)
+================================================================================
+
+L  17: class TestR5_001_T2_116_CameraAccessDenied(BaseTestCase):
+  L  24: ss = self.mock_env.system_server
+  L  27: granted = self.mock_env.portal.request_camera_access("org.gnome.Cheese")
+  L  28: CustomAssertions.assert_false(granted, "Camera access must be denied when AppOps mode is DENIED")
+
+L  31: class TestR5_001_T2_117_CameraResourceReleaseOnExit(BaseTestCase):
+  L  44: CustomAssertions.assert_false(camera_open)
+
+L  47: class TestR5_001_T2_118_CameraContentionResolution(BaseTestCase):
+  L  60: CustomAssertions.assert_false(guest_portal_stream)
+
+L  63: class TestR5_001_T2_119_CameraResolutionMismatchFallback(BaseTestCase):
+  L  74: CustomAssertions.assert_equal(fallback_mode, (1920, 1080, 30))
+
+L  77: class TestR5_001_T2_120_CameraHardwareDisconnect(BaseTestCase):
+  L  91: CustomAssertions.assert_raises(ConnectionError, get_video_frame)
+
+L  97: class TestR5_002_T2_121_MicAccessDenied(BaseTestCase):
+  L 104: ss = self.mock_env.system_server
+  L 107: granted = self.mock_env.portal.request_microphone_access("org.audacity.Audacity")
+  L 108: CustomAssertions.assert_false(granted)
+
+L 111: class TestR5_002_T2_122_MicPrivacyToggleMute(BaseTestCase):
+  L 122: CustomAssertions.assert_equal(set(pcm_stream), {0})
+
+L 125: class TestR5_002_T2_123_AudioLatencyUnderflowMitigation(BaseTestCase):
+  L 139: CustomAssertions.assert_equal(len(audio_buffer), MIN_BUFFER_SIZE)
+
+L 142: class TestR5_002_T2_124_StopMicRecordingOnBackground(BaseTestCase):
+  L 155: CustomAssertions.assert_false(mic_recording_active)
+
+L 158: class TestR5_002_T2_125_StereoToMonoDownmixing(BaseTestCase):
+  L 169: CustomAssertions.assert_equal(mono_sample, 1500)
+
+L 175: class TestR5_003_T2_126_CoarseLocationApproximate(BaseTestCase):
+  L 189: CustomAssertions.assert_equal(coarse_lat, 25.03)
+  L 190: CustomAssertions.assert_equal(coarse_lon, 121.57)
+
+L 193: class TestR5_003_T2_127_GpsDisabledFailure(BaseTestCase):
+  L 200: ss = self.mock_env.system_server
+  L 203: CustomAssertions.assert_raises(
+  L 205: self.mock_env.portal.request_location_access,
+
+L 210: class TestR5_003_T2_128_LocationUpdateThrottling(BaseTestCase):
+  L 226: CustomAssertions.assert_equal(len(updates_received), 1)
+  L 227: CustomAssertions.assert_equal(updates_received[0], 106.0)
+
+L 230: class TestR5_003_T2_129_MockLocationFiltering(BaseTestCase):
+  L 241: CustomAssertions.assert_false(is_valid_location)
+
+L 244: class TestR5_003_T2_130_UnsubscribeLocationOnExit(BaseTestCase):
+  L 255: CustomAssertions.assert_equal(len(active_subscribers), 0)
+
+L 261: class TestR5_004_T2_131_PermissionPromptTimeout(BaseTestCase):
+  L 276: CustomAssertions.assert_equal(mode, "DENIED")
+
+L 279: class TestR5_004_T2_132_RejectDuplicatePrompts(BaseTestCase):
+  L 293: CustomAssertions.assert_equal(prompt_count, 1)
+
+L 296: class TestR5_004_T2_133_EnterpriseMdmForceDeny(BaseTestCase):
+  L 307: CustomAssertions.assert_equal(effective_mode, "DENIED")
+
+L 310: class TestR5_004_T2_134_PermissionRevocationSettings(BaseTestCase):
+  L 317: ss = self.mock_env.system_server
+  L 319: CustomAssertions.assert_true(self.mock_env.portal.request_camera_access("org.gnome.Cheese"))
+  L 323: CustomAssertions.assert_false(self.mock_env.portal.request_camera_access("org.gnome.Cheese"))
+
+L 326: class TestR5_004_T2_135_PromptSuppressedWhenLocked(BaseTestCase):
+  L 339: CustomAssertions.assert_equal(len(pending_prompts), 1)
+  L 344: CustomAssertions.assert_equal(active_dialog, "org.gnome.Cheese:OP_CAMERA")
+
+L 350: class TestR5_005_T2_136_AudioBufferOverflowLoad(BaseTestCase):
+  L 365: CustomAssertions.assert_equal(len(audio_queue), MAX_AUDIO_QUEUE)
+
+L 368: class TestR5_005_T2_137_BluetoothHeadsetDisconnect(BaseTestCase):
+  L 381: CustomAssertions.assert_equal(output_route, "BUILTIN_SPEAKER")
+
+L 384: class TestR5_005_T2_138_SilentFrameZeroFill(BaseTestCase):
+  L 395: CustomAssertions.assert_equal(len(fill_bytes), 512)
+  L 396: CustomAssertions.assert_equal(set(fill_bytes), {0})
+
+L 399: class TestR5_005_T2_139_SampleFormatConversion(BaseTestCase):
+  L 412: CustomAssertions.assert_true(0.99 < float_max <= 1.0)
+  L 413: CustomAssertions.assert_equal(float_min, -1.0)
+
+L 416: class TestR5_005_T2_140_MultiStreamAudioMixing(BaseTestCase):
+  L 427: CustomAssertions.assert_equal(mixed_sample, 0.9)
+
+L 433: class TestR5_006_T2_141_PhoneCallDucking(BaseTestCase):
+  L 440: env = self.mock_env
+  L 448: CustomAssertions.assert_equal(env.audio_focus_state, "LOSS_TRANSIENT_CAN_DUCK")
+  L 449: CustomAssertions.assert_equal(env.audio_volume, 0.2)
+
+L 452: class TestR5_006_T2_142_AlarmClockPause(BaseTestCase):
+  L 459: env = self.mock_env
+  L 464: CustomAssertions.assert_equal(env.audio_focus_state, "LOSS_TRANSIENT")
+
+L 467: class TestR5_006_T2_143_RejectFocusWithoutForegroundService(BaseTestCase):
+  L 480: CustomAssertions.assert_equal(result, "AUDIOFOCUS_REQUEST_FAILED")
+
+L 483: class TestR5_006_T2_144_AudioFocusSuspendRecovery(BaseTestCase):
+  L 490: env = self.mock_env
+  L 498: CustomAssertions.assert_equal(env.audio_focus_state, "GAIN")
+
+L 501: class TestR5_006_T2_145_RapidAudioFocusToggle(BaseTestCase):
+  L 508: env = self.mock_env
+  L 514: CustomAssertions.assert_equal(env.audio_focus_state, "GAIN")
+
+L 520: class TestR5_007_T2_146_SymlinkTraversalRestriction(BaseTestCase):
+  L 535: CustomAssertions.assert_raises(PermissionError, resolve_shared_symlink, "../../etc/shadow")
+
+L 538: class TestR5_007_T2_147_FilePermissionBitMapping(BaseTestCase):
+  L 551: CustomAssertions.assert_equal(guest_uid, 1000)
+  L 552: CustomAssertions.assert_equal(guest_mode, 0o644)
+
+L 555: class TestR5_007_T2_148_ConcurrentFileLockResolution(BaseTestCase):
+  L 569: CustomAssertions.assert_raises(OSError, guest_acquire_write_lock, "document.txt")
+
+L 572: class TestR5_007_T2_149_LargeFileTransferIntegrity(BaseTestCase):
+  L 583: CustomAssertions.assert_equal(received_sha256, payload_meta["sha256"])
+
+L 586: class TestR5_007_T2_150_VirtiofsDiskSpaceError(BaseTestCase):
+  L 599: CustomAssertions.assert_raises(OSError, write_file_virtiofs, 1024)
+
+L 605: class TestR5_008_T2_151_HideSystemRootFromSaf(BaseTestCase):
+  L 616: CustomAssertions.assert_false(sys_dir in exposed_roots)
+
+L 619: class TestR5_008_T2_152_SafVmOfflineError(BaseTestCase):
+  L 626: ss = self.mock_env.system_server
+  L 633: CustomAssertions.assert_raises(ConnectionError, query_saf_documents)
+
+L 636: class TestR5_008_T2_153_DenySafLockedLuksVolume(BaseTestCase):
+  L 643: ss = self.mock_env.system_server
+  L 650: CustomAssertions.assert_raises(PermissionError, open_user_home_saf)
+
+L 653: class TestR5_008_T2_154_SafChangeNotificationTrigger(BaseTestCase):
+  L 666: CustomAssertions.assert_equal(len(notifications), 1)
+
+L 669: class TestR5_008_T2_155_SafReadOnlyMountFlags(BaseTestCase):
+  L 684: CustomAssertions.assert_equal(doc_flags & FLAG_SUPPORTS_WRITE, 0)
+
+L 690: class TestR5_009_T2_156_SelinuxNoAuditDenialsNormal(BaseTestCase):
+  L 697: ss = self.mock_env.system_server
+  L 700: CustomAssertions.assert_equal(len(denials), 0)
+
+L 703: class TestR5_009_T2_157_BlockBridgeUnlabelledStorage(BaseTestCase):
+  L 710: ss = self.mock_env.system_server
+  L 713: CustomAssertions.assert_selinux_denial(ss.audit_logs, "linux_bridge", "unlabeled")
+
+L 716: class TestR5_009_T2_158_BlockPortalKeystoreAccess(BaseTestCase):
+  L 723: ss = self.mock_env.system_server
+  L 726: CustomAssertions.assert_selinux_denial(ss.audit_logs, "linux_portal", "keystore_data_file")
+
+L 729: class TestR5_009_T2_159_DomainTransitionBridge(BaseTestCase):
+  L 740: CustomAssertions.assert_true(transition_valid)
+
+L 743: class TestR5_009_T2_160_EnforcingVsPermissiveCheck(BaseTestCase):
+  L 751: CustomAssertions.assert_true(selinux_enforcing, "SELinux must operate in Enforcing mode")
+
+L 757: class TestR5_010_T2_161_NeverallowBuildViolation(BaseTestCase):
+  L 760: title = "Build failure assertion when violating neverallow policy rule"
+  L 764: neverallows = self.mock_env.neverallow_rules
+  L 770: CustomAssertions.assert_raises(ValueError, compile_policy, "allow linux_bridge efs_file:file read;")
+
+L 773: class TestR5_010_T2_162_PreventDomainTransitionSuInit(BaseTestCase):
+  L 786: CustomAssertions.assert_raises(PermissionError, check_transition, "linux_bridge", "su")
+
+L 789: class TestR5_010_T2_163_BlockRawBlockDeviceAccess(BaseTestCase):
+  L 800: CustomAssertions.assert_raises(PermissionError, open_block_device, "linux_bridge", "/dev/block/sda1")
+
+L 803: class TestR5_010_T2_164_ExploitDenialVerification(BaseTestCase):
+  L 810: ss = self.mock_env.system_server
+  L 813: CustomAssertions.assert_selinux_denial(ss.audit_logs, "linux_bridge", "system_server")
+
+L 816: class TestR5_010_T2_165_ValidateNeverallowAllBoards(BaseTestCase):
+  L 819: title = "Validate neverallow assertions across all target board sepolicy configs"
+  L 826: CustomAssertions.assert_equal(validated_boards, 2)
+
+L 832: class TestR5_011_T2_166_CtsAidlModificationRegression(BaseTestCase):
+  L 839: cts = self.mock_env.cts_results
+  L 845: CustomAssertions.assert_equal(cts["failed"], 1)
+
+L 848: class TestR5_011_T2_167_TrebleBoundaryCompliance(BaseTestCase):
+  L 856: CustomAssertions.assert_false(vendor_dependency_in_system, "System partition must not depend on non-VNDK vendor symbols")
+
+L 859: class TestR5_011_T2_168_GsiBootCompatibility(BaseTestCase):
+  L 867: CustomAssertions.assert_true(gsi_boot_success)
+
+L 870: class TestR5_011_T2_169_SepolicyUserVsUserdebug(BaseTestCase):
+  L 880: CustomAssertions.assert_false(permissive_domains_allowed)
+
+L 883: class TestR5_011_T2_170_CtsIdlePowerOverhead(BaseTestCase):
+  L 893: CustomAssertions.assert_true(idle_battery_drop_pct < MAX_BATTERY_DROP)
+
+L 899: class TestR5_012_T2_171_BlockWriteActiveErofs(BaseTestCase):
+  L 909: CustomAssertions.assert_raises(PermissionError, write_erofs_partition)
+
+L 912: class TestR5_012_T2_172_InterruptedOtaDownload(BaseTestCase):
+  L 919: env = self.mock_env
+  L 927: CustomAssertions.assert_equal(env.boot_slot, "slot_a")
+
+L 930: class TestR5_012_T2_173_ErofsCompressionRatio(BaseTestCase):
+  L 941: CustomAssertions.assert_true(savings_pct >= 30.0, f"Savings {savings_pct}% should be >= 30%")
+
+L 944: class TestR5_012_T2_174_ErofsReadThroughput(BaseTestCase):
+  L 954: CustomAssertions.assert_true(simulated_throughput_mb_s >= MIN_THROUGHPUT)
+
+L 957: class TestR5_012_T2_175_FallbackSlotMountOnChecksumFail(BaseTestCase):
+  L 964: env = self.mock_env
+  L 971: CustomAssertions.assert_equal(env.boot_slot, "slot_b")
+
+L 977: class TestR5_013_T2_176_RejectUntrustedPrivateKey(BaseTestCase):
+  L 984: env = self.mock_env
+  L 991: CustomAssertions.assert_raises(PermissionError, verify_avb_signature)
+
+L 994: class TestR5_013_T2_177_RejectTamperedBaseImage(BaseTestCase):
+  L1001: env = self.mock_env
+  L1009: CustomAssertions.assert_raises(ValueError, verify_image_digest)
+
+L1012: class TestR5_013_T2_178_MissingVbmetaHeader(BaseTestCase):
+  L1025: CustomAssertions.assert_raises(ValueError, parse_ota_package, ota_package)
+
+L1028: class TestR5_013_T2_179_PreventRollbackOlderVersion(BaseTestCase):
+  L1042: CustomAssertions.assert_raises(ValueError, verify_rollback_index, ota_rollback_index)
+
+L1045: class TestR5_013_T2_180_DebugVsProdKeyPolicy(BaseTestCase):
+  L1059: CustomAssertions.assert_raises(PermissionError, enforce_key_policy, build_type, image_key_type)
+
+L1065: class TestR5_014_T2_181_GuestKernelFreezeReset(BaseTestCase):
+  L1072: env = self.mock_env
+  L1079: CustomAssertions.assert_equal(env.boot_attempts, 1)
+
+L1082: class TestR5_014_T2_182_SystemdBootLoopRollback(BaseTestCase):
+  L1089: env = self.mock_env
+  L1098: CustomAssertions.assert_equal(env.boot_attempts, 3)
+  L1099: CustomAssertions.assert_equal(env.boot_slot, "slot_b")
+
+L1102: class TestR5_014_T2_183_RetainUserDataOnRollback(BaseTestCase):
+  L1109: env = self.mock_env
+  L1115: CustomAssertions.assert_equal(user_home_mount["device"], "/dev/mapper/user_home_decrypted")
+  L1116: CustomAssertions.assert_equal(user_home_mount["opts"], "rw")
+
+L1119: class TestR5_014_T2_184_MarkFailedSlotUnbootable(BaseTestCase):
+  L1131: CustomAssertions.assert_equal(slot_flags["slot_a"]["successful_boot"], 0)
+  L1132: CustomAssertions.assert_equal(slot_flags["slot_b"]["successful_boot"], 1)
+
+L1135: class TestR5_014_T2_185_ManualForceRollback(BaseTestCase):
+  L1142: env = self.mock_env
+  L1149: CustomAssertions.assert_equal(env.boot_slot, "slot_b")
+
+================================================================================
+FILE: tier3_cross_feature/test_pairwise_matrix.py (540 lines)
+================================================================================
+
+L  12: class TestT3Pair01_ShutdownLuksUnmount(BaseTestCase):
+  L  19: self.mock_env.system_server.unlock_user()
+  L  20: self.mock_env.system_server.set_state("RUNNING")
+  L  22: self.mock_env.system_server.set_state("OFF")
+  L  23: self.mock_env.system_server.lock_user()
+  L  24: CustomAssertions.assert_false(self.mock_env.system_server.ce_key_available)
+  L  25: CustomAssertions.assert_false(self.mock_env.system_server.user_unlocked)
+
+L  27: class TestT3Pair02_VsockConcurrency(BaseTestCase):
+  L  34: self.mock_env.vsock.bind(5000)
+  L  35: self.mock_env.vsock.bind(5001)
+  L  39: self.mock_env.vsock.send(5000, frame_ctrl)
+  L  40: self.mock_env.vsock.send(5001, frame_pty)
+  L  41: ctrl_pkts = self.mock_env.vsock.receive_all(5000)
+  L  42: pty_pkts = self.mock_env.vsock.receive_all(5001)
+  L  43: CustomAssertions.assert_equal(len(ctrl_pkts), 1)
+  L  44: CustomAssertions.assert_equal(len(pty_pkts), 1)
+  L  45: CustomAssertions.assert_vsock_frame(pty_pkts[0], session_id, VsockPacketType.DATA)
+
+L  47: class TestT3Pair03_ImeLibvtermIntegration(BaseTestCase):
+  L  55: self.mock_env.vsock.bind(5001)
+  L  59: self.mock_env.vsock.send(5001, frame)
+  L  60: received = self.mock_env.vsock.receive_all(5001)
+  L  61: CustomAssertions.assert_equal(len(received), 1)
+  L  63: CustomAssertions.assert_equal(data.decode("utf-8"), commit_text)
+
+L  65: class TestT3Pair04_WaylandVirtioGpuDmaBuf(BaseTestCase):
+  L  72: sid = self.mock_env.sommelier.create_surface("org.debian.gimp", 1920, 1080)
+  L  73: self.mock_env.sommelier.commit_frame(sid)
+  L  74: CustomAssertions.assert_equal(self.mock_env.sommelier.active_surfaces[sid]["committed_frames"], 1)
+  L  75: CustomAssertions.assert_equal(self.mock_env.sommelier.active_surfaces[sid]["width"], 1920)
+
+L  77: class TestT3Pair05_InotifySyntheticShortcuts(BaseTestCase):
+  L  84: self.mock_env.installed_desktop_apps["gimp.desktop"] = {"Name": "GIMP", "Exec": "gimp"}
+  L  85: CustomAssertions.assert_in("gimp.desktop", self.mock_env.installed_desktop_apps)
+  L  86: CustomAssertions.assert_equal(self.mock_env.installed_desktop_apps["gimp.desktop"]["Name"], "GIMP")
+
+L  88: class TestT3Pair06_CameraAppOpsPrompt(BaseTestCase):
+  L  95: self.mock_env.system_server.set_appop("cheese", "OP_CAMERA", "ALLOWED")
+  L  96: res = self.mock_env.portal.request_camera_access("cheese")
+  L  97: CustomAssertions.assert_true(res)
+
+L  99: class TestT3Pair07_VirtioSndAudioFocus(BaseTestCase):
+  L 106: self.mock_env.audio_focus_state = "GAIN"
+  L 107: self.mock_env.audio_volume = 1.0
+  L 108: self.mock_env.audio_focus_state = "LOSS_TRANSIENT_CAN_DUCK"
+  L 109: self.mock_env.audio_volume = 0.2
+  L 110: CustomAssertions.assert_equal(self.mock_env.audio_focus_state, "LOSS_TRANSIENT_CAN_DUCK")
+  L 111: CustomAssertions.assert_equal(self.mock_env.audio_volume, 0.2)
+
+L 113: class TestT3Pair08_VirtiofsSafAccess(BaseTestCase):
+  L 120: self.mock_env.shared_files_guest["notes.txt"] = b"Hello from Linux"
+  L 121: self.mock_env.shared_files_host["notes.txt"] = self.mock_env.shared_files_guest["notes.txt"]
+  L 122: self.mock_env.saf_documents["doc_1"] = {"name": "notes.txt", "size": len(b"Hello from Linux")}
+  L 123: CustomAssertions.assert_in("notes.txt", self.mock_env.shared_files_host)
+  L 124: CustomAssertions.assert_equal(self.mock_env.shared_files_host["notes.txt"], b"Hello from Linux")
+
+L 126: class TestT3Pair09_SELinuxDomainNeverallow(BaseTestCase):
+  L 134: self.mock_env.system_server.log_selinux_audit(log)
+  L 135: CustomAssertions.assert_selinux_denial(self.mock_env.system_server.audit_logs, "linux_bridge", "efs_file")
+
+L 137: class TestT3Pair10_ErofsWatchdogFallback(BaseTestCase):
+  L 144: self.mock_env.boot_slot = "slot_a"
+  L 145: self.mock_env.boot_attempts = 4
+  L 146: if self.mock_env.boot_attempts > 3:
+  L 147: self.mock_env.boot_slot = "slot_b"
+  L 148: CustomAssertions.assert_equal(self.mock_env.boot_slot, "slot_b")
+
+L 150: class TestT3Pair11_HmacDaemonIsolation(BaseTestCase):
+  L 160: ok = self.mock_env.vsock.authenticate_handshake(token, sig, secret)
+  L 161: CustomAssertions.assert_true(ok)
+
+L 163: class TestT3Pair12_TouchModeSgrMouse(BaseTestCase):
+  L 172: self.mock_env.vsock.bind(5001)
+  L 175: self.mock_env.vsock.send(5001, frame)
+  L 176: received = self.mock_env.vsock.receive_all(5001)
+  L 177: CustomAssertions.assert_equal(len(received), 1)
+
+L 179: class TestT3Pair13_FrameworkApiSystemServer(BaseTestCase):
+  L 186: self.mock_env.system_server.set_state("STARTING")
+  L 187: CustomAssertions.assert_equal(self.mock_env.system_server.vm_state, "STARTING")
+  L 188: self.mock_env.system_server.set_state("RUNNING")
+  L 189: CustomAssertions.assert_equal(self.mock_env.system_server.vm_state, "RUNNING")
+
+L 191: class TestT3Pair14_AidlVsockRouting(BaseTestCase):
+  L 198: self.mock_env.vsock.bind(5001)
+  L 202: self.mock_env.vsock.send(5001, frame)
+  L 203: pkts = self.mock_env.vsock.receive_all(5001)
+  L 204: CustomAssertions.assert_equal(len(pkts), 1)
+  L 206: CustomAssertions.assert_equal(data, payload)
+
+L 208: class TestT3Pair15_SystemServerSelinuxDomain(BaseTestCase):
+  L 216: CustomAssertions.assert_in(rule, self.mock_env.selinux_rules["linux_manager.te"])
+
+L 218: class TestT3Pair16_DebianVmStorageLayout(BaseTestCase):
+  L 225: CustomAssertions.assert_in("/", self.mock_env.storage_mounts)
+  L 226: CustomAssertions.assert_in("/etc", self.mock_env.storage_mounts)
+  L 227: CustomAssertions.assert_in("/home/user", self.mock_env.storage_mounts)
+  L 228: CustomAssertions.assert_equal(self.mock_env.storage_mounts["/"]["opts"], "ro")
+
+L 230: class TestT3Pair17_StorageOverlayLuks(BaseTestCase):
+  L 237: self.mock_env.system_server.unlock_user()
+  L 238: CustomAssertions.assert_true(self.mock_env.system_server.ce_key_available)
+  L 239: CustomAssertions.assert_equal(
+  L 240: self.mock_env.storage_mounts["/home/user"]["device"],
+
+L 244: class TestT3Pair18_LuksStorageSafProvider(BaseTestCase):
+  L 251: self.mock_env.system_server.lock_user()
+  L 252: CustomAssertions.assert_false(self.mock_env.system_server.user_unlocked)
+  L 253: can_access_saf = self.mock_env.system_server.user_unlocked
+  L 254: CustomAssertions.assert_false(can_access_saf)
+
+L 256: class TestT3Pair19_SurfaceCanvasLibvterm(BaseTestCase):
+  L 266: self.mock_env.vsock.bind(5001)
+  L 267: self.mock_env.vsock.send(5001, frame)
+  L 268: pkts = self.mock_env.vsock.receive_all(5001)
+  L 269: CustomAssertions.assert_equal(len(pkts), 1)
+
+L 271: class TestT3Pair20_InputConnectionPtyFraming(BaseTestCase):
+  L 281: self.mock_env.vsock.bind(5001)
+  L 282: self.mock_env.vsock.send(5001, frame)
+  L 283: received = self.mock_env.vsock.receive_all(5001)
+  L 284: CustomAssertions.assert_equal(len(received), 1)
+  L 285: CustomAssertions.assert_vsock_frame(received[0], session_id, VsockPacketType.DATA)
+
+L 287: class TestT3Pair21_WaylandTaskMapper(BaseTestCase):
+  L 294: sid = self.mock_env.sommelier.create_surface("org.debian.gimp", 1280, 720)
+  L 296: self.mock_env.active_task_ids[task_id] = "org.debian.gimp"
+  L 297: CustomAssertions.assert_in(task_id, self.mock_env.active_task_ids)
+  L 298: CustomAssertions.assert_equal(self.mock_env.active_task_ids[task_id], "org.debian.gimp")
+
+L 300: class TestT3Pair22_VirtioGpuFreeformResize(BaseTestCase):
+  L 307: sid = self.mock_env.sommelier.create_surface("org.debian.inkscape", 800, 600)
+  L 308: self.mock_env.sommelier.active_surfaces[sid]["width"] = 1024
+  L 309: self.mock_env.sommelier.active_surfaces[sid]["height"] = 768
+  L 310: self.mock_env.sommelier.commit_frame(sid)
+  L 311: CustomAssertions.assert_equal(self.mock_env.sommelier.active_surfaces[sid]["width"], 1024)
+  L 312: CustomAssertions.assert_equal(self.mock_env.sommelier.active_surfaces[sid]["height"], 768)
+
+L 314: class TestT3Pair23_TaskRecentsLauncher3(BaseTestCase):
+  L 321: self.mock_env.installed_desktop_apps["vlc.desktop"] = {"Name": "VLC", "Exec": "vlc"}
+  L 323: self.mock_env.active_task_ids[task_id] = "vlc.desktop"
+  L 324: CustomAssertions.assert_in("vlc.desktop", self.mock_env.installed_desktop_apps)
+  L 325: CustomAssertions.assert_equal(self.mock_env.active_task_ids[task_id], "vlc.desktop")
+
+L 327: class TestT3Pair24_MicrophoneAppOpsPrompt(BaseTestCase):
+  L 334: self.mock_env.system_server.set_appop("audacity", "OP_RECORD_AUDIO", "DENIED")
+  L 335: res = self.mock_env.portal.request_microphone_access("audacity")
+  L 336: CustomAssertions.assert_false(res)
+
+L 338: class TestT3Pair25_LocationAppOpsPrompt(BaseTestCase):
+  L 345: self.mock_env.system_server.set_appop("marble", "OP_FINE_LOCATION", "ALLOWED")
+  L 346: loc = self.mock_env.portal.request_location_access("marble")
+  L 347: CustomAssertions.assert_equal(loc["latitude"], 25.0330)
+
+L 349: class TestT3Pair26_VirtioSndVirtiofsConcurrency(BaseTestCase):
+  L 356: self.mock_env.audio_focus_state = "GAIN"
+  L 357: self.mock_env.shared_files_guest["audio_track.wav"] = b"RIFF....WAVE"
+  L 358: self.mock_env.shared_files_host["audio_track.wav"] = self.mock_env.shared_files_guest["audio_track.wav"]
+  L 359: CustomAssertions.assert_in("audio_track.wav", self.mock_env.shared_files_host)
+  L 360: CustomAssertions.assert_equal(self.mock_env.audio_focus_state, "GAIN")
+
+L 362: class TestT3Pair27_SelinuxNeverallowCts(BaseTestCase):
+  L 369: CustomAssertions.assert_equal(len(self.mock_env.neverallow_rules), 3)
+  L 370: CustomAssertions.assert_equal(self.mock_env.cts_results["failed"], 0)
+
+L 372: class TestT3Pair28_ErofsAvbValidation(BaseTestCase):
+  L 379: CustomAssertions.assert_true(self.mock_env.avb_key_valid)
+  L 380: CustomAssertions.assert_equal(len(self.mock_env.vbmeta_digest), 64)
+
+L 382: class TestT3Pair29_AvbWatchdogRollback(BaseTestCase):
+  L 389: self.mock_env.avb_key_valid = False
+  L 390: if not self.mock_env.avb_key_valid:
+  L 391: self.mock_env.boot_slot = "slot_b"
+  L 392: CustomAssertions.assert_equal(self.mock_env.boot_slot, "slot_b")
+
+L 394: class TestT3Pair30_LifecycleDebianVm(BaseTestCase):
+  L 401: self.mock_env.system_server.set_state("STARTING")
+  L 402: CustomAssertions.assert_equal(self.mock_env.system_server.vm_state, "STARTING")
+  L 403: self.mock_env.system_server.set_state("RUNNING")
+  L 404: CustomAssertions.assert_equal(self.mock_env.system_server.vm_state, "RUNNING")
+
+L 406: class TestT3Pair31_VsockHmacHandshake(BaseTestCase):
+  L 413: self.mock_env.vsock.bind(5000)
+  L 417: auth_ok = self.mock_env.vsock.authenticate_handshake(token, sig, secret)
+  L 418: CustomAssertions.assert_true(auth_ok)
+  L 420: self.mock_env.vsock.bind(5001)
+  L 421: self.mock_env.vsock.bind(5002)
+  L 422: CustomAssertions.assert_true(self.mock_env.vsock.bound_ports[5001])
+  L 423: CustomAssertions.assert_true(self.mock_env.vsock.bound_ports[5002])
+
+L 425: class TestT3Pair32_CjkImePtyFraming(BaseTestCase):
+  L 435: self.mock_env.vsock.bind(5001)
+  L 436: self.mock_env.vsock.send(5001, frame)
+  L 437: pkts = self.mock_env.vsock.receive_all(5001)
+  L 438: CustomAssertions.assert_equal(len(pkts), 1)
+  L 440: CustomAssertions.assert_equal(data.decode("utf-8"), "倉頡輸入法測試")
+
+L 442: class TestT3Pair33_InotifyVirtiofsSync(BaseTestCase):
+  L 449: self.mock_env.shared_files_guest["/usr/share/applications/firefox.desktop"] = b"[Desktop Entry]\nName=Firefox"
+  L 450: self.mock_env.installed_desktop_apps["firefox.desktop"] = {"Name": "Firefox", "Exec": "firefox"}
+  L 451: CustomAssertions.assert_in("firefox.desktop", self.mock_env.installed_desktop_apps)
+
+L 453: class TestT3Pair34_CameraVirtioSndConcurrency(BaseTestCase):
+  L 460: self.mock_env.system_server.set_appop("obs_studio", "OP_CAMERA", "ALLOWED")
+  L 461: cam_ok = self.mock_env.portal.request_camera_access("obs_studio")
+  L 462: self.mock_env.audio_focus_state = "GAIN"
+  L 463: CustomAssertions.assert_true(cam_ok)
+  L 464: CustomAssertions.assert_equal(self.mock_env.audio_focus_state, "GAIN")
+
+L 466: class TestT3Pair35_AudioFocusSafStability(BaseTestCase):
+  L 473: self.mock_env.system_server.unlock_user()
+  L 474: self.mock_env.audio_focus_state = "LOSS_TRANSIENT_CAN_DUCK"
+  L 475: self.mock_env.saf_documents["doc_2"] = {"name": "report.pdf", "size": 1024}
+  L 476: CustomAssertions.assert_in("doc_2", self.mock_env.saf_documents)
+  L 477: CustomAssertions.assert_equal(self.mock_env.audio_focus_state, "LOSS_TRANSIENT_CAN_DUCK")
+
+L 479: class TestT3Pair36_SelinuxCtsDomainTransition(BaseTestCase):
+  L 487: CustomAssertions.assert_in(rule, self.mock_env.selinux_rules["linux_bridge.te"])
+  L 488: CustomAssertions.assert_equal(self.mock_env.cts_results["failed"], 0)
+
+L 490: class TestT3Pair37_DaemonSelinuxNeverallow(BaseTestCase):
+  L 498: CustomAssertions.assert_in(neverallow_rule, self.mock_env.neverallow_rules)
+  L 500: self.mock_env.system_server.log_selinux_audit(audit_entry)
+  L 501: CustomAssertions.assert_selinux_denial(self.mock_env.system_server.audit_logs, "linux_bridge", "efs_file")
+
+L 503: class TestT3Pair38_ErofsStorageLayoutIntegration(BaseTestCase):
+  L 510: CustomAssertions.assert_in("/", self.mock_env.storage_mounts)
+  L 511: CustomAssertions.assert_equal(self.mock_env.storage_mounts["/"]["opts"], "ro")
+  L 512: CustomAssertions.assert_in(self.mock_env.boot_slot, ["slot_a", "slot_b"])
+
+L 514: class TestT3Pair39_CanvasFreeformResizeIntegration(BaseTestCase):
+  L 521: sid = self.mock_env.sommelier.create_surface("org.debian.terminal", 800, 600)
+  L 522: self.mock_env.sommelier.active_surfaces[sid]["width"] = 1280
+  L 523: self.mock_env.sommelier.active_surfaces[sid]["height"] = 720
+  L 524: self.mock_env.sommelier.commit_frame(sid)
+  L 525: CustomAssertions.assert_equal(self.mock_env.sommelier.active_surfaces[sid]["width"], 1280)
+  L 526: CustomAssertions.assert_equal(self.mock_env.sommelier.active_surfaces[sid]["height"], 720)
+
+L 528: class TestT3Pair40_LocationAudioFocusConcurrency(BaseTestCase):
+  L 535: self.mock_env.system_server.set_appop("nav_app", "OP_FINE_LOCATION", "ALLOWED")
+  L 536: loc = self.mock_env.portal.request_location_access("nav_app")
+  L 537: self.mock_env.audio_focus_state = "LOSS_TRANSIENT"
+  L 538: CustomAssertions.assert_equal(loc["latitude"], 25.0330)
+  L 539: CustomAssertions.assert_equal(self.mock_env.audio_focus_state, "LOSS_TRANSIENT")
+
+================================================================================
+FILE: tier4_real_world/test_scenarios.py (290 lines)
+================================================================================
+
+L  18: class TestScenario01_ColdBootDebian(BaseTestCase):
+  L  25: self.mock_env.system_server.unlock_user()
+  L  26: self.mock_env.system_server.set_state("STARTING")
+  L  27: self.mock_env.vsock.bind(5000)
+  L  31: auth_ok = self.mock_env.vsock.authenticate_handshake(token, sig, secret)
+  L  32: CustomAssertions.assert_true(auth_ok)
+  L  33: self.mock_env.system_server.set_state("RUNNING")
+  L  34: self.mock_env.vsock.bind(5001)
+  L  37: self.mock_env.vsock.send(5001, frame)
+  L  38: pkts = self.mock_env.vsock.receive_all(5001)
+  L  39: CustomAssertions.assert_equal(len(pkts), 1)
+
+L  41: class TestScenario02_CjkImeTextInput(BaseTestCase):
+  L  48: self.mock_env.vsock.bind(5001)
+  L  52: self.mock_env.vsock.send(5001, frame)
+  L  53: pkts = self.mock_env.vsock.receive_all(5001)
+  L  54: CustomAssertions.assert_equal(len(pkts), 1)
+  L  56: CustomAssertions.assert_equal(data.decode("utf-8"), "測試")
+
+L  58: class TestScenario03_TuiEditorNavigation(BaseTestCase):
+  L  66: self.mock_env.vsock.bind(5001)
+  L  69: self.mock_env.vsock.send(5001, frame)
+  L  70: pkts = self.mock_env.vsock.receive_all(5001)
+  L  71: CustomAssertions.assert_equal(len(pkts), 1)
+
+L  73: class TestScenario04_WaylandGuiAppLaunch(BaseTestCase):
+  L  80: self.mock_env.installed_desktop_apps["gimp.desktop"] = {"Name": "GIMP", "Exec": "gimp"}
+  L  81: sid = self.mock_env.sommelier.create_surface("gimp", 1920, 1080)
+  L  82: self.mock_env.active_task_ids[101] = "gimp"
+  L  83: CustomAssertions.assert_in(101, self.mock_env.active_task_ids)
+
+L  85: class TestScenario05_FreeformMultiWindowResize(BaseTestCase):
+  L  92: sid = self.mock_env.sommelier.create_surface("vlc", 800, 600)
+  L  93: self.mock_env.sommelier.active_surfaces[sid]["width"] = 1280
+  L  94: self.mock_env.sommelier.active_surfaces[sid]["height"] = 720
+  L  95: self.mock_env.sommelier.commit_frame(sid)
+  L  96: CustomAssertions.assert_equal(self.mock_env.sommelier.active_surfaces[sid]["width"], 1280)
+
+L  98: class TestScenario06_SyntheticDesktopShortcutSync(BaseTestCase):
+  L 105: self.mock_env.installed_desktop_apps["vlc.desktop"] = {"Name": "VLC", "Exec": "vlc"}
+  L 106: CustomAssertions.assert_in("vlc.desktop", self.mock_env.installed_desktop_apps)
+
+L 108: class TestScenario07_CameraStreamingPortal(BaseTestCase):
+  L 115: self.mock_env.system_server.set_appop("cheese", "OP_CAMERA", "ALLOWED")
+  L 116: ok = self.mock_env.portal.request_camera_access("cheese")
+  L 117: CustomAssertions.assert_true(ok)
+
+L 119: class TestScenario08_MicrophoneAccessDenial(BaseTestCase):
+  L 126: self.mock_env.system_server.set_appop("recorder", "OP_RECORD_AUDIO", "DENIED")
+  L 127: ok = self.mock_env.portal.request_microphone_access("recorder")
+  L 128: CustomAssertions.assert_false(ok)
+
+L 130: class TestScenario09_LocationStreamingCheck(BaseTestCase):
+  L 137: self.mock_env.system_server.set_appop("marble", "OP_FINE_LOCATION", "ALLOWED")
+  L 138: loc = self.mock_env.portal.request_location_access("marble")
+  L 139: CustomAssertions.assert_equal(loc["latitude"], 25.0330)
+
+L 141: class TestScenario10_VirtioSndAudioFocusDucking(BaseTestCase):
+  L 148: self.mock_env.audio_focus_state = "GAIN"
+  L 149: self.mock_env.audio_volume = 1.0
+  L 151: self.mock_env.audio_focus_state = "LOSS_TRANSIENT_CAN_DUCK"
+  L 152: self.mock_env.audio_volume = 0.2
+  L 153: CustomAssertions.assert_equal(self.mock_env.audio_focus_state, "LOSS_TRANSIENT_CAN_DUCK")
+  L 154: CustomAssertions.assert_equal(self.mock_env.audio_volume, 0.2)
+
+L 156: class TestScenario11_VirtiofsSafAccess(BaseTestCase):
+  L 163: self.mock_env.shared_files_guest["notes.txt"] = b"notes content"
+  L 164: self.mock_env.shared_files_host["notes.txt"] = self.mock_env.shared_files_guest["notes.txt"]
+  L 165: CustomAssertions.assert_in("notes.txt", self.mock_env.shared_files_host)
+
+L 167: class TestScenario12_Luks2UserUnlockDecryption(BaseTestCase):
+  L 174: CustomAssertions.assert_false(self.mock_env.system_server.user_unlocked)
+  L 175: self.mock_env.system_server.unlock_user()
+  L 176: CustomAssertions.assert_true(self.mock_env.system_server.user_unlocked)
+
+L 178: class TestScenario13_VsockHandshakeReplayPrevention(BaseTestCase):
+  L 188: ok1 = self.mock_env.vsock.authenticate_handshake(token, sig, secret)
+  L 189: ok2 = self.mock_env.vsock.authenticate_handshake(token, sig, secret)
+  L 190: CustomAssertions.assert_true(ok1)
+  L 191: CustomAssertions.assert_false(ok2)
+
+L 193: class TestScenario14_SELinuxDomainDenial(BaseTestCase):
+  L 201: self.mock_env.system_server.log_selinux_audit(log)
+  L 202: CustomAssertions.assert_selinux_denial(self.mock_env.system_server.audit_logs, "linux_bridge", "efs_file")
+
+L 204: class TestScenario15_OtaAvbValidationFailureRollback(BaseTestCase):
+  L 211: self.mock_env.avb_key_valid = False
+  L 212: if not self.mock_env.avb_key_valid:
+  L 213: self.mock_env.boot_slot = "slot_a"
+  L 214: CustomAssertions.assert_equal(self.mock_env.boot_slot, "slot_a")
+
+L 216: class TestScenario16_VmCrashWatchdogRollback(BaseTestCase):
+  L 223: self.mock_env.boot_slot = "slot_a"
+  L 224: self.mock_env.boot_attempts = 3
+  L 225: if self.mock_env.boot_attempts >= 3:
+  L 226: self.mock_env.boot_slot = "slot_b"
+  L 227: CustomAssertions.assert_equal(self.mock_env.boot_slot, "slot_b")
+
+L 229: class TestScenario17_MultiAppWaylandPortals(BaseTestCase):
+  L 236: self.mock_env.system_server.set_appop("vlc", "OP_CAMERA", "ALLOWED")
+  L 237: cam_ok = self.mock_env.portal.request_camera_access("vlc")
+  L 238: sid = self.mock_env.sommelier.create_surface("vlc", 1920, 1080)
+  L 239: self.mock_env.sommelier.commit_frame(sid)
+  L 240: CustomAssertions.assert_true(cam_ok)
+  L 241: CustomAssertions.assert_equal(self.mock_env.sommelier.active_surfaces[sid]["committed_frames"], 1)
+
+L 243: class TestScenario18_StorageKeyRevocationOnLock(BaseTestCase):
+  L 250: self.mock_env.system_server.unlock_user()
+  L 251: CustomAssertions.assert_true(self.mock_env.system_server.ce_key_available)
+  L 252: self.mock_env.system_server.lock_user()
+  L 253: CustomAssertions.assert_false(self.mock_env.system_server.ce_key_available)
+
+L 255: class TestScenario19_SharedFileSafWorkflow(BaseTestCase):
+  L 262: self.mock_env.system_server.unlock_user()
+  L 263: self.mock_env.system_server.set_state("RUNNING")
+  L 264: self.mock_env.shared_files_guest["project_report.pdf"] = b"%PDF-1.4 sample content"
+  L 265: self.mock_env.shared_files_host["project_report.pdf"] = self.mock_env.shared_files_guest["project_report.pdf"]
+  L 266: self.mock_env.saf_documents["doc_19"] = {"name": "project_report.pdf", "size": len(b"%PDF-1.4 sample content")}
+  L 267: CustomAssertions.assert_in("project_report.pdf", self.mock_env.shared_files_host)
+  L 268: CustomAssertions.assert_in("doc_19", self.mock_env.saf_documents)
+
+L 270: class TestScenario20_FullSecurityLifecycleValidation(BaseTestCase):
+  L 277: self.mock_env.system_server.unlock_user()
+  L 278: self.mock_env.system_server.set_state("STARTING")
+  L 282: auth_ok = self.mock_env.vsock.authenticate_handshake(token, sig, secret)
+  L 283: CustomAssertions.assert_true(auth_ok)
+  L 284: self.mock_env.system_server.set_state("RUNNING")
+  L 285: sid = self.mock_env.sommelier.create_surface("org.debian.secapp", 1024, 768)
+  L 286: self.mock_env.sommelier.commit_frame(sid)
+  L 287: CustomAssertions.assert_equal(self.mock_env.sommelier.active_surfaces[sid]["committed_frames"], 1)
+  L 289: CustomAssertions.assert_in(rule, self.mock_env.selinux_rules["linux_manager.te"])

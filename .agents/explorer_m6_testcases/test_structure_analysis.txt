@@ -1,0 +1,908 @@
+
+================================================================================
+FILE: tier1_feature_coverage/test_m1_tier1.py
+================================================================================
+
+Class: TestR1_001_T1_01_ApiClassPresence (line 15)
+
+Class: TestR1_001_T1_02_ServiceRetrievalContext (line 30)
+
+Class: TestR1_001_T1_03_LinuxAppInfoInstantiation (line 43)
+
+Class: TestR1_001_T1_04_StatusCallbackRegistration (line 61)
+
+Class: TestR1_001_T1_05_QueryInitialGuestStatus (line 79)
+
+Class: TestR1_002_T1_06_StartVmAidlInvocation (line 93)
+
+Class: TestR1_002_T1_07_StatusCallbackDispatchNotification (line 105)
+
+Class: TestR1_002_T1_08_TerminalCallbackByteStream (line 123)
+
+Class: TestR1_002_T1_09_GetVmStatusAidlQuery (line 142)
+
+Class: TestR1_002_T1_10_ListenerRegistrationUnregistration (line 154)
+
+Class: TestR1_003_T1_11_ServicePublishedInServiceManager (line 171)
+
+Class: TestR1_003_T1_12_SystemServerPhaseThirdPartyInit (line 185)
+
+Class: TestR1_003_T1_13_LocalServiceRegistrationInternal (line 197)
+
+Class: TestR1_003_T1_14_BootCompletedReceiverDaemonInit (line 208)
+
+Class: TestR1_003_T1_15_UserSwitchStorageKeyRotation (line 220)
+
+Class: TestR1_004_T1_16_DaemonProcessCredentials (line 235)
+
+Class: TestR1_004_T1_17_ControlVsockSocketBind5000 (line 248)
+
+Class: TestR1_004_T1_18_UnixDomainSocketIpcEstablishment (line 259)
+
+Class: TestR1_004_T1_19_PingPongHeartbeatActive (line 271)
+
+Class: TestR1_004_T1_20_ProcessOomAdjPriority (line 285)
+
+Class: TestR1_005_T1_21_TransitionOffStartingRunning (line 300)
+
+Class: TestR1_005_T1_22_TransitionRunningSuspendedRunning (line 315)
+
+Class: TestR1_005_T1_23_TransitionRunningStoppingOff (line 331)
+
+Class: TestR1_005_T1_24_TransitionRunningErrorOnCrash (line 346)
+
+Class: TestR1_005_T1_25_StatusBroadcastNotificationSequence (line 359)
+
+================================================================================
+FILE: tier1_feature_coverage/test_m2_tier1.py
+================================================================================
+
+Class: TestR2_001_T1_26_LaunchCrosvmNonProtected (line 19)
+
+Class: TestR2_001_T1_27_GuestKernelBootVerification (line 39)
+
+Class: TestR2_001_T1_28_GuestSystemdInitCompletion (line 55)
+
+Class: TestR2_001_T1_29_AndroidBridgeAgentServiceActive (line 70)
+
+Class: TestR2_001_T1_30_VirtualCpuRamAllocation (line 89)
+
+Class: TestR2_002_T1_31_MountReadOnlyBaseRootfs (line 106)
+
+Class: TestR2_002_T1_32_MountOverlayfsWritableLayer (line 121)
+
+Class: TestR2_002_T1_33_MountLuksDecryptedUserHome (line 141)
+
+Class: TestR2_002_T1_34_VmStateSnapshotCreation (line 156)
+
+Class: TestR2_002_T1_35_OverlayfsDiffPersistence (line 170)
+
+Class: TestR2_003_T1_36_DeriveKeyFromCeKeymaster (line 189)
+
+Class: TestR2_003_T1_37_CryptsetupOpenOnUserUnlock (line 202)
+
+Class: TestR2_003_T1_38_MountDecryptedMapperToUserHome (line 217)
+
+Class: TestR2_003_T1_39_UnmountAndCloseOnUserLock (line 231)
+
+Class: TestR2_003_T1_40_Aes256XtsCipherValidation (line 246)
+
+Class: TestR2_004_T1_41_Port5000ControlRpcBound (line 262)
+
+Class: TestR2_004_T1_42_Port5001PtyStreamBound (line 278)
+
+Class: TestR2_004_T1_43_Port5002WaylandGuiBound (line 294)
+
+Class: TestR2_004_T1_44_ThreePortBiDirectionalTransmission (line 310)
+
+Class: TestR2_004_T1_45_IndependentPortCloseTeardown (line 322)
+
+Class: TestR2_005_T1_46_HostRandomTokenGeneration (line 338)
+
+Class: TestR2_005_T1_47_TokenPassedViaVirtioSeed (line 354)
+
+Class: TestR2_005_T1_48_GuestComputesHmacSignature (line 368)
+
+Class: TestR2_005_T1_49_HostVerifiesChallengeResponse (line 382)
+
+Class: TestR2_005_T1_50_SessionEstablishmentAuthenticatedState (line 394)
+
+================================================================================
+FILE: tier1_feature_coverage/test_m3_tier1.py
+================================================================================
+
+Class: TestR3_001_T1_51_SurfaceViewCreation (line 85)
+
+Class: TestR3_001_T1_52_CanvasPipeline60FpsUpdate (line 98)
+
+Class: TestR3_001_T1_53_FontBitmapGlyphRendering (line 110)
+
+Class: TestR3_001_T1_54_AnsiColorPaletteRendering (line 122)
+
+Class: TestR3_001_T1_55_DynamicTerminalGridRecalculation (line 134)
+
+Class: TestR3_002_T1_56_ParseStandardAsciiStream (line 149)
+
+Class: TestR3_002_T1_57_InterpretAnsiEscapeSequences (line 162)
+
+Class: TestR3_002_T1_58_ProcessVt100ControlCodes (line 174)
+
+Class: TestR3_002_T1_59_MaintainScrollbackBuffer (line 186)
+
+Class: TestR3_002_T1_60_ScreenResizeRecalculation (line 197)
+
+Class: TestR3_003_T1_61_InstantiateTerminalInputConnection (line 212)
+
+Class: TestR3_003_T1_62_KeyEventTranslation (line 224)
+
+Class: TestR3_003_T1_63_ModifierStateHandling (line 235)
+
+Class: TestR3_003_T1_64_SoftKeyboardCommitTextDispatch (line 247)
+
+Class: TestR3_003_T1_65_SelectionCursorPositionReporting (line 258)
+
+Class: TestR3_004_T1_66_InlineZhuyinComposingText (line 272)
+
+Class: TestR3_004_T1_67_InlineCangjiePinyinComposingText (line 284)
+
+Class: TestR3_004_T1_68_CandidatesSelectionPanelDisplayNavigation (line 295)
+
+Class: TestR3_004_T1_69_Utf8MultiByteStringCommit (line 306)
+
+Class: TestR3_004_T1_70_ComposingTextBackspaceDeletion (line 317)
+
+Class: TestR3_005_T1_71_ActiveModeShellMode (line 332)
+
+Class: TestR3_005_T1_72_SwitchToTuiMouseMode (line 344)
+
+Class: TestR3_005_T1_73_SwitchToTouchpadMode (line 355)
+
+Class: TestR3_005_T1_74_ModeTransitionUiIndicatorDisplay (line 366)
+
+Class: TestR3_005_T1_75_TouchModePreferencePersistence (line 377)
+
+Class: TestR3_006_T1_76_TouchDownToSgrButtonPress (line 391)
+
+Class: TestR3_006_T1_77_TouchDragToSgrMotion (line 407)
+
+Class: TestR3_006_T1_78_TouchUpToSgrButtonRelease (line 418)
+
+Class: TestR3_006_T1_79_ScrollWheelToSgrButtons64_65 (line 429)
+
+Class: TestR3_006_T1_80_OneBasedGridCoordinateTranslation (line 440)
+
+Class: TestR3_007_T1_81_FrameHeaderSerialization (line 454)
+
+Class: TestR3_007_T1_82_FramePayloadParserExtraction (line 469)
+
+Class: TestR3_007_T1_83_TerminalWindowResizeFrame (line 481)
+
+Class: TestR3_007_T1_84_KeepalivePingPongFrameRoundtrip (line 492)
+
+Class: TestR3_007_T1_85_EndOfStreamPacketHandling (line 503)
+
+================================================================================
+FILE: tier1_feature_coverage/test_m4_tier1.py
+================================================================================
+
+Class: TestR4_001_T1_86_ConnectSommelierWaylandProxy (line 15)
+
+Class: TestR4_001_T1_87_ForwardWlSurfaceCommitEvents (line 27)
+
+Class: TestR4_001_T1_88_RenderLinuxAppGuiInProxyActivity (line 40)
+
+Class: TestR4_001_T1_89_DispatchInputEventsToSommelier (line 53)
+
+Class: TestR4_001_T1_90_WaylandSurfaceDestroyCleanup (line 65)
+
+Class: TestR4_002_T1_91_GuestAllocatesGraphicBuffer (line 81)
+
+Class: TestR4_002_T1_92_ExportDmaBufFileDescriptor (line 93)
+
+Class: TestR4_002_T1_93_ImportDmaBufToHardwareBuffer (line 104)
+
+Class: TestR4_002_T1_94_BindHardwareBufferToSurfaceControl (line 116)
+
+Class: TestR4_002_T1_95_ZeroCopyPresentationLatency (line 128)
+
+Class: TestR4_003_T1_96_LaunchProxyActivityWithUniqueTaskId (line 143)
+
+Class: TestR4_003_T1_97_DisplayLinuxAppTitleIconInRecents (line 156)
+
+Class: TestR4_003_T1_98_SwitchBetweenLinuxAndAndroidApps (line 174)
+
+Class: TestR4_003_T1_99_TaskTerminationSendsSigterm (line 189)
+
+Class: TestR4_003_T1_100_LaunchMultipleInstancesUnderDistinctTaskIds (line 201)
+
+Class: TestR4_004_T1_101_SupportFreeformResizeDragHandles (line 219)
+
+Class: TestR4_004_T1_102_SendXdgToplevelConfigureOnResize (line 231)
+
+Class: TestR4_004_T1_103_GuestAppReRendersBufferToNewSize (line 243)
+
+Class: TestR4_004_T1_104_FramePacingSyncDuringLiveResizeDrag (line 255)
+
+Class: TestR4_004_T1_105_MaximizeMinimizeWindowStateTransitions (line 267)
+
+Class: TestR4_005_T1_106_InotifyWatchRegisteredOnApplicationsDir (line 285)
+
+Class: TestR4_005_T1_107_DetectNewDesktopFileCreation (line 297)
+
+Class: TestR4_005_T1_108_ParseDesktopMetadataFields (line 309)
+
+Class: TestR4_005_T1_109_TransmitMetadataPayloadOverVsock5000 (line 326)
+
+Class: TestR4_005_T1_110_DetectModificationDeletionDesktopFiles (line 341)
+
+Class: TestR4_006_T1_111_HostReceivesDesktopMetadataFromDaemon (line 356)
+
+Class: TestR4_006_T1_112_GenerateSyntheticShortcutInLauncher (line 367)
+
+Class: TestR4_006_T1_113_ExtractFormatAppIconPngSvg (line 382)
+
+Class: TestR4_006_T1_114_TappingIconStartsProxyActivity (line 394)
+
+Class: TestR4_006_T1_115_UninstallPackageRemovesShortcut (line 406)
+
+================================================================================
+FILE: tier1_feature_coverage/test_m5_tier1.py
+================================================================================
+
+Class: TestR5_001_T1_116_InterceptCameraAccess (line 18)
+
+Class: TestR5_001_T1_117_ForwardCameraPortalRequest (line 30)
+
+Class: TestR5_001_T1_118_CheckCameraAppOpsPermission (line 44)
+
+Class: TestR5_001_T1_119_PipeCameraStreamV4l2loopback (line 56)
+
+Class: TestR5_001_T1_120_FrameDeliveryToLinuxApp (line 69)
+
+Class: TestR5_002_T1_121_InterceptMicDBusRequest (line 83)
+
+Class: TestR5_002_T1_122_ForwardMicPortalRequest (line 95)
+
+Class: TestR5_002_T1_123_CheckRecordAudioPermission (line 109)
+
+Class: TestR5_002_T1_124_StreamHostPcmAudioToGuest (line 121)
+
+Class: TestR5_002_T1_125_SampleRateConversion (line 132)
+
+Class: TestR5_003_T1_126_InterceptLocationDBusRequest (line 147)
+
+Class: TestR5_003_T1_127_CheckLocationPermissionAppOps (line 159)
+
+Class: TestR5_003_T1_128_FetchPositionFixLocationManager (line 170)
+
+Class: TestR5_003_T1_129_FormatGeoClueDBusStructure (line 183)
+
+Class: TestR5_003_T1_130_ContinuousPositionUpdates (line 199)
+
+Class: TestR5_004_T1_131_TriggerSystemPermissionDialog (line 213)
+
+Class: TestR5_004_T1_132_DisplayAppNameAndPermission (line 224)
+
+Class: TestR5_004_T1_133_RecordAllowChoiceInAppOps (line 236)
+
+Class: TestR5_004_T1_134_RecordDenyChoiceInAppOps (line 248)
+
+Class: TestR5_004_T1_135_SupportAllowOnlyWhileUsingApp (line 260)
+
+Class: TestR5_005_T1_136_GuestAlsaOutputsVirtioSnd (line 275)
+
+Class: TestR5_005_T1_137_HostReceivesPcmBuffer (line 287)
+
+Class: TestR5_005_T1_138_PlayAudioThroughHostAudioTrack (line 298)
+
+Class: TestR5_005_T1_139_HardwareVolumeControlSync (line 309)
+
+Class: TestR5_005_T1_140_LowLatencyAudioPlaybackBufferDelay (line 320)
+
+Class: TestR5_006_T1_141_RequestAudioFocusGain (line 334)
+
+Class: TestR5_006_T1_142_HandleAudioFocusLossTransientCanDuck (line 345)
+
+Class: TestR5_006_T1_143_HandleAudioFocusLossTransient (line 357)
+
+Class: TestR5_006_T1_144_HandleAudioFocusLoss (line 368)
+
+Class: TestR5_006_T1_145_RestoreAudioPlaybackOnGain (line 381)
+
+Class: TestR5_007_T1_146_MountHostLinuxSharedToGuest (line 396)
+
+Class: TestR5_007_T1_147_HostFileAppearsInGuest (line 407)
+
+Class: TestR5_007_T1_148_GuestFileAppearsInHost (line 419)
+
+Class: TestR5_007_T1_149_SubdirectoryAndDeletionSync (line 431)
+
+Class: TestR5_007_T1_150_ZeroCopyPageCacheReadPerformance (line 443)
+
+Class: TestR5_008_T1_151_RegisterLinuxStorageProvider (line 457)
+
+Class: TestR5_008_T1_152_ExposeGuestHomeUserInPicker (line 468)
+
+Class: TestR5_008_T1_153_BrowseGuestDirectoriesViaSaf (line 479)
+
+Class: TestR5_008_T1_154_OpenEditSaveGuestFileViaAndroidEditor (line 490)
+
+Class: TestR5_008_T1_155_CopyFileFromAndroidToGuestHome (line 501)
+
+Class: TestR5_009_T1_156_LinuxManagerDomainPolicy (line 515)
+
+Class: TestR5_009_T1_157_LinuxBridgeDomainPolicy (line 526)
+
+Class: TestR5_009_T1_158_LinuxPortalDomainPolicy (line 537)
+
+Class: TestR5_009_T1_159_VsockIpcPermissionRules (line 548)
+
+Class: TestR5_009_T1_160_StorageGetattrReadWritePermissions (line 559)
+
+Class: TestR5_010_T1_161_NeverallowLinuxBridgeEfsFile (line 573)
+
+Class: TestR5_010_T1_162_NeverallowLinuxManagerSystemFileWrite (line 584)
+
+Class: TestR5_010_T1_163_NeverallowLinuxPortalDeviceRawIo (line 595)
+
+Class: TestR5_010_T1_164_NeverallowDirectModemAccess (line 606)
+
+Class: TestR5_010_T1_165_PolicyCompilationVerificationCheckpolicy (line 617)
+
+Class: TestR5_011_T1_166_ExecuteCtsSelinuxHostTestCases (line 631)
+
+Class: TestR5_011_T1_167_ExecuteCtsSecurityTestCases (line 643)
+
+Class: TestR5_011_T1_168_VtsKernelComplianceValidation (line 654)
+
+Class: TestR5_011_T1_169_AndroidFrameworkApiCompatibility (line 665)
+
+Class: TestR5_011_T1_170_CtsVerifierManualTestSuite (line 676)
+
+Class: TestR5_012_T1_171_ImmutableReadOnlyErofsLayout (line 690)
+
+Class: TestR5_012_T1_172_ActiveBootSlotDetermination (line 701)
+
+Class: TestR5_012_T1_173_GuestRootfsMountFromSlotA (line 711)
+
+Class: TestR5_012_T1_174_BackgroundOtaStreamingWriteSlotB (line 722)
+
+Class: TestR5_012_T1_175_ActiveSlotFlagUpdateAfterOta (line 733)
+
+Class: TestR5_013_T1_176_AvbKeyChainVerification (line 747)
+
+Class: TestR5_013_T1_177_ValidateRsa4096SignatureHeader (line 757)
+
+Class: TestR5_013_T1_178_CalculateSha256DigestMatchVbmeta (line 768)
+
+Class: TestR5_013_T1_179_SuccessfulOtaUpdateAuthorization (line 779)
+
+Class: TestR5_013_T1_180_ReportAvbVerificationStateToHost (line 790)
+
+Class: TestR5_014_T1_181_IncrementBootAttemptCounter (line 806)
+
+Class: TestR5_014_T1_182_ResetBootAttemptCounterOnHeartbeat (line 817)
+
+Class: TestR5_014_T1_183_TriggerBootWatchdogTimerDeadline (line 829)
+
+Class: TestR5_014_T1_184_AutomaticSlotRollbackExceedThreshold (line 840)
+
+Class: TestR5_014_T1_185_EmitCriticalLogOnWatchdogRollback (line 853)
+
+================================================================================
+FILE: tier2_boundary_corner/test_m1_tier2.py
+================================================================================
+
+Class: TestR1_001_T2_01_NullCallbackRejection (line 18)
+
+Class: TestR1_001_T2_02_UnpermissionedCaller (line 35)
+
+Class: TestR1_001_T2_03_CorruptedParcelable (line 54)
+
+Class: TestR1_001_T2_04_DuplicateCallbackRegister (line 70)
+
+Class: TestR1_001_T2_05_BinderDeadObjectRecovery (line 90)
+
+Class: TestR1_002_T2_06_AidlTimeout (line 114)
+
+Class: TestR1_002_T2_07_MaxPayloadCap (line 129)
+
+Class: TestR1_002_T2_08_ConcurrentAidlLock (line 145)
+
+Class: TestR1_002_T2_09_DeadBinderCallback (line 173)
+
+Class: TestR1_002_T2_10_InvalidUidCaller (line 202)
+
+Class: TestR1_003_T2_11_SystemServerCrashRecovery (line 222)
+
+Class: TestR1_003_T2_12_EarlyBootHandshakeDelay (line 237)
+
+Class: TestR1_003_T2_13_SystemShutdownHook (line 255)
+
+Class: TestR1_003_T2_14_LmkPressureSignal (line 273)
+
+Class: TestR1_003_T2_15_UntrustedUidDenial (line 292)
+
+Class: TestR1_004_T2_16_DaemonSigkillWatchdog (line 309)
+
+Class: TestR1_004_T2_17_MalformedFrameRejection (line 330)
+
+Class: TestR1_004_T2_18_SocketBufferOverflow (line 341)
+
+Class: TestR1_004_T2_19_DaemonNetworkRestriction (line 361)
+
+Class: TestR1_004_T2_20_MemoryLeakPingStress (line 375)
+
+Class: TestR1_005_T2_21_InvalidStateTransition (line 397)
+
+Class: TestR1_005_T2_22_RapidStartStopRace (line 424)
+
+Class: TestR1_005_T2_23_VmStartTimeout (line 438)
+
+Class: TestR1_005_T2_24_ForceStopDuringStarting (line 455)
+
+Class: TestR1_005_T2_25_ReinitFromErrorState (line 469)
+
+================================================================================
+FILE: tier2_boundary_corner/test_m2_tier2.py
+================================================================================
+
+Class: TestR2_001_T2_26_HostKvmMissingError (line 20)
+
+Class: TestR2_001_T2_27_InsufficientRamError (line 33)
+
+Class: TestR2_001_T2_28_GuestKernelPanic (line 46)
+
+Class: TestR2_001_T2_29_UnexpectedPoweroff (line 59)
+
+Class: TestR2_001_T2_30_VcpuStallDetection (line 73)
+
+Class: TestR2_002_T2_31_BaseRootfsReadOnly (line 90)
+
+Class: TestR2_002_T2_32_OverlayfsStorageFull (line 104)
+
+Class: TestR2_002_T2_33_CorruptedOverlayfsRecovery (line 122)
+
+Class: TestR2_002_T2_34_SnapshotRestorationFailure (line 158)
+
+Class: TestR2_001_T2_35_MultiProcessMountLock (line 172)
+
+Class: TestR2_003_T2_36_IncorrectCeKeyDecryption (line 226)
+
+Class: TestR2_003_T2_37_LockScreenKeyWipe (line 237)
+
+Class: TestR2_003_T2_38_CorruptedLuksHeader (line 251)
+
+Class: TestR2_003_T2_39_RawDiskCiphertextOnly (line 264)
+
+Class: TestR2_003_T2_40_LockScreenCredentialRekey (line 277)
+
+Class: TestR2_004_T2_41_UnauthorizedPortBind (line 293)
+
+Class: TestR2_004_T2_42_PortCollisionHandling (line 309)
+
+Class: TestR2_004_T2_43_CidSpoofingRejection (line 322)
+
+Class: TestR2_004_T2_44_SocketBufferExhaustion (line 335)
+
+Class: TestR2_004_T2_45_UnexpectedGuestRebootReconnect (line 347)
+
+Class: TestR2_005_T2_46_InvalidHmacSignature (line 363)
+
+Class: TestR2_005_T2_47_ReplayedTokenRejection (line 374)
+
+Class: TestR2_005_T2_48_HandshakeTimeoutExpiration (line 386)
+
+Class: TestR2_005_T2_49_KeyMismatchAlert (line 398)
+
+Class: TestR2_005_T2_50_ReauthAfterSuspend (line 411)
+
+================================================================================
+FILE: tier2_boundary_corner/test_m3_tier2.py
+================================================================================
+
+Class: TestR3_001_T2_51_RapidSurfaceRotation (line 85)
+
+Class: TestR3_001_T2_52_MemoryReclamationViewDetach (line 96)
+
+Class: TestR3_001_T2_53_HighResRenderingBudget (line 107)
+
+Class: TestR3_001_T2_54_InvalidSurfaceStateBackground (line 118)
+
+Class: TestR3_001_T2_55_GlyphRasterizationFallback (line 129)
+
+Class: TestR3_002_T2_56_MalformedEscapeSequence (line 143)
+
+Class: TestR3_002_T2_57_BinaryLogDumpOverflow (line 154)
+
+Class: TestR3_002_T2_58_AltScreenBufferSwitching (line 165)
+
+Class: TestR3_002_T2_59_WideUtf8Alignment (line 176)
+
+Class: TestR3_002_T2_60_PartialMultiByteSplit (line 187)
+
+Class: TestR3_003_T2_61_KeyStormHandling (line 201)
+
+Class: TestR3_003_T2_62_SpecialKeyComboMapping (line 212)
+
+Class: TestR3_003_T2_63_HardwareKeyboardPassthrough (line 223)
+
+Class: TestR3_003_T2_64_DeadKeyComposition (line 234)
+
+Class: TestR3_003_T2_65_FocusLossBufferReset (line 245)
+
+Class: TestR3_004_T2_66_CancelInlineComposition (line 259)
+
+Class: TestR3_004_T2_67_RapidCandidateSelection (line 270)
+
+Class: TestR3_004_T2_68_SurroundingTextQuery (line 281)
+
+Class: TestR3_004_T2_69_LongComposingTextTruncation (line 292)
+
+Class: TestR3_004_T2_70_ThirdPartyKeyboardCompat (line 303)
+
+Class: TestR3_005_T2_71_MultiTouchRejectionShell (line 317)
+
+Class: TestR3_005_T2_72_PinchToZoomFontScaling (line 328)
+
+Class: TestR3_005_T2_73_PalmRejectionTouchpad (line 339)
+
+Class: TestR3_005_T2_74_FastTouchModeToggle (line 350)
+
+Class: TestR3_005_T2_75_TouchModePauseResume (line 361)
+
+Class: TestR3_006_T2_76_OutOfBoundsCoordClamping (line 375)
+
+Class: TestR3_006_T2_77_SubPixelMotionThreshold (line 386)
+
+Class: TestR3_006_T2_78_RightClickLongPress (line 397)
+
+Class: TestR3_006_T2_79_ResizeGridRecalculation (line 408)
+
+Class: TestR3_006_T2_80_DisableSgrWhenTrackingDisabled (line 419)
+
+Class: TestR3_007_T2_81_InvalidHeaderByteRejection (line 433)
+
+Class: TestR3_007_T2_82_FragmentedPayloadReassembly (line 445)
+
+Class: TestR3_007_T2_83_PartialHeaderSplit (line 457)
+
+Class: TestR3_007_T2_84_SessionIdMismatchDrop (line 468)
+
+Class: TestR3_007_T2_85_PayloadLengthSanityCheck (line 479)
+
+================================================================================
+FILE: tier2_boundary_corner/test_m4_tier2.py
+================================================================================
+
+Class: TestR4_001_T2_86_SommelierCrashRecovery (line 16)
+
+Class: TestR4_001_T2_87_MultiWindowSurfaceIsolation (line 32)
+
+Class: TestR4_001_T2_88_ProtocolVersionMismatch (line 51)
+
+Class: TestR4_001_T2_89_HighFpsBufferDropCheck (line 65)
+
+Class: TestR4_001_T2_90_OutOfOrderPacketSequence (line 82)
+
+Class: TestR4_002_T2_91_InvalidDmabufHandle (line 100)
+
+Class: TestR4_002_T2_92_GpuMemoryLeakValidation (line 115)
+
+Class: TestR4_002_T2_93_GpuResetHostSurfaceRecreation (line 133)
+
+Class: TestR4_002_T2_94_FormatIncompatibilityFallback (line 151)
+
+Class: TestR4_002_T2_95_SyncGpuFenceCompletion (line 168)
+
+Class: TestR4_003_T2_96_ReuseTaskIdOnRelaunch (line 187)
+
+Class: TestR4_003_T2_97_AbruptTaskKillProcessCleanup (line 208)
+
+Class: TestR4_003_T2_98_MaxConcurrentTaskLimit (line 225)
+
+Class: TestR4_003_T2_99_RetainTaskIdOnOrientationChange (line 246)
+
+Class: TestR4_003_T2_100_ClearTasksOnVmShutdown (line 261)
+
+Class: TestR4_004_T2_101_EnforceMinWindowSize (line 282)
+
+Class: TestR4_004_T2_102_EnforceMaxWindowSize (line 299)
+
+Class: TestR4_004_T2_103_ResizeQueueBufferStability (line 316)
+
+Class: TestR4_004_T2_104_AspectRatioPreservation (line 332)
+
+Class: TestR4_004_T2_105_DisplayDpiChangeBufferScaling (line 346)
+
+Class: TestR4_005_T2_106_IgnoreInvalidDesktopSyntax (line 366)
+
+Class: TestR4_005_T2_107_IgnoreHiddenDesktopEntries (line 383)
+
+Class: TestR4_005_T2_108_InotifyBurstThrottling (line 396)
+
+Class: TestR4_005_T2_109_MissingIconFallback (line 413)
+
+Class: TestR4_005_T2_110_RecursiveInotifyWatch (line 427)
+
+Class: TestR4_006_T2_111_DuplicateShortcutDeduplication (line 444)
+
+Class: TestR4_006_T2_112_LauncherRestartPersistence (line 459)
+
+Class: TestR4_006_T2_113_SpecialCharEscaping (line 477)
+
+Class: TestR4_006_T2_114_IconConversionFallback (line 490)
+
+Class: TestR4_006_T2_115_WorkProfileShortcutIsolation (line 506)
+
+================================================================================
+FILE: tier2_boundary_corner/test_m5_tier2.py
+================================================================================
+
+Class: TestR5_001_T2_116_CameraAccessDenied (line 17)
+
+Class: TestR5_001_T2_117_CameraResourceReleaseOnExit (line 31)
+
+Class: TestR5_001_T2_118_CameraContentionResolution (line 47)
+
+Class: TestR5_001_T2_119_CameraResolutionMismatchFallback (line 63)
+
+Class: TestR5_001_T2_120_CameraHardwareDisconnect (line 77)
+
+Class: TestR5_002_T2_121_MicAccessDenied (line 97)
+
+Class: TestR5_002_T2_122_MicPrivacyToggleMute (line 111)
+
+Class: TestR5_002_T2_123_AudioLatencyUnderflowMitigation (line 125)
+
+Class: TestR5_002_T2_124_StopMicRecordingOnBackground (line 142)
+
+Class: TestR5_002_T2_125_StereoToMonoDownmixing (line 158)
+
+Class: TestR5_003_T2_126_CoarseLocationApproximate (line 175)
+
+Class: TestR5_003_T2_127_GpsDisabledFailure (line 193)
+
+Class: TestR5_003_T2_128_LocationUpdateThrottling (line 210)
+
+Class: TestR5_003_T2_129_MockLocationFiltering (line 230)
+
+Class: TestR5_003_T2_130_UnsubscribeLocationOnExit (line 244)
+
+Class: TestR5_004_T2_131_PermissionPromptTimeout (line 261)
+
+Class: TestR5_004_T2_132_RejectDuplicatePrompts (line 279)
+
+Class: TestR5_004_T2_133_EnterpriseMdmForceDeny (line 296)
+
+Class: TestR5_004_T2_134_PermissionRevocationSettings (line 310)
+
+Class: TestR5_004_T2_135_PromptSuppressedWhenLocked (line 326)
+
+Class: TestR5_005_T2_136_AudioBufferOverflowLoad (line 350)
+
+Class: TestR5_005_T2_137_BluetoothHeadsetDisconnect (line 368)
+
+Class: TestR5_005_T2_138_SilentFrameZeroFill (line 384)
+
+Class: TestR5_005_T2_139_SampleFormatConversion (line 399)
+
+Class: TestR5_005_T2_140_MultiStreamAudioMixing (line 416)
+
+Class: TestR5_006_T2_141_PhoneCallDucking (line 433)
+
+Class: TestR5_006_T2_142_AlarmClockPause (line 452)
+
+Class: TestR5_006_T2_143_RejectFocusWithoutForegroundService (line 467)
+
+Class: TestR5_006_T2_144_AudioFocusSuspendRecovery (line 483)
+
+Class: TestR5_006_T2_145_RapidAudioFocusToggle (line 501)
+
+Class: TestR5_007_T2_146_SymlinkTraversalRestriction (line 520)
+
+Class: TestR5_007_T2_147_FilePermissionBitMapping (line 538)
+
+Class: TestR5_007_T2_148_ConcurrentFileLockResolution (line 555)
+
+Class: TestR5_007_T2_149_LargeFileTransferIntegrity (line 572)
+
+Class: TestR5_007_T2_150_VirtiofsDiskSpaceError (line 586)
+
+Class: TestR5_008_T2_151_HideSystemRootFromSaf (line 605)
+
+Class: TestR5_008_T2_152_SafVmOfflineError (line 619)
+
+Class: TestR5_008_T2_153_DenySafLockedLuksVolume (line 636)
+
+Class: TestR5_008_T2_154_SafChangeNotificationTrigger (line 653)
+
+Class: TestR5_008_T2_155_SafReadOnlyMountFlags (line 669)
+
+Class: TestR5_009_T2_156_SelinuxNoAuditDenialsNormal (line 690)
+
+Class: TestR5_009_T2_157_BlockBridgeUnlabelledStorage (line 703)
+
+Class: TestR5_009_T2_158_BlockPortalKeystoreAccess (line 716)
+
+Class: TestR5_009_T2_159_DomainTransitionBridge (line 729)
+
+Class: TestR5_009_T2_160_EnforcingVsPermissiveCheck (line 743)
+
+Class: TestR5_010_T2_161_NeverallowBuildViolation (line 757)
+
+Class: TestR5_010_T2_162_PreventDomainTransitionSuInit (line 773)
+
+Class: TestR5_010_T2_163_BlockRawBlockDeviceAccess (line 789)
+
+Class: TestR5_010_T2_164_ExploitDenialVerification (line 803)
+
+Class: TestR5_010_T2_165_ValidateNeverallowAllBoards (line 816)
+
+Class: TestR5_011_T2_166_CtsAidlModificationRegression (line 832)
+
+Class: TestR5_011_T2_167_TrebleBoundaryCompliance (line 848)
+
+Class: TestR5_011_T2_168_GsiBootCompatibility (line 859)
+
+Class: TestR5_011_T2_169_SepolicyUserVsUserdebug (line 870)
+
+Class: TestR5_011_T2_170_CtsIdlePowerOverhead (line 883)
+
+Class: TestR5_012_T2_171_BlockWriteActiveErofs (line 899)
+
+Class: TestR5_012_T2_172_InterruptedOtaDownload (line 912)
+
+Class: TestR5_012_T2_173_ErofsCompressionRatio (line 930)
+
+Class: TestR5_012_T2_174_ErofsReadThroughput (line 944)
+
+Class: TestR5_012_T2_175_FallbackSlotMountOnChecksumFail (line 957)
+
+Class: TestR5_013_T2_176_RejectUntrustedPrivateKey (line 977)
+
+Class: TestR5_013_T2_177_RejectTamperedBaseImage (line 994)
+
+Class: TestR5_013_T2_178_MissingVbmetaHeader (line 1012)
+
+Class: TestR5_013_T2_179_PreventRollbackOlderVersion (line 1028)
+
+Class: TestR5_013_T2_180_DebugVsProdKeyPolicy (line 1045)
+
+Class: TestR5_014_T2_181_GuestKernelFreezeReset (line 1065)
+
+Class: TestR5_014_T2_182_SystemdBootLoopRollback (line 1082)
+
+Class: TestR5_014_T2_183_RetainUserDataOnRollback (line 1102)
+
+Class: TestR5_014_T2_184_MarkFailedSlotUnbootable (line 1119)
+
+Class: TestR5_014_T2_185_ManualForceRollback (line 1135)
+
+================================================================================
+FILE: tier3_cross_feature/test_pairwise_matrix.py
+================================================================================
+
+Class: TestT3Pair01_ShutdownLuksUnmount (line 12)
+
+Class: TestT3Pair02_VsockConcurrency (line 27)
+
+Class: TestT3Pair03_ImeLibvtermIntegration (line 47)
+
+Class: TestT3Pair04_WaylandVirtioGpuDmaBuf (line 65)
+
+Class: TestT3Pair05_InotifySyntheticShortcuts (line 77)
+
+Class: TestT3Pair06_CameraAppOpsPrompt (line 88)
+
+Class: TestT3Pair07_VirtioSndAudioFocus (line 99)
+
+Class: TestT3Pair08_VirtiofsSafAccess (line 113)
+
+Class: TestT3Pair09_SELinuxDomainNeverallow (line 126)
+
+Class: TestT3Pair10_ErofsWatchdogFallback (line 137)
+
+Class: TestT3Pair11_HmacDaemonIsolation (line 150)
+
+Class: TestT3Pair12_TouchModeSgrMouse (line 163)
+
+Class: TestT3Pair13_FrameworkApiSystemServer (line 179)
+
+Class: TestT3Pair14_AidlVsockRouting (line 191)
+
+Class: TestT3Pair15_SystemServerSelinuxDomain (line 208)
+
+Class: TestT3Pair16_DebianVmStorageLayout (line 218)
+
+Class: TestT3Pair17_StorageOverlayLuks (line 230)
+
+Class: TestT3Pair18_LuksStorageSafProvider (line 244)
+
+Class: TestT3Pair19_SurfaceCanvasLibvterm (line 256)
+
+Class: TestT3Pair20_InputConnectionPtyFraming (line 271)
+
+Class: TestT3Pair21_WaylandTaskMapper (line 287)
+
+Class: TestT3Pair22_VirtioGpuFreeformResize (line 300)
+
+Class: TestT3Pair23_TaskRecentsLauncher3 (line 314)
+
+Class: TestT3Pair24_MicrophoneAppOpsPrompt (line 327)
+
+Class: TestT3Pair25_LocationAppOpsPrompt (line 338)
+
+Class: TestT3Pair26_VirtioSndVirtiofsConcurrency (line 349)
+
+Class: TestT3Pair27_SelinuxNeverallowCts (line 362)
+
+Class: TestT3Pair28_ErofsAvbValidation (line 372)
+
+Class: TestT3Pair29_AvbWatchdogRollback (line 382)
+
+Class: TestT3Pair30_LifecycleDebianVm (line 394)
+
+Class: TestT3Pair31_VsockHmacHandshake (line 406)
+
+Class: TestT3Pair32_CjkImePtyFraming (line 425)
+
+Class: TestT3Pair33_InotifyVirtiofsSync (line 442)
+
+Class: TestT3Pair34_CameraVirtioSndConcurrency (line 453)
+
+Class: TestT3Pair35_AudioFocusSafStability (line 466)
+
+Class: TestT3Pair36_SelinuxCtsDomainTransition (line 479)
+
+Class: TestT3Pair37_DaemonSelinuxNeverallow (line 490)
+
+Class: TestT3Pair38_ErofsStorageLayoutIntegration (line 503)
+
+Class: TestT3Pair39_CanvasFreeformResizeIntegration (line 514)
+
+Class: TestT3Pair40_LocationAudioFocusConcurrency (line 528)
+
+================================================================================
+FILE: tier4_real_world/test_scenarios.py
+================================================================================
+
+Class: TestScenario01_ColdBootDebian (line 18)
+
+Class: TestScenario02_CjkImeTextInput (line 41)
+
+Class: TestScenario03_TuiEditorNavigation (line 58)
+
+Class: TestScenario04_WaylandGuiAppLaunch (line 73)
+
+Class: TestScenario05_FreeformMultiWindowResize (line 85)
+
+Class: TestScenario06_SyntheticDesktopShortcutSync (line 98)
+
+Class: TestScenario07_CameraStreamingPortal (line 108)
+
+Class: TestScenario08_MicrophoneAccessDenial (line 119)
+
+Class: TestScenario09_LocationStreamingCheck (line 130)
+
+Class: TestScenario10_VirtioSndAudioFocusDucking (line 141)
+
+Class: TestScenario11_VirtiofsSafAccess (line 156)
+
+Class: TestScenario12_Luks2UserUnlockDecryption (line 167)
+
+Class: TestScenario13_VsockHandshakeReplayPrevention (line 178)
+
+Class: TestScenario14_SELinuxDomainDenial (line 193)
+
+Class: TestScenario15_OtaAvbValidationFailureRollback (line 204)
+
+Class: TestScenario16_VmCrashWatchdogRollback (line 216)
+
+Class: TestScenario17_MultiAppWaylandPortals (line 229)
+
+Class: TestScenario18_StorageKeyRevocationOnLock (line 243)
+
+Class: TestScenario19_SharedFileSafWorkflow (line 255)
+
+Class: TestScenario20_FullSecurityLifecycleValidation (line 270)

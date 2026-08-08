@@ -1,18 +1,19 @@
-// guest/bridge-agent/src/vsock.rs
-// Vsock IPC Connection module connecting to Host CID 2 across Ports 5000, 5001, 5002
+use std::io::{self, Read, Write};
+use std::net::{TcpListener, TcpStream};
 
-use std::fs::File;
-use std::os::unix::io::{FromRawFd, RawFd};
+pub const VMADDR_CID_ANY: u32 = 0xFFFFFFFF;
+pub const VMADDR_CID_HOST: u32 = 2;
 
-pub const CID_HOST: u32 = 2;
-pub const PORT_CONTROL: u32 = 5000;
+pub const PORT_PORTAL: u32 = 5000;
 pub const PORT_PTY: u32 = 5001;
 pub const PORT_WAYLAND: u32 = 5002;
 
-pub const AF_VSOCK: i32 = 40;
+#[cfg(target_os = "linux")]
+const AF_VSOCK: i32 = 37;
 
+#[cfg(target_os = "linux")]
 #[repr(C)]
-struct SockAddrVm {
+struct sockaddr_vm {
     svm_family: u16,
     svm_reserved1: u16,
     svm_port: u32,
@@ -20,59 +21,205 @@ struct SockAddrVm {
     svm_zero: [u8; 4],
 }
 
-#[allow(dead_code)]
-pub struct VsockEndpoint {
-    pub cid: u32,
-    pub port: u32,
+pub enum VsockStream {
+    #[allow(dead_code)]
+    Vsock(libc::c_int),
+    Tcp(TcpStream),
 }
 
-#[allow(dead_code)]
-impl VsockEndpoint {
-    pub fn control() -> Self {
-        Self { cid: CID_HOST, port: PORT_CONTROL }
+impl VsockStream {
+    pub fn try_clone(&self) -> io::Result<Self> {
+        match self {
+            VsockStream::Vsock(fd) => {
+                let dup_fd = unsafe { libc::dup(*fd) };
+                if dup_fd < 0 {
+                    Err(io::Error::last_os_error())
+                } else {
+                    Ok(VsockStream::Vsock(dup_fd))
+                }
+            }
+            VsockStream::Tcp(s) => Ok(VsockStream::Tcp(s.try_clone()?)),
+        }
     }
 
-    pub fn pty() -> Self {
-        Self { cid: CID_HOST, port: PORT_PTY }
-    }
-
-    pub fn wayland() -> Self {
-        Self { cid: CID_HOST, port: PORT_WAYLAND }
+    pub fn set_read_timeout(&self, timeout: Option<std::time::Duration>) -> io::Result<()> {
+        match self {
+            VsockStream::Vsock(fd) => {
+                let timeval = match timeout {
+                    Some(dur) => libc::timeval {
+                        tv_sec: dur.as_secs() as libc::time_t,
+                        tv_usec: dur.subsec_micros() as libc::suseconds_t,
+                    },
+                    None => libc::timeval { tv_sec: 0, tv_usec: 0 },
+                };
+                let res = unsafe {
+                    libc::setsockopt(
+                        *fd,
+                        libc::SOL_SOCKET,
+                        libc::SO_RCVTIMEO,
+                        &timeval as *const _ as *const libc::c_void,
+                        std::mem::size_of::<libc::timeval>() as libc::socklen_t,
+                    )
+                };
+                if res < 0 {
+                    Err(io::Error::last_os_error())
+                } else {
+                    Ok(())
+                }
+            }
+            VsockStream::Tcp(s) => s.set_read_timeout(timeout),
+        }
     }
 }
 
-/// Connects to a Host Vsock endpoint (CID 2, Port) returning a File descriptor wrapper supporting Read/Write.
-pub fn connect_vsock(cid: u32, port: u32) -> Result<File, String> {
-    unsafe {
-        let fd: RawFd = libc::socket(AF_VSOCK, libc::SOCK_STREAM, 0);
-        if fd < 0 {
-            return Err(format!(
-                "Failed to create AF_VSOCK socket: {}",
-                std::io::Error::last_os_error()
-            ));
+impl Read for VsockStream {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        match self {
+            VsockStream::Vsock(fd) => {
+                let res = unsafe { libc::read(*fd, buf.as_mut_ptr() as *mut libc::c_void, buf.len()) };
+                if res < 0 {
+                    Err(io::Error::last_os_error())
+                } else {
+                    Ok(res as usize)
+                }
+            }
+            VsockStream::Tcp(s) => s.read(buf),
+        }
+    }
+}
+
+impl Write for VsockStream {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self {
+            VsockStream::Vsock(fd) => {
+                let res = unsafe { libc::write(*fd, buf.as_ptr() as *const libc::c_void, buf.len()) };
+                if res < 0 {
+                    Err(io::Error::last_os_error())
+                } else {
+                    Ok(res as usize)
+                }
+            }
+            VsockStream::Tcp(s) => s.write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        match self {
+            VsockStream::Vsock(_) => Ok(()),
+            VsockStream::Tcp(s) => s.flush(),
+        }
+    }
+}
+
+impl Drop for VsockStream {
+    fn drop(&mut self) {
+        if let VsockStream::Vsock(fd) = self {
+            if *fd >= 0 {
+                unsafe { libc::close(*fd); }
+            }
+        }
+    }
+}
+
+pub enum VsockListener {
+    #[allow(dead_code)]
+    Vsock(libc::c_int, u32),
+    Tcp(TcpListener, u32),
+}
+
+impl VsockListener {
+    pub fn bind(_cid: u32, port: u32) -> io::Result<Self> {
+        #[cfg(target_os = "linux")]
+        {
+            let fd = unsafe { libc::socket(AF_VSOCK, libc::SOCK_STREAM, 0) };
+            if fd >= 0 {
+                let mut sa: sockaddr_vm = unsafe { std::mem::zeroed() };
+                sa.svm_family = AF_VSOCK as u16;
+                sa.svm_cid = _cid;
+                sa.svm_port = port;
+
+                let res = unsafe {
+                    libc::bind(
+                        fd,
+                        &sa as *const _ as *const libc::sockaddr,
+                        std::mem::size_of::<sockaddr_vm>() as libc::socklen_t,
+                    )
+                };
+
+                if res == 0 {
+                    let listen_res = unsafe { libc::listen(fd, 128) };
+                    if listen_res == 0 {
+                        return Ok(VsockListener::Vsock(fd, port));
+                    }
+                }
+                unsafe { libc::close(fd); }
+            }
         }
 
-        let mut addr: SockAddrVm = std::mem::zeroed();
-        addr.svm_family = AF_VSOCK as u16;
-        addr.svm_cid = cid;
-        addr.svm_port = port;
+        let addr = format!("127.0.0.1:{}", port);
+        let listener = TcpListener::bind(&addr)?;
+        Ok(VsockListener::Tcp(listener, port))
+    }
 
-        let res = libc::connect(
-            fd,
-            &addr as *const _ as *const libc::sockaddr,
-            std::mem::size_of::<SockAddrVm>() as u32,
-        );
-
-        if res < 0 {
-            libc::close(fd);
-            return Err(format!(
-                "Failed to connect AF_VSOCK CID {} Port {}: {}",
-                cid,
-                port,
-                std::io::Error::last_os_error()
-            ));
+    pub fn accept(&self) -> io::Result<(VsockStream, u32)> {
+        match self {
+            VsockListener::Vsock(fd, _port) => {
+                #[cfg(target_os = "linux")]
+                {
+                    let mut sa: sockaddr_vm = unsafe { std::mem::zeroed() };
+                    let mut len = std::mem::size_of::<sockaddr_vm>() as libc::socklen_t;
+                    let client_fd = unsafe {
+                        libc::accept(
+                            *fd,
+                            &mut sa as *mut _ as *mut libc::sockaddr,
+                            &mut len,
+                        )
+                    };
+                    if client_fd < 0 {
+                        Err(io::Error::last_os_error())
+                    } else {
+                        Ok((VsockStream::Vsock(client_fd), sa.svm_cid))
+                    }
+                }
+                #[cfg(not(target_os = "linux"))]
+                {
+                    let _ = fd;
+                    Err(io::Error::new(io::ErrorKind::Other, "Vsock raw socket accept not supported on non-linux target"))
+                }
+            }
+            VsockListener::Tcp(listener, _port) => {
+                let (stream, _addr) = listener.accept()?;
+                Ok((VsockStream::Tcp(stream), VMADDR_CID_HOST))
+            }
         }
+    }
 
-        Ok(File::from_raw_fd(fd))
+    #[allow(dead_code)]
+    pub fn port(&self) -> u32 {
+        match self {
+            VsockListener::Vsock(_, p) => *p,
+            VsockListener::Tcp(_, p) => *p,
+        }
+    }
+}
+
+impl Drop for VsockListener {
+    fn drop(&mut self) {
+        if let VsockListener::Vsock(fd, _) = self {
+            if *fd >= 0 {
+                unsafe { libc::close(*fd); }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_vsock_listener_bind_free_port() {
+        let listener = VsockListener::bind(VMADDR_CID_ANY, 0).expect("Should bind to dynamic port");
+        assert_eq!(listener.port(), 0);
     }
 }

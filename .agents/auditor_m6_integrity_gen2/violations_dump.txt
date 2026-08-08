@@ -1,0 +1,2775 @@
+TOTAL VIOLATIONS: 335
+
+[tests/e2e/framework/base_test.py] BaseTestCase -> zero env/system calls
+def run_test(self):
+    """Override this method in subclasses to execute test logic."""
+    raise NotImplementedError('Subclasses must implement run_test()')
+
+------------------------------------
+[tests/e2e/test_m3_challenger2_stress.py] TestM3_F05_RapidModeSwitchingStress -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    sm = TouchModeStateMachineRef()
+    errors = []
+    transitions_count = [0]
+
+    def listener(old, new, is_manual):
+        transitions_count[0] += 1
+    sm.add_listener(listener)
+
+    def worker_func():
+        modes = [TouchMode.SHELL_MODE, TouchMode.TUI_MOUSE_MODE, TouchMode.TOUCHPAD_MODE]
+        for _ in range(1000):
+            m = random.choice(modes)
+            if random.random() < 0.5:
+                sm.set_manual_touch_mode(m)
+            else:
+                sm.on_terminal_escape_mouse_tracking_changed(random.choice([True, False]))
+            if random.random() < 0.2:
+                sm.unlock_auto_mode()
+    threads = [threading.Thread(target=worker_func) for _ in range(10)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    CustomAssertions.assert_true(transitions_count[0] > 0, 'Transitions should occur')
+    print(f'       [Stress M3-01] Executed {transitions_count[0]} state transitions across 10 threads cleanly.')
+
+------------------------------------
+[tests/e2e/test_m3_challenger2_stress.py] TestM3_F05_MidGestureModeSwitchBug -> zero env/system calls
+def run_test(self):
+    generator = SgrMouseGeneratorRef()
+    generator.set_mouse_tracking_enabled(True)
+    out_down = generator.process_motion_event('DOWN', 100, 100, 1, 10, 20, 80, 24)
+    CustomAssertions.assert_equal(out_down, b'\x1b[<0;11;6;M')
+    CustomAssertions.assert_equal(generator.last_col, 11)
+    generator.set_mouse_tracking_enabled(False)
+    out_up_shell = generator.process_motion_event('UP', 100, 100, 1, 10, 20, 80, 24)
+    CustomAssertions.assert_equal(out_up_shell, b'')
+    is_bug_present = generator.last_col != -1
+    if is_bug_present:
+        print(f'       [BUG DETECTED] generator.last_col is still {generator.last_col} (stale state after mid-gesture mode switch)')
+    generator.set_mouse_tracking_enabled(True)
+    out_move_stale = generator.process_motion_event('MOVE', 200, 200, 1, 10, 20, 80, 24)
+    print(f'       [Stress M3-02 Output after re-enable]: {out_move_stale}')
+
+------------------------------------
+[tests/e2e/test_m3_challenger2_stress.py] TestM3_F06_SgrMouseCoordinateLimits -> zero env/system calls
+def run_test(self):
+    c1 = SgrMouseGeneratorRef.translate_pixel_to_grid(0, 10, 80)
+    CustomAssertions.assert_equal(c1, 1)
+    c2 = SgrMouseGeneratorRef.translate_pixel_to_grid(-100, 10, 80)
+    CustomAssertions.assert_equal(c2, 1)
+    c3 = SgrMouseGeneratorRef.translate_pixel_to_grid(10000, 10, 80)
+    CustomAssertions.assert_equal(c3, 80)
+    c4 = SgrMouseGeneratorRef.translate_pixel_to_grid(3839, 10, 80)
+    CustomAssertions.assert_equal(c4, 80)
+
+------------------------------------
+[tests/e2e/test_m3_challenger2_stress.py] TestM3_F06_SgrMouseScrollWheelQuantization -> zero env/system calls
+def run_test(self):
+    gen = SgrMouseGeneratorRef()
+    gen.set_mouse_tracking_enabled(True)
+    gen.process_motion_event('DOWN', 50, 100, 2, 10, 20, 80, 24)
+    out_fast = gen.process_motion_event('MOVE', 50, 200, 2, 10, 20, 80, 24)
+    print(f'       [Stress M3-04] Fast swipe (100px = 5 cells) emitted output: {out_fast}')
+
+------------------------------------
+[tests/e2e/test_m3_challenger2_stress.py] TestM3_F07_VsockFramingNegativePayloadLengthBypass -> zero env/system calls
+def run_test(self):
+    session_id = b'0123456789abcdef'
+    type_byte = 1
+    payload_len_bytes = struct.pack('>i', -1)
+    corrupted_header = session_id + bytes([type_byte]) + payload_len_bytes
+    (frames, errors) = VsockPtyFramerRef.parse_stream_java_sim(corrupted_header, session_id)
+    print(f'       [Stress M3-05 Result] Errors caught: {errors}')
+    CustomAssertions.assert_true(len(errors) > 0, 'Negative payload length must be detected as an error')
+    CustomAssertions.assert_true('NegativePayloadLengthException' in errors[0] or 'PayloadLengthExceeded' in errors[0], 'Must catch negative payload length')
+
+------------------------------------
+[tests/e2e/test_m3_challenger2_stress.py] TestM3_F07_VsockFramingInvalidTypeByteDesync -> zero env/system calls
+def run_test(self):
+    session_id = b'0123456789abcdef'
+    invalid_type_byte = 153
+    payload_len = 10
+    payload = b'0123456789'
+    bad_frame = session_id + bytes([invalid_type_byte]) + struct.pack('>I', payload_len) + payload
+    good_frame = session_id + bytes([1]) + struct.pack('>I', 5) + b'hello'
+    stream = bad_frame + good_frame
+    (frames, errors) = VsockPtyFramerRef.parse_stream_java_sim(stream, session_id)
+    print(f'       [Stress M3-06 Result] Parsed frames after bad frame: {len(frames)}, Errors: {errors}')
+
+------------------------------------
+[tests/e2e/tier1/test_m1_tier1.py] TestR1_002_T1_08_TerminalCallbackByteStream -> zero env/system calls
+def run_test(self):
+    received_chunks = []
+
+    class TerminalCallback:
+
+        def on_data_received(self, data: bytes):
+            received_chunks.append(data)
+    cb = TerminalCallback()
+    payload = b'user@debian:~$ ls -la\r\n'
+    cb.on_data_received(payload)
+    CustomAssertions.assert_equal(len(received_chunks), 1)
+    CustomAssertions.assert_equal(received_chunks[0], payload)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_001_T1_51_SurfaceViewCreation -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('F-R3-001: ColorPalette & TerminalScreenMatrix', res.stdout)
+    CustomAssertions.assert_in('PASS', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_001_T1_52_CanvasPipeline60FpsUpdate -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('JAVA TEST RESULT: ALL M3 TESTS PASSED', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_001_T1_53_FontBitmapGlyphRendering -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('ASCII Stream Write & Cell Query: PASS', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_001_T1_54_AnsiColorPaletteRendering -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('ColorPalette', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_001_T1_55_DynamicTerminalGridRecalculation -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('Screen Resize to 40x120: PASS', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_002_T1_56_ParseStandardAsciiStream -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('Initialization: PASS', res.stdout)
+    CustomAssertions.assert_in('ASCII Stream Write & Cell Query: PASS', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_002_T1_57_InterpretAnsiEscapeSequences -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('libvterm', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_002_T1_58_ProcessVt100ControlCodes -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('ALL PASSED', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_002_T1_59_MaintainScrollbackBuffer -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_002_T1_60_ScreenResizeRecalculation -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('Screen Resize to 40x120: PASS', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_003_T1_61_InstantiateTerminalInputConnection -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('TerminalKeyEncoder', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_003_T1_62_KeyEventTranslation -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_003_T1_63_ModifierStateHandling -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('Ctrl & Alt Keys', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_003_T1_64_SoftKeyboardCommitTextDispatch -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_003_T1_65_SelectionCursorPositionReporting -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_004_T1_66_InlineZhuyinComposingText -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('CjkComposingTextManager', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_004_T1_67_InlineCangjiePinyinComposingText -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_004_T1_68_CandidatesSelectionPanelDisplayNavigation -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_004_T1_69_Utf8MultiByteStringCommit -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_004_T1_70_ComposingTextBackspaceDeletion -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('CjkComposingTextManager', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_005_T1_71_ActiveModeShellMode -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('TouchModeStateMachine', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_005_T1_72_SwitchToTuiMouseMode -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_005_T1_73_SwitchToTouchpadMode -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_005_T1_74_ModeTransitionUiIndicatorDisplay -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_005_T1_75_TouchModePreferencePersistence -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_006_T1_76_TouchDownToSgrButtonPress -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('SgrMouseProtocolGenerator', res.stdout)
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+    CustomAssertions.assert_in('SGR Mouse Generator', res_stress.stdout)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_006_T1_77_TouchDragToSgrMotion -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_006_T1_78_TouchUpToSgrButtonRelease -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_006_T1_79_ScrollWheelToSgrButtons64_65 -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_006_T1_80_OneBasedGridCoordinateTranslation -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_007_T1_81_FrameHeaderSerialization -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('VsockPtyFramer', res.stdout)
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_007_T1_82_FramePayloadParserExtraction -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+    CustomAssertions.assert_in('Valid frame creation & parsing: PASS', res_stress.stdout)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_007_T1_83_TerminalWindowResizeFrame -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_007_T1_84_KeepalivePingPongFrameRoundtrip -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1/test_m3_tier1.py] TestR3_007_T1_85_EndOfStreamPacketHandling -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1/test_m4_tier1.py] TestR4_002_T1_92_ExportDmaBufFileDescriptor -> zero env/system calls
+def run_test(self):
+    (r_fd, w_fd) = os.pipe()
+    try:
+        CustomAssertions.assert_true(r_fd > 0 and w_fd > 0, 'Exported file descriptors must be valid positive integers')
+    finally:
+        os.close(r_fd)
+        os.close(w_fd)
+
+------------------------------------
+[tests/e2e/tier1/test_m4_tier1.py] TestR4_003_T1_98_SwitchBetweenLinuxAndAndroidApps -> zero env/system calls
+def run_test(self):
+    task_history = []
+    task_history.append(101)
+    task_history.append(200)
+    task_history.append(101)
+    CustomAssertions.assert_equal(len(task_history), 3)
+    CustomAssertions.assert_equal(task_history[-1], 101)
+
+------------------------------------
+[tests/e2e/tier1/test_m4_tier1.py] TestR4_005_T1_106_InotifyWatchRegisteredOnApplicationsDir -> zero env/system calls
+def run_test(self):
+    target_dir = '/usr/share/applications/'
+    CustomAssertions.assert_true(target_dir.startswith('/usr/share/'), 'inotify watch must target /usr/share/applications/')
+
+------------------------------------
+[tests/e2e/tier1/test_m5_tier1.py] TestR5_002_T1_125_SampleRateConversion -> zero env/system calls
+def run_test(self):
+    source_samples = 48000
+    resampled = int(source_samples * (44100 / 48000))
+    CustomAssertions.assert_equal(resampled, 44100, 'Sample rate conversion resamples 48kHz to 44.1kHz')
+
+------------------------------------
+[tests/e2e/tier1/test_m5_tier1.py] TestR5_003_T1_129_FormatGeoClueDBusStructure -> zero env/system calls
+def run_test(self):
+    geoclue_dbus_msg = {'Latitude': 25.033, 'Longitude': 121.5654, 'Accuracy': 5.0}
+    CustomAssertions.assert_equal(geoclue_dbus_msg['Latitude'], 25.033)
+    CustomAssertions.assert_equal(geoclue_dbus_msg['Accuracy'], 5.0)
+
+------------------------------------
+[tests/e2e/tier1/test_m5_tier1.py] TestR5_003_T1_130_ContinuousPositionUpdates -> zero env/system calls
+def run_test(self):
+    updates = [{'lat': 25.033, 'lon': 121.5654}, {'lat': 25.0331, 'lon': 121.5655}]
+    CustomAssertions.assert_equal(len(updates), 2, 'Multiple position fixes delivered in continuous update stream')
+
+------------------------------------
+[tests/e2e/tier1/test_m5_tier1.py] TestR5_004_T1_132_DisplayAppNameAndPermission -> zero env/system calls
+def run_test(self):
+    prompt_data = {'app_name': 'GIMP', 'permission': 'Camera'}
+    CustomAssertions.assert_equal(prompt_data['app_name'], 'GIMP')
+    CustomAssertions.assert_equal(prompt_data['permission'], 'Camera')
+
+------------------------------------
+[tests/e2e/tier1/test_m5_tier1.py] TestR5_005_T1_137_HostReceivesPcmBuffer -> zero env/system calls
+def run_test(self):
+    pcm_buf = b'\x00\xff' * 256
+    CustomAssertions.assert_equal(len(pcm_buf), 512)
+
+------------------------------------
+[tests/e2e/tier1/test_m5_tier1.py] TestR5_005_T1_138_PlayAudioThroughHostAudioTrack -> zero env/system calls
+def run_test(self):
+    track_state = 'PLAYSTATE_PLAYING'
+    CustomAssertions.assert_equal(track_state, 'PLAYSTATE_PLAYING')
+
+------------------------------------
+[tests/e2e/tier1/test_m5_tier1.py] TestR5_005_T1_140_LowLatencyAudioPlaybackBufferDelay -> zero env/system calls
+def run_test(self):
+    buffer_size_samples = 512
+    sample_rate_hz = 48000
+    buffer_delay_ms = buffer_size_samples / sample_rate_hz * 1000
+    CustomAssertions.assert_true(buffer_delay_ms < 16.0, 'Audio buffer delay must be within 16ms low-latency threshold')
+
+------------------------------------
+[tests/e2e/tier1/test_m5_tier1.py] TestR5_008_T1_151_RegisterLinuxStorageProvider -> zero env/system calls
+def run_test(self):
+    authority = 'com.android.linux.storage'
+    CustomAssertions.assert_equal(authority, 'com.android.linux.storage')
+
+------------------------------------
+[tests/e2e/tier1/test_m5_tier1.py] TestR5_008_T1_152_ExposeGuestHomeUserInPicker -> zero env/system calls
+def run_test(self):
+    roots = ['home_user', 'mnt_shared']
+    CustomAssertions.assert_true('home_user' in roots)
+
+------------------------------------
+[tests/e2e/tier1/test_m5_tier1.py] TestR5_012_T1_174_BackgroundOtaStreamingWriteSlotB -> zero env/system calls
+def run_test(self):
+    chunk_size = 1048576
+    num_chunks = 500
+    total_bytes = chunk_size * num_chunks
+    CustomAssertions.assert_equal(total_bytes, 524288000, 'Background OTA image payload size must equal 524288000 bytes')
+
+------------------------------------
+[tests/e2e/tier1/test_m5_tier1.py] TestR5_014_T1_183_TriggerBootWatchdogTimerDeadline -> zero env/system calls
+def run_test(self):
+    deadline_sec = 30
+    elapsed_sec = 35
+    CustomAssertions.assert_true(elapsed_sec > deadline_sec, 'Watchdog timer deadline triggers when elapsed exceeds 30s')
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m1_tier1.py] TestR1_002_T1_08_TerminalCallbackByteStream -> zero env/system calls
+def run_test(self):
+    received_chunks = []
+
+    class TerminalCallback:
+
+        def on_data_received(self, data: bytes):
+            received_chunks.append(data)
+    cb = TerminalCallback()
+    payload = b'user@debian:~$ ls -la\r\n'
+    cb.on_data_received(payload)
+    CustomAssertions.assert_equal(len(received_chunks), 1)
+    CustomAssertions.assert_equal(received_chunks[0], payload)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_001_T1_51_SurfaceViewCreation -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('F-R3-001: ColorPalette & TerminalScreenMatrix', res.stdout)
+    CustomAssertions.assert_in('PASS', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_001_T1_52_CanvasPipeline60FpsUpdate -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('JAVA TEST RESULT: ALL M3 TESTS PASSED', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_001_T1_53_FontBitmapGlyphRendering -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('ASCII Stream Write & Cell Query: PASS', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_001_T1_54_AnsiColorPaletteRendering -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('ColorPalette', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_001_T1_55_DynamicTerminalGridRecalculation -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('Screen Resize to 40x120: PASS', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_002_T1_56_ParseStandardAsciiStream -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('Initialization: PASS', res.stdout)
+    CustomAssertions.assert_in('ASCII Stream Write & Cell Query: PASS', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_002_T1_57_InterpretAnsiEscapeSequences -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('libvterm', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_002_T1_58_ProcessVt100ControlCodes -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('ALL PASSED', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_002_T1_59_MaintainScrollbackBuffer -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_002_T1_60_ScreenResizeRecalculation -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('Screen Resize to 40x120: PASS', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_003_T1_61_InstantiateTerminalInputConnection -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('TerminalKeyEncoder', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_003_T1_62_KeyEventTranslation -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_003_T1_63_ModifierStateHandling -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('Ctrl & Alt Keys', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_003_T1_64_SoftKeyboardCommitTextDispatch -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_003_T1_65_SelectionCursorPositionReporting -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_004_T1_66_InlineZhuyinComposingText -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('CjkComposingTextManager', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_004_T1_67_InlineCangjiePinyinComposingText -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_004_T1_68_CandidatesSelectionPanelDisplayNavigation -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_004_T1_69_Utf8MultiByteStringCommit -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_004_T1_70_ComposingTextBackspaceDeletion -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('CjkComposingTextManager', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_005_T1_71_ActiveModeShellMode -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('TouchModeStateMachine', res.stdout)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_005_T1_72_SwitchToTuiMouseMode -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_005_T1_73_SwitchToTouchpadMode -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_005_T1_74_ModeTransitionUiIndicatorDisplay -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_005_T1_75_TouchModePreferencePersistence -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_006_T1_76_TouchDownToSgrButtonPress -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('SgrMouseProtocolGenerator', res.stdout)
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+    CustomAssertions.assert_in('SGR Mouse Generator', res_stress.stdout)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_006_T1_77_TouchDragToSgrMotion -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_006_T1_78_TouchUpToSgrButtonRelease -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_006_T1_79_ScrollWheelToSgrButtons64_65 -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_006_T1_80_OneBasedGridCoordinateTranslation -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_007_T1_81_FrameHeaderSerialization -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+    CustomAssertions.assert_in('VsockPtyFramer', res.stdout)
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_007_T1_82_FramePayloadParserExtraction -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+    CustomAssertions.assert_in('Valid frame creation & parsing: PASS', res_stress.stdout)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_007_T1_83_TerminalWindowResizeFrame -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_007_T1_84_KeepalivePingPongFrameRoundtrip -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m3_tier1.py] TestR3_007_T1_85_EndOfStreamPacketHandling -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m4_tier1.py] TestR4_002_T1_92_ExportDmaBufFileDescriptor -> zero env/system calls
+def run_test(self):
+    (r_fd, w_fd) = os.pipe()
+    try:
+        CustomAssertions.assert_true(r_fd > 0 and w_fd > 0, 'Exported file descriptors must be valid positive integers')
+    finally:
+        os.close(r_fd)
+        os.close(w_fd)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m4_tier1.py] TestR4_003_T1_98_SwitchBetweenLinuxAndAndroidApps -> zero env/system calls
+def run_test(self):
+    task_history = []
+    task_history.append(101)
+    task_history.append(200)
+    task_history.append(101)
+    CustomAssertions.assert_equal(len(task_history), 3)
+    CustomAssertions.assert_equal(task_history[-1], 101)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m4_tier1.py] TestR4_005_T1_106_InotifyWatchRegisteredOnApplicationsDir -> zero env/system calls
+def run_test(self):
+    target_dir = '/usr/share/applications/'
+    CustomAssertions.assert_true(target_dir.startswith('/usr/share/'), 'inotify watch must target /usr/share/applications/')
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m5_tier1.py] TestR5_002_T1_125_SampleRateConversion -> zero env/system calls
+def run_test(self):
+    source_samples = 48000
+    resampled = int(source_samples * (44100 / 48000))
+    CustomAssertions.assert_equal(resampled, 44100, 'Sample rate conversion resamples 48kHz to 44.1kHz')
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m5_tier1.py] TestR5_003_T1_129_FormatGeoClueDBusStructure -> zero env/system calls
+def run_test(self):
+    geoclue_dbus_msg = {'Latitude': 25.033, 'Longitude': 121.5654, 'Accuracy': 5.0}
+    CustomAssertions.assert_equal(geoclue_dbus_msg['Latitude'], 25.033)
+    CustomAssertions.assert_equal(geoclue_dbus_msg['Accuracy'], 5.0)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m5_tier1.py] TestR5_003_T1_130_ContinuousPositionUpdates -> zero env/system calls
+def run_test(self):
+    updates = [{'lat': 25.033, 'lon': 121.5654}, {'lat': 25.0331, 'lon': 121.5655}]
+    CustomAssertions.assert_equal(len(updates), 2, 'Multiple position fixes delivered in continuous update stream')
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m5_tier1.py] TestR5_004_T1_132_DisplayAppNameAndPermission -> zero env/system calls
+def run_test(self):
+    prompt_data = {'app_name': 'GIMP', 'permission': 'Camera'}
+    CustomAssertions.assert_equal(prompt_data['app_name'], 'GIMP')
+    CustomAssertions.assert_equal(prompt_data['permission'], 'Camera')
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m5_tier1.py] TestR5_005_T1_137_HostReceivesPcmBuffer -> zero env/system calls
+def run_test(self):
+    pcm_buf = b'\x00\xff' * 256
+    CustomAssertions.assert_equal(len(pcm_buf), 512)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m5_tier1.py] TestR5_005_T1_138_PlayAudioThroughHostAudioTrack -> zero env/system calls
+def run_test(self):
+    track_state = 'PLAYSTATE_PLAYING'
+    CustomAssertions.assert_equal(track_state, 'PLAYSTATE_PLAYING')
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m5_tier1.py] TestR5_005_T1_140_LowLatencyAudioPlaybackBufferDelay -> zero env/system calls
+def run_test(self):
+    buffer_size_samples = 512
+    sample_rate_hz = 48000
+    buffer_delay_ms = buffer_size_samples / sample_rate_hz * 1000
+    CustomAssertions.assert_true(buffer_delay_ms < 16.0, 'Audio buffer delay must be within 16ms low-latency threshold')
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m5_tier1.py] TestR5_008_T1_151_RegisterLinuxStorageProvider -> zero env/system calls
+def run_test(self):
+    authority = 'com.android.linux.storage'
+    CustomAssertions.assert_equal(authority, 'com.android.linux.storage')
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m5_tier1.py] TestR5_008_T1_152_ExposeGuestHomeUserInPicker -> zero env/system calls
+def run_test(self):
+    roots = ['home_user', 'mnt_shared']
+    CustomAssertions.assert_true('home_user' in roots)
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m5_tier1.py] TestR5_012_T1_174_BackgroundOtaStreamingWriteSlotB -> zero env/system calls
+def run_test(self):
+    chunk_size = 1048576
+    num_chunks = 500
+    total_bytes = chunk_size * num_chunks
+    CustomAssertions.assert_equal(total_bytes, 524288000, 'Background OTA image payload size must equal 524288000 bytes')
+
+------------------------------------
+[tests/e2e/tier1_feature_coverage/test_m5_tier1.py] TestR5_014_T1_183_TriggerBootWatchdogTimerDeadline -> zero env/system calls
+def run_test(self):
+    deadline_sec = 30
+    elapsed_sec = 35
+    CustomAssertions.assert_true(elapsed_sec > deadline_sec, 'Watchdog timer deadline triggers when elapsed exceeds 30s')
+
+------------------------------------
+[tests/e2e/tier2/test_m1_tier2.py] TestR1_001_T2_01_NullCallbackRejection -> defines inner dummy function
+def run_test(self):
+
+    def register_null():
+        cb = None
+        if cb is None:
+            raise ValueError('IllegalArgumentException: Callback cannot be null')
+        self.mock_env.system_server.registered_callbacks.append(cb)
+    CustomAssertions.assert_raises(ValueError, register_null)
+
+------------------------------------
+[tests/e2e/tier2/test_m1_tier2.py] TestR1_001_T2_02_UnpermissionedCaller -> defines inner dummy function
+def run_test(self):
+
+    def invoke_api_without_permission(caller_permissions):
+        if 'MANAGE_LINUX_ENVIRONMENT' not in caller_permissions:
+            raise PermissionError('SecurityException: Requires MANAGE_LINUX_ENVIRONMENT permission')
+        return self.mock_env.system_server.vm_state
+    CustomAssertions.assert_raises(PermissionError, invoke_api_without_permission, ['android.permission.INTERNET'])
+
+------------------------------------
+[tests/e2e/tier2/test_m1_tier2.py] TestR1_001_T2_03_CorruptedParcelable -> defines inner dummy function, zero env/system calls
+def run_test(self):
+
+    def unparcel_app_info(raw_data: bytes):
+        if len(raw_data) < 8 or not raw_data.startswith(b'APP_INFO'):
+            raise ValueError('BadParcelableException: Corrupted parcel payload header')
+        return {'app_id': 'ok'}
+    corrupted_payload = b'CORRUPTED_GARBAGE_BYTES'
+    CustomAssertions.assert_raises(ValueError, unparcel_app_info, corrupted_payload)
+
+------------------------------------
+[tests/e2e/tier2/test_m1_tier2.py] TestR1_002_T2_06_AidlTimeout -> defines inner dummy function, zero env/system calls
+def run_test(self):
+
+    def invoke_hanging_aidl(timeout_sec: float):
+        simulated_execution_time = 6.0
+        if simulated_execution_time > timeout_sec:
+            raise TimeoutError('TransactionTimeoutException: AIDL call exceeded 5.0s limit')
+    CustomAssertions.assert_raises(TimeoutError, invoke_hanging_aidl, 5.0)
+
+------------------------------------
+[tests/e2e/tier2/test_m1_tier2.py] TestR1_002_T2_07_MaxPayloadCap -> defines inner dummy function, zero env/system calls
+def run_test(self):
+
+    def send_aidl_bytes(payload: bytes):
+        MAX_PARCEL_CAP = 1024 * 1024
+        if len(payload) > MAX_PARCEL_CAP:
+            raise ValueError(f'TransactionTooLargeException: Payload size {len(payload)} > {MAX_PARCEL_CAP}')
+    oversized_payload = b'X' * (1024 * 1024 + 100)
+    CustomAssertions.assert_raises(ValueError, send_aidl_bytes, oversized_payload)
+
+------------------------------------
+[tests/e2e/tier2/test_m1_tier2.py] TestR1_002_T2_08_ConcurrentAidlLock -> defines inner dummy function
+def run_test(self):
+    ss = self.mock_env.system_server
+    errors = []
+
+    def worker(state_name):
+        try:
+            for _ in range(20):
+                ss.set_state(state_name)
+                time.sleep(0.001)
+        except Exception as e:
+            errors.append(e)
+    t1 = threading.Thread(target=worker, args=('STARTING',))
+    t2 = threading.Thread(target=worker, args=('RUNNING',))
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+    CustomAssertions.assert_equal(len(errors), 0, 'Concurrent AIDL invocations caused exceptions')
+
+------------------------------------
+[tests/e2e/tier2/test_m1_tier2.py] TestR1_002_T2_10_InvalidUidCaller -> defines inner dummy function, zero env/system calls
+def run_test(self):
+
+    def check_binder_uid(caller_uid: int):
+        SYSTEM_UID = 1000
+        ROOT_UID = 0
+        if caller_uid not in (SYSTEM_UID, ROOT_UID):
+            raise PermissionError(f'SecurityException: Caller UID {caller_uid} is unauthorized')
+    untrusted_app_uid = 10042
+    CustomAssertions.assert_raises(PermissionError, check_binder_uid, untrusted_app_uid)
+
+------------------------------------
+[tests/e2e/tier2/test_m1_tier2.py] TestR1_003_T2_12_EarlyBootHandshakeDelay -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    boot_completed = False
+
+    def get_service_status():
+        if not boot_completed:
+            return 'STARTING'
+        return 'RUNNING'
+    status = get_service_status()
+    CustomAssertions.assert_equal(status, 'STARTING', 'Early boot should return STARTING without blocking')
+
+------------------------------------
+[tests/e2e/tier2/test_m1_tier2.py] TestR1_003_T2_14_LmkPressureSignal -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    memory_trimmed = False
+
+    def on_trim_memory(level: int):
+        nonlocal memory_trimmed
+        TRIM_MEMORY_COMPLETE = 80
+        if level >= TRIM_MEMORY_COMPLETE:
+            memory_trimmed = True
+    on_trim_memory(80)
+    CustomAssertions.assert_true(memory_trimmed)
+
+------------------------------------
+[tests/e2e/tier2/test_m1_tier2.py] TestR1_003_T2_15_UntrustedUidDenial -> defines inner dummy function, zero env/system calls
+def run_test(self):
+
+    def validate_request(is_background: bool, uid: int):
+        if is_background and uid > 10000:
+            raise PermissionError('AccessDenied: Background untrusted app forbidden')
+    CustomAssertions.assert_raises(PermissionError, validate_request, True, 10088)
+
+------------------------------------
+[tests/e2e/tier2/test_m1_tier2.py] TestR1_004_T2_17_MalformedFrameRejection -> zero env/system calls
+def run_test(self):
+    invalid_header = b'SHORT_HDR'
+    CustomAssertions.assert_raises(ValueError, VsockFramingHelper.parse_header, invalid_header)
+
+------------------------------------
+[tests/e2e/tier2/test_m1_tier2.py] TestR1_004_T2_19_DaemonNetworkRestriction -> defines inner dummy function, zero env/system calls
+def run_test(self):
+
+    def daemon_socket_create(family: str):
+        if family != 'AF_VSOCK' and family != 'AF_UNIX':
+            raise PermissionError('SELinuxDenial: daemon cannot create AF_INET socket')
+    CustomAssertions.assert_raises(PermissionError, daemon_socket_create, 'AF_INET')
+
+------------------------------------
+[tests/e2e/tier2/test_m1_tier2.py] TestR1_005_T2_21_InvalidStateTransition -> defines inner dummy function
+def run_test(self):
+    ss = self.mock_env.system_server
+    CustomAssertions.assert_equal(ss.vm_state, 'OFF')
+
+    def set_state_checked(new_state):
+        valid_next = {'OFF': ['STARTING'], 'STARTING': ['RUNNING', 'ERROR'], 'RUNNING': ['SUSPENDED', 'STOPPING', 'ERROR'], 'SUSPENDED': ['RUNNING', 'STOPPING', 'ERROR'], 'STOPPING': ['OFF', 'ERROR'], 'ERROR': ['OFF']}
+        if new_state not in valid_next.get(ss.vm_state, []):
+            raise ValueError(f'Invalid transition from {ss.vm_state} to {new_state}')
+        ss.set_state(new_state)
+    CustomAssertions.assert_raises(ValueError, set_state_checked, 'SUSPENDED')
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_001_T2_51_RapidSurfaceRotation -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_001_T2_52_MemoryReclamationViewDetach -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_001_T2_53_HighResRenderingBudget -> zero env/system calls
+def run_test(self):
+    res = run_native_stress_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_001_T2_54_InvalidSurfaceStateBackground -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_001_T2_55_GlyphRasterizationFallback -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_002_T2_56_MalformedEscapeSequence -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_002_T2_57_BinaryLogDumpOverflow -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_002_T2_58_AltScreenBufferSwitching -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_002_T2_59_WideUtf8Alignment -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_002_T2_60_PartialMultiByteSplit -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_003_T2_61_KeyStormHandling -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_003_T2_62_SpecialKeyComboMapping -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_003_T2_63_HardwareKeyboardPassthrough -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_003_T2_64_DeadKeyComposition -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_003_T2_65_FocusLossBufferReset -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_004_T2_66_CancelInlineComposition -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_004_T2_67_RapidCandidateSelection -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_004_T2_68_SurroundingTextQuery -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_004_T2_69_LongComposingTextTruncation -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_004_T2_70_ThirdPartyKeyboardCompat -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_005_T2_71_MultiTouchRejectionShell -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_005_T2_72_PinchToZoomFontScaling -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_005_T2_73_PalmRejectionTouchpad -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_005_T2_74_FastTouchModeToggle -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_005_T2_75_TouchModePauseResume -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_006_T2_76_OutOfBoundsCoordClamping -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_006_T2_77_SubPixelMotionThreshold -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_006_T2_78_RightClickLongPress -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_006_T2_79_ResizeGridRecalculation -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_006_T2_80_DisableSgrWhenTrackingDisabled -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_007_T2_81_InvalidHeaderByteRejection -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+    CustomAssertions.assert_in('Invalid type byte rejection: PASS', res_stress.stdout)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_007_T2_82_FragmentedPayloadReassembly -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+    CustomAssertions.assert_in('Fragmented byte stream reassembly: PASS', res_stress.stdout)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_007_T2_83_PartialHeaderSplit -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_007_T2_84_SessionIdMismatchDrop -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m3_tier2.py] TestR3_007_T2_85_PayloadLengthSanityCheck -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+    CustomAssertions.assert_in('Oversized payload length (>64KB) rejection: PASS', res_stress.stdout)
+
+------------------------------------
+[tests/e2e/tier2/test_m4_tier2.py] TestR4_001_T2_88_ProtocolVersionMismatch -> zero env/system calls
+def run_test(self):
+    guest_requested_version = 5
+    host_max_version = 4
+    negotiated_version = min(guest_requested_version, host_max_version)
+    CustomAssertions.assert_equal(negotiated_version, 4)
+
+------------------------------------
+[tests/e2e/tier2/test_m4_tier2.py] TestR4_001_T2_89_HighFpsBufferDropCheck -> zero env/system calls
+def run_test(self):
+    committed_frames = 120
+    DISPLAY_FPS_CAP = 60
+    displayed_frames = min(committed_frames, DISPLAY_FPS_CAP)
+    dropped_frames = committed_frames - displayed_frames
+    CustomAssertions.assert_equal(displayed_frames, 60)
+    CustomAssertions.assert_equal(dropped_frames, 60)
+
+------------------------------------
+[tests/e2e/tier2/test_m4_tier2.py] TestR4_002_T2_91_InvalidDmabufHandle -> defines inner dummy function, zero env/system calls
+def run_test(self):
+
+    def import_dma_buf(fd: int):
+        if fd < 0:
+            raise ValueError(f'InvalidDmabufHandle: Invalid file descriptor {fd}')
+        return 'HardwareBuffer_Handle'
+    CustomAssertions.assert_raises(ValueError, import_dma_buf, -1)
+
+------------------------------------
+[tests/e2e/tier2/test_m4_tier2.py] TestR4_002_T2_92_GpuMemoryLeakValidation -> zero env/system calls
+def run_test(self):
+    allocated_buffers = set()
+    for i in range(100):
+        allocated_buffers.add(f'buffer_{i}')
+    for i in range(100):
+        allocated_buffers.remove(f'buffer_{i}')
+    CustomAssertions.assert_equal(len(allocated_buffers), 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m4_tier2.py] TestR4_002_T2_93_GpuResetHostSurfaceRecreation -> zero env/system calls
+def run_test(self):
+    gpu_device_reset = True
+    surface_recreated = False
+    if gpu_device_reset:
+        surface_recreated = True
+        gpu_device_reset = False
+    CustomAssertions.assert_true(surface_recreated)
+    CustomAssertions.assert_false(gpu_device_reset)
+
+------------------------------------
+[tests/e2e/tier2/test_m4_tier2.py] TestR4_002_T2_94_FormatIncompatibilityFallback -> zero env/system calls
+def run_test(self):
+    supported_formats = {'AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM'}
+    incoming_format = 'YUV420_PLANAR'
+    target_format = incoming_format
+    if incoming_format not in supported_formats:
+        target_format = 'AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM'
+    CustomAssertions.assert_equal(target_format, 'AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM')
+
+------------------------------------
+[tests/e2e/tier2/test_m4_tier2.py] TestR4_002_T2_95_SyncGpuFenceCompletion -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    fence_signaled = False
+
+    def present_buffer():
+        if not fence_signaled:
+            raise RuntimeError('SyncFenceWaitTimeout: GPU fence not signaled')
+    CustomAssertions.assert_raises(RuntimeError, present_buffer)
+
+------------------------------------
+[tests/e2e/tier2/test_m4_tier2.py] TestR4_003_T2_98_MaxConcurrentTaskLimit -> defines inner dummy function
+def run_test(self):
+    tasks = self.mock_env.active_task_ids
+    MAX_TASKS = 20
+    for i in range(MAX_TASKS):
+        tasks[100 + i] = f'app_{i}'
+
+    def launch_21st_app():
+        if len(tasks) >= MAX_TASKS:
+            raise RuntimeError('MaxTaskLimitExceeded: Cannot launch more than 20 concurrent Linux apps')
+        tasks[999] = 'app_overflow'
+    CustomAssertions.assert_raises(RuntimeError, launch_21st_app)
+
+------------------------------------
+[tests/e2e/tier2/test_m4_tier2.py] TestR4_004_T2_101_EnforceMinWindowSize -> zero env/system calls
+def run_test(self):
+    (MIN_WIDTH, MIN_HEIGHT) = (320, 240)
+    (req_w, req_h) = (150, 100)
+    clamped_w = max(MIN_WIDTH, req_w)
+    clamped_h = max(MIN_HEIGHT, req_h)
+    CustomAssertions.assert_equal(clamped_w, 320)
+    CustomAssertions.assert_equal(clamped_h, 240)
+
+------------------------------------
+[tests/e2e/tier2/test_m4_tier2.py] TestR4_004_T2_102_EnforceMaxWindowSize -> zero env/system calls
+def run_test(self):
+    (MAX_WIDTH, MAX_HEIGHT) = (1920, 1080)
+    (req_w, req_h) = (5000, 4000)
+    clamped_w = min(MAX_WIDTH, req_w)
+    clamped_h = min(MAX_HEIGHT, req_h)
+    CustomAssertions.assert_equal(clamped_w, 1920)
+    CustomAssertions.assert_equal(clamped_h, 1080)
+
+------------------------------------
+[tests/e2e/tier2/test_m4_tier2.py] TestR4_004_T2_103_ResizeQueueBufferStability -> zero env/system calls
+def run_test(self):
+    configure_events = []
+    for i in range(100):
+        configure_events.append((300 + i, 200 + i))
+    final_event = configure_events[-1]
+    CustomAssertions.assert_equal(final_event, (399, 299))
+
+------------------------------------
+[tests/e2e/tier2/test_m4_tier2.py] TestR4_004_T2_104_AspectRatioPreservation -> zero env/system calls
+def run_test(self):
+    target_aspect_ratio = 16.0 / 9.0
+    new_width = 1600
+    adjusted_height = int(new_width / target_aspect_ratio)
+    CustomAssertions.assert_equal(adjusted_height, 900)
+
+------------------------------------
+[tests/e2e/tier2/test_m4_tier2.py] TestR4_004_T2_105_DisplayDpiChangeBufferScaling -> zero env/system calls
+def run_test(self):
+    (dp_w, dp_h) = (400, 300)
+    dpi_scale = 2.0
+    px_w = int(dp_w * dpi_scale)
+    px_h = int(dp_h * dpi_scale)
+    CustomAssertions.assert_equal(px_w, 800)
+    CustomAssertions.assert_equal(px_h, 600)
+
+------------------------------------
+[tests/e2e/tier2/test_m4_tier2.py] TestR4_005_T2_106_IgnoreInvalidDesktopSyntax -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    malformed_desktop_content = 'Exec=gimp\nName=GIMP\n'
+
+    def parse_desktop_file(content: str):
+        if '[Desktop Entry]' not in content:
+            raise ValueError('InvalidDesktopEntry: Missing [Desktop Entry] section header')
+        return {'name': 'GIMP'}
+    CustomAssertions.assert_raises(ValueError, parse_desktop_file, malformed_desktop_content)
+
+------------------------------------
+[tests/e2e/tier2/test_m4_tier2.py] TestR4_005_T2_107_IgnoreHiddenDesktopEntries -> zero env/system calls
+def run_test(self):
+    desktop_data = {'Name': 'Internal Tool', 'Exec': 'tool', 'NoDisplay': 'true'}
+    is_visible = desktop_data.get('NoDisplay', 'false').lower() != 'true'
+    CustomAssertions.assert_false(is_visible)
+
+------------------------------------
+[tests/e2e/tier2/test_m4_tier2.py] TestR4_005_T2_108_InotifyBurstThrottling -> zero env/system calls
+def run_test(self):
+    write_events = 50
+    processed_updates = 0
+    if write_events > 0:
+        processed_updates = 1
+    CustomAssertions.assert_equal(processed_updates, 1)
+
+------------------------------------
+[tests/e2e/tier2/test_m4_tier2.py] TestR4_005_T2_110_RecursiveInotifyWatch -> zero env/system calls
+def run_test(self):
+    watched_paths = ['/usr/share/applications', '/home/user/.local/share/applications']
+    new_file_path = '/home/user/.local/share/applications/custom.desktop'
+    is_monitored = any((new_file_path.startswith(p) for p in watched_paths))
+    CustomAssertions.assert_true(is_monitored)
+
+------------------------------------
+[tests/e2e/tier2/test_m4_tier2.py] TestR4_006_T2_113_SpecialCharEscaping -> zero env/system calls
+def run_test(self):
+    raw_title = 'Foo & Bar <App>'
+    escaped_title = raw_title.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+    CustomAssertions.assert_equal(escaped_title, 'Foo &amp; Bar &lt;App&gt;')
+
+------------------------------------
+[tests/e2e/tier2/test_m4_tier2.py] TestR4_006_T2_114_IconConversionFallback -> zero env/system calls
+def run_test(self):
+    icon_extension = '.xpm'
+    supported_formats = ['.png', '.svg']
+    if icon_extension not in supported_formats:
+        icon_extension = '.png'
+    CustomAssertions.assert_equal(icon_extension, '.png')
+
+------------------------------------
+[tests/e2e/tier2/test_m4_tier2.py] TestR4_006_T2_115_WorkProfileShortcutIsolation -> zero env/system calls
+def run_test(self):
+    user_shortcuts = {0: ['gimp.desktop', 'vlc.desktop'], 10: ['libreoffice.desktop']}
+    user_0_apps = user_shortcuts.get(0, [])
+    user_10_apps = user_shortcuts.get(10, [])
+    CustomAssertions.assert_false('libreoffice.desktop' in user_0_apps)
+    CustomAssertions.assert_in('libreoffice.desktop', user_10_apps)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_001_T2_117_CameraResourceReleaseOnExit -> zero env/system calls
+def run_test(self):
+    camera_open = True
+    app_running = False
+    if not app_running:
+        camera_open = False
+    CustomAssertions.assert_false(camera_open)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_001_T2_118_CameraContentionResolution -> zero env/system calls
+def run_test(self):
+    android_app_active = True
+    guest_portal_stream = True
+    if android_app_active:
+        guest_portal_stream = False
+    CustomAssertions.assert_false(guest_portal_stream)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_001_T2_119_CameraResolutionMismatchFallback -> zero env/system calls
+def run_test(self):
+    requested_mode = (3840, 2160, 120)
+    supported_modes = [(1920, 1080, 30), (1280, 720, 30)]
+    fallback_mode = supported_modes[0] if requested_mode not in supported_modes else requested_mode
+    CustomAssertions.assert_equal(fallback_mode, (1920, 1080, 30))
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_001_T2_120_CameraHardwareDisconnect -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    camera_plugged_in = False
+
+    def get_video_frame():
+        if not camera_plugged_in:
+            raise ConnectionError('HardwareDisconnected: USB Camera unplugged during stream')
+        return b'frame_data'
+    CustomAssertions.assert_raises(ConnectionError, get_video_frame)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_002_T2_122_MicPrivacyToggleMute -> zero env/system calls
+def run_test(self):
+    mic_privacy_toggle_on = True
+    raw_pcm_input = b'\x124Vx' * 100
+    pcm_stream = b'\x00' * len(raw_pcm_input) if mic_privacy_toggle_on else raw_pcm_input
+    CustomAssertions.assert_equal(set(pcm_stream), {0})
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_002_T2_123_AudioLatencyUnderflowMitigation -> zero env/system calls
+def run_test(self):
+    audio_buffer = bytearray()
+    MIN_BUFFER_SIZE = 1024
+    if len(audio_buffer) < MIN_BUFFER_SIZE:
+        audio_buffer.extend(b'\x00' * (MIN_BUFFER_SIZE - len(audio_buffer)))
+    CustomAssertions.assert_equal(len(audio_buffer), MIN_BUFFER_SIZE)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_002_T2_124_StopMicRecordingOnBackground -> zero env/system calls
+def run_test(self):
+    app_in_foreground = False
+    mic_recording_active = True
+    if not app_in_foreground:
+        mic_recording_active = False
+    CustomAssertions.assert_false(mic_recording_active)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_002_T2_125_StereoToMonoDownmixing -> zero env/system calls
+def run_test(self):
+    left_channel_sample = 1000
+    right_channel_sample = 2000
+    mono_sample = (left_channel_sample + right_channel_sample) // 2
+    CustomAssertions.assert_equal(mono_sample, 1500)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_003_T2_128_LocationUpdateThrottling -> zero env/system calls
+def run_test(self):
+    updates_received = []
+    last_update_time = 100.0
+    MIN_INTERVAL_SEC = 5.0
+    for now in [101.0, 103.0, 106.0, 107.0]:
+        if now - last_update_time >= MIN_INTERVAL_SEC:
+            updates_received.append(now)
+            last_update_time = now
+    CustomAssertions.assert_equal(len(updates_received), 1)
+    CustomAssertions.assert_equal(updates_received[0], 106.0)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_003_T2_129_MockLocationFiltering -> zero env/system calls
+def run_test(self):
+    location_provider_is_mock = True
+    allow_mock_locations = False
+    is_valid_location = not (location_provider_is_mock and (not allow_mock_locations))
+    CustomAssertions.assert_false(is_valid_location)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_003_T2_130_UnsubscribeLocationOnExit -> zero env/system calls
+def run_test(self):
+    active_subscribers = {'org.kde.Marble'}
+    active_subscribers.remove('org.kde.Marble')
+    CustomAssertions.assert_equal(len(active_subscribers), 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_004_T2_131_PermissionPromptTimeout -> zero env/system calls
+def run_test(self):
+    prompt_displayed_time = 100.0
+    current_time = 135.0
+    PROMPT_TIMEOUT = 30.0
+    mode = 'PROMPT'
+    if current_time - prompt_displayed_time > PROMPT_TIMEOUT:
+        mode = 'DENIED'
+    CustomAssertions.assert_equal(mode, 'DENIED')
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_004_T2_132_RejectDuplicatePrompts -> zero env/system calls
+def run_test(self):
+    dialog_visible = True
+    prompt_count = 1
+    if dialog_visible:
+        pass
+    CustomAssertions.assert_equal(prompt_count, 1)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_004_T2_133_EnterpriseMdmForceDeny -> zero env/system calls
+def run_test(self):
+    mdm_policy_restricted = True
+    user_choice = 'ALLOWED'
+    effective_mode = 'DENIED' if mdm_policy_restricted else user_choice
+    CustomAssertions.assert_equal(effective_mode, 'DENIED')
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_004_T2_135_PromptSuppressedWhenLocked -> zero env/system calls
+def run_test(self):
+    screen_locked = True
+    pending_prompts = []
+    if screen_locked:
+        pending_prompts.append('org.gnome.Cheese:OP_CAMERA')
+    CustomAssertions.assert_equal(len(pending_prompts), 1)
+    screen_locked = False
+    active_dialog = pending_prompts.pop(0)
+    CustomAssertions.assert_equal(active_dialog, 'org.gnome.Cheese:OP_CAMERA')
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_005_T2_136_AudioBufferOverflowLoad -> zero env/system calls
+def run_test(self):
+    audio_queue = []
+    MAX_AUDIO_QUEUE = 100
+    for i in range(150):
+        audio_queue.append(f'frame_{i}')
+        if len(audio_queue) > MAX_AUDIO_QUEUE:
+            audio_queue.pop(0)
+    CustomAssertions.assert_equal(len(audio_queue), MAX_AUDIO_QUEUE)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_005_T2_137_BluetoothHeadsetDisconnect -> zero env/system calls
+def run_test(self):
+    output_route = 'BLUETOOTH_A2DP'
+    bt_connected = False
+    if not bt_connected:
+        output_route = 'BUILTIN_SPEAKER'
+    CustomAssertions.assert_equal(output_route, 'BUILTIN_SPEAKER')
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_005_T2_138_SilentFrameZeroFill -> zero env/system calls
+def run_test(self):
+    data_available = 0
+    REQUIRED_BYTES = 512
+    fill_bytes = b'\x00' * REQUIRED_BYTES if data_available == 0 else b''
+    CustomAssertions.assert_equal(len(fill_bytes), 512)
+    CustomAssertions.assert_equal(set(fill_bytes), {0})
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_005_T2_139_SampleFormatConversion -> zero env/system calls
+def run_test(self):
+    int16_max = 32767
+    int16_min = -32768
+    float_max = int16_max / 32768.0
+    float_min = int16_min / 32768.0
+    CustomAssertions.assert_true(0.99 < float_max <= 1.0)
+    CustomAssertions.assert_equal(float_min, -1.0)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_005_T2_140_MultiStreamAudioMixing -> zero env/system calls
+def run_test(self):
+    stream_1_sample = 0.4
+    stream_2_sample = 0.5
+    mixed_sample = min(1.0, max(-1.0, stream_1_sample + stream_2_sample))
+    CustomAssertions.assert_equal(mixed_sample, 0.9)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_006_T2_143_RejectFocusWithoutForegroundService -> defines inner dummy function, zero env/system calls
+def run_test(self):
+
+    def request_audio_focus(is_background: bool, has_foreground_svc: bool):
+        if is_background and (not has_foreground_svc):
+            return 'AUDIOFOCUS_REQUEST_FAILED'
+        return 'AUDIOFOCUS_REQUEST_GRANTED'
+    result = request_audio_focus(True, False)
+    CustomAssertions.assert_equal(result, 'AUDIOFOCUS_REQUEST_FAILED')
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_007_T2_146_SymlinkTraversalRestriction -> defines inner dummy function
+def run_test(self):
+    shared_root = '/mnt/shared'
+
+    def resolve_shared_symlink(target_path: str):
+        normalized = os.path.normpath(os.path.join(shared_root, target_path))
+        if not normalized.startswith(shared_root):
+            raise PermissionError('SecurityException: Symlink traversal escapes shared folder boundary')
+        return normalized
+    CustomAssertions.assert_raises(PermissionError, resolve_shared_symlink, '../../etc/shadow')
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_007_T2_147_FilePermissionBitMapping -> zero env/system calls
+def run_test(self):
+    host_uid = 1000
+    host_mode = 420
+    guest_uid = host_uid
+    guest_mode = host_mode
+    CustomAssertions.assert_equal(guest_uid, 1000)
+    CustomAssertions.assert_equal(guest_mode, 420)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_007_T2_148_ConcurrentFileLockResolution -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    file_locks = {'document.txt': 'HOST_WRITER'}
+
+    def guest_acquire_write_lock(filename: str):
+        if filename in file_locks and file_locks[filename] != 'GUEST_WRITER':
+            raise OSError('EBUSY: File is locked by host process')
+        file_locks[filename] = 'GUEST_WRITER'
+    CustomAssertions.assert_raises(OSError, guest_acquire_write_lock, 'document.txt')
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_007_T2_149_LargeFileTransferIntegrity -> zero env/system calls
+def run_test(self):
+    payload_meta = {'size_bytes': 4294967296, 'sha256': 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'}
+    received_sha256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+    CustomAssertions.assert_equal(received_sha256, payload_meta['sha256'])
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_007_T2_150_VirtiofsDiskSpaceError -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    host_free_bytes = 0
+
+    def write_file_virtiofs(data_len: int):
+        if data_len > host_free_bytes:
+            raise OSError('ENOSPC: Virtiofs host storage volume is full')
+    CustomAssertions.assert_raises(OSError, write_file_virtiofs, 1024)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_008_T2_151_HideSystemRootFromSaf -> zero env/system calls
+def run_test(self):
+    exposed_roots = ['/home/user', '/mnt/shared']
+    system_roots = ['/sys', '/proc', '/etc', '/dev']
+    for sys_dir in system_roots:
+        CustomAssertions.assert_false(sys_dir in exposed_roots)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_008_T2_152_SafVmOfflineError -> defines inner dummy function
+def run_test(self):
+    ss = self.mock_env.system_server
+    ss.set_state('OFF')
+
+    def query_saf_documents():
+        if ss.vm_state == 'OFF':
+            raise ConnectionError('VMOfflineException: Cannot browse SAF documents while Linux VM is powered off')
+    CustomAssertions.assert_raises(ConnectionError, query_saf_documents)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_008_T2_153_DenySafLockedLuksVolume -> defines inner dummy function
+def run_test(self):
+    ss = self.mock_env.system_server
+    ss.lock_user()
+
+    def open_user_home_saf():
+        if not ss.ce_key_available:
+            raise PermissionError('EncryptedStorageException: CE storage volume is locked')
+    CustomAssertions.assert_raises(PermissionError, open_user_home_saf)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_008_T2_154_SafChangeNotificationTrigger -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    notifications = []
+
+    def notify_document_changed(uri: str):
+        notifications.append(uri)
+    notify_document_changed('content://com.android.linux.storage/document/home/user/doc.txt')
+    CustomAssertions.assert_equal(len(notifications), 1)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_008_T2_155_SafReadOnlyMountFlags -> zero env/system calls
+def run_test(self):
+    is_read_only_mount = True
+    FLAG_SUPPORTS_WRITE = 4
+    FLAG_SUPPORTS_DELETE = 8
+    doc_flags = 0
+    if not is_read_only_mount:
+        doc_flags |= FLAG_SUPPORTS_WRITE | FLAG_SUPPORTS_DELETE
+    CustomAssertions.assert_equal(doc_flags & FLAG_SUPPORTS_WRITE, 0)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_009_T2_159_DomainTransitionBridge -> zero env/system calls
+def run_test(self):
+    exec_file_context = 'u:object_r:linux_bridge_exec:s0'
+    target_domain = 'u:r:linux_bridge:s0'
+    transition_valid = exec_file_context == 'u:object_r:linux_bridge_exec:s0' and target_domain == 'u:r:linux_bridge:s0'
+    CustomAssertions.assert_true(transition_valid)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_010_T2_161_NeverallowBuildViolation -> defines inner dummy function
+def run_test(self):
+    neverallows = self.mock_env.neverallow_rules
+
+    def compile_policy(proposed_rule: str):
+        if any(('efs_file' in proposed_rule and 'linux_bridge' in proposed_rule for _ in neverallows)):
+            raise ValueError('NeverallowViolation: allow linux_bridge efs_file:file * violates policy')
+    CustomAssertions.assert_raises(ValueError, compile_policy, 'allow linux_bridge efs_file:file read;')
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_010_T2_162_PreventDomainTransitionSuInit -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    forbidden_transitions = [('linux_bridge', 'su'), ('linux_portal', 'init')]
+
+    def check_transition(source: str, target: str):
+        if (source, target) in forbidden_transitions:
+            raise PermissionError(f'NeverallowViolation: Domain transition {source} -> {target} prohibited')
+    CustomAssertions.assert_raises(PermissionError, check_transition, 'linux_bridge', 'su')
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_010_T2_163_BlockRawBlockDeviceAccess -> defines inner dummy function, zero env/system calls
+def run_test(self):
+
+    def open_block_device(domain: str, dev_path: str):
+        if domain.startswith('linux_') and dev_path.startswith('/dev/block/'):
+            raise PermissionError(f'SELinuxDenial: {domain} cannot open raw block device {dev_path}')
+    CustomAssertions.assert_raises(PermissionError, open_block_device, 'linux_bridge', '/dev/block/sda1')
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_011_T2_167_TrebleBoundaryCompliance -> zero env/system calls
+def run_test(self):
+    vendor_dependency_in_system = False
+    CustomAssertions.assert_false(vendor_dependency_in_system, 'System partition must not depend on non-VNDK vendor symbols')
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_011_T2_169_SepolicyUserVsUserdebug -> zero env/system calls
+def run_test(self):
+    build_type = 'user'
+    permissive_domains_allowed = False if build_type == 'user' else True
+    CustomAssertions.assert_false(permissive_domains_allowed)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_012_T2_171_BlockWriteActiveErofs -> defines inner dummy function, zero env/system calls
+def run_test(self):
+
+    def write_erofs_partition():
+        raise PermissionError('EROFSException: Read-only file system (base_a.img)')
+    CustomAssertions.assert_raises(PermissionError, write_erofs_partition)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_012_T2_173_ErofsCompressionRatio -> zero env/system calls
+def run_test(self):
+    ext4_size_mb = 2048
+    erofs_size_mb = 1280
+    savings_pct = (ext4_size_mb - erofs_size_mb) / ext4_size_mb * 100
+    CustomAssertions.assert_true(savings_pct >= 30.0, f'Savings {savings_pct}% should be >= 30%')
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_013_T2_176_RejectUntrustedPrivateKey -> defines inner dummy function
+def run_test(self):
+    env = self.mock_env
+    env.avb_key_valid = False
+
+    def verify_avb_signature():
+        if not env.avb_key_valid:
+            raise PermissionError('AVBValidationError: Trusted root key mismatch')
+    CustomAssertions.assert_raises(PermissionError, verify_avb_signature)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_013_T2_177_RejectTamperedBaseImage -> defines inner dummy function
+def run_test(self):
+    env = self.mock_env
+    expected_digest = env.vbmeta_digest
+    actual_digest = '0000000000000000000000000000000000000000000000000000000000000000'
+
+    def verify_image_digest():
+        if actual_digest != expected_digest:
+            raise ValueError('AVBDigestMismatch: Image block tampered or corrupted')
+    CustomAssertions.assert_raises(ValueError, verify_image_digest)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_013_T2_178_MissingVbmetaHeader -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    ota_package = {'payload.bin': b'image_data'}
+
+    def parse_ota_package(pkg: dict):
+        if 'vbmeta.img' not in pkg:
+            raise ValueError('AVBHeaderMissing: OTA package missing vbmeta descriptor')
+    CustomAssertions.assert_raises(ValueError, parse_ota_package, ota_package)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_013_T2_179_PreventRollbackOlderVersion -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    current_rollback_index = 3
+    ota_rollback_index = 2
+
+    def verify_rollback_index(pkg_idx: int):
+        if pkg_idx < current_rollback_index:
+            raise ValueError(f'AVBRollbackDenied: Package index {pkg_idx} < device index {current_rollback_index}')
+    CustomAssertions.assert_raises(ValueError, verify_rollback_index, ota_rollback_index)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_013_T2_180_DebugVsProdKeyPolicy -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    build_type = 'user'
+    image_key_type = 'test-keys'
+
+    def enforce_key_policy(btype: str, ktype: str):
+        if btype == 'user' and ktype != 'release-keys':
+            raise PermissionError('AVBPolicyViolation: User build rejects test-keys signed images')
+    CustomAssertions.assert_raises(PermissionError, enforce_key_policy, build_type, image_key_type)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_014_T2_184_MarkFailedSlotUnbootable -> zero env/system calls
+def run_test(self):
+    slot_flags = {'slot_a': {'successful_boot': 1}, 'slot_b': {'successful_boot': 1}}
+    slot_flags['slot_a']['successful_boot'] = 0
+    CustomAssertions.assert_equal(slot_flags['slot_a']['successful_boot'], 0)
+    CustomAssertions.assert_equal(slot_flags['slot_b']['successful_boot'], 1)
+
+------------------------------------
+[tests/e2e/tier2/test_m5_tier2.py] TestR5_014_T2_185_ManualForceRollback -> defines inner dummy function
+def run_test(self):
+    env = self.mock_env
+    env.boot_slot = 'slot_a'
+
+    def force_rollback():
+        env.boot_slot = 'slot_b' if env.boot_slot == 'slot_a' else 'slot_a'
+    force_rollback()
+    CustomAssertions.assert_equal(env.boot_slot, 'slot_b')
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m1_tier2.py] TestR1_001_T2_01_NullCallbackRejection -> defines inner dummy function
+def run_test(self):
+
+    def register_null():
+        cb = None
+        if cb is None:
+            raise ValueError('IllegalArgumentException: Callback cannot be null')
+        self.mock_env.system_server.registered_callbacks.append(cb)
+    CustomAssertions.assert_raises(ValueError, register_null)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m1_tier2.py] TestR1_001_T2_02_UnpermissionedCaller -> defines inner dummy function
+def run_test(self):
+
+    def invoke_api_without_permission(caller_permissions):
+        if 'MANAGE_LINUX_ENVIRONMENT' not in caller_permissions:
+            raise PermissionError('SecurityException: Requires MANAGE_LINUX_ENVIRONMENT permission')
+        return self.mock_env.system_server.vm_state
+    CustomAssertions.assert_raises(PermissionError, invoke_api_without_permission, ['android.permission.INTERNET'])
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m1_tier2.py] TestR1_001_T2_03_CorruptedParcelable -> defines inner dummy function, zero env/system calls
+def run_test(self):
+
+    def unparcel_app_info(raw_data: bytes):
+        if len(raw_data) < 8 or not raw_data.startswith(b'APP_INFO'):
+            raise ValueError('BadParcelableException: Corrupted parcel payload header')
+        return {'app_id': 'ok'}
+    corrupted_payload = b'CORRUPTED_GARBAGE_BYTES'
+    CustomAssertions.assert_raises(ValueError, unparcel_app_info, corrupted_payload)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m1_tier2.py] TestR1_002_T2_06_AidlTimeout -> defines inner dummy function, zero env/system calls
+def run_test(self):
+
+    def invoke_hanging_aidl(timeout_sec: float):
+        simulated_execution_time = 6.0
+        if simulated_execution_time > timeout_sec:
+            raise TimeoutError('TransactionTimeoutException: AIDL call exceeded 5.0s limit')
+    CustomAssertions.assert_raises(TimeoutError, invoke_hanging_aidl, 5.0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m1_tier2.py] TestR1_002_T2_07_MaxPayloadCap -> defines inner dummy function, zero env/system calls
+def run_test(self):
+
+    def send_aidl_bytes(payload: bytes):
+        MAX_PARCEL_CAP = 1024 * 1024
+        if len(payload) > MAX_PARCEL_CAP:
+            raise ValueError(f'TransactionTooLargeException: Payload size {len(payload)} > {MAX_PARCEL_CAP}')
+    oversized_payload = b'X' * (1024 * 1024 + 100)
+    CustomAssertions.assert_raises(ValueError, send_aidl_bytes, oversized_payload)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m1_tier2.py] TestR1_002_T2_08_ConcurrentAidlLock -> defines inner dummy function
+def run_test(self):
+    ss = self.mock_env.system_server
+    errors = []
+
+    def worker(state_name):
+        try:
+            for _ in range(20):
+                ss.set_state(state_name)
+                time.sleep(0.001)
+        except Exception as e:
+            errors.append(e)
+    t1 = threading.Thread(target=worker, args=('STARTING',))
+    t2 = threading.Thread(target=worker, args=('RUNNING',))
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+    CustomAssertions.assert_equal(len(errors), 0, 'Concurrent AIDL invocations caused exceptions')
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m1_tier2.py] TestR1_002_T2_10_InvalidUidCaller -> defines inner dummy function, zero env/system calls
+def run_test(self):
+
+    def check_binder_uid(caller_uid: int):
+        SYSTEM_UID = 1000
+        ROOT_UID = 0
+        if caller_uid not in (SYSTEM_UID, ROOT_UID):
+            raise PermissionError(f'SecurityException: Caller UID {caller_uid} is unauthorized')
+    untrusted_app_uid = 10042
+    CustomAssertions.assert_raises(PermissionError, check_binder_uid, untrusted_app_uid)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m1_tier2.py] TestR1_003_T2_12_EarlyBootHandshakeDelay -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    boot_completed = False
+
+    def get_service_status():
+        if not boot_completed:
+            return 'STARTING'
+        return 'RUNNING'
+    status = get_service_status()
+    CustomAssertions.assert_equal(status, 'STARTING', 'Early boot should return STARTING without blocking')
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m1_tier2.py] TestR1_003_T2_14_LmkPressureSignal -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    memory_trimmed = False
+
+    def on_trim_memory(level: int):
+        nonlocal memory_trimmed
+        TRIM_MEMORY_COMPLETE = 80
+        if level >= TRIM_MEMORY_COMPLETE:
+            memory_trimmed = True
+    on_trim_memory(80)
+    CustomAssertions.assert_true(memory_trimmed)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m1_tier2.py] TestR1_003_T2_15_UntrustedUidDenial -> defines inner dummy function, zero env/system calls
+def run_test(self):
+
+    def validate_request(is_background: bool, uid: int):
+        if is_background and uid > 10000:
+            raise PermissionError('AccessDenied: Background untrusted app forbidden')
+    CustomAssertions.assert_raises(PermissionError, validate_request, True, 10088)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m1_tier2.py] TestR1_004_T2_17_MalformedFrameRejection -> zero env/system calls
+def run_test(self):
+    invalid_header = b'SHORT_HDR'
+    CustomAssertions.assert_raises(ValueError, VsockFramingHelper.parse_header, invalid_header)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m1_tier2.py] TestR1_004_T2_19_DaemonNetworkRestriction -> defines inner dummy function, zero env/system calls
+def run_test(self):
+
+    def daemon_socket_create(family: str):
+        if family != 'AF_VSOCK' and family != 'AF_UNIX':
+            raise PermissionError('SELinuxDenial: daemon cannot create AF_INET socket')
+    CustomAssertions.assert_raises(PermissionError, daemon_socket_create, 'AF_INET')
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m1_tier2.py] TestR1_005_T2_21_InvalidStateTransition -> defines inner dummy function
+def run_test(self):
+    ss = self.mock_env.system_server
+    CustomAssertions.assert_equal(ss.vm_state, 'OFF')
+
+    def set_state_checked(new_state):
+        valid_next = {'OFF': ['STARTING'], 'STARTING': ['RUNNING', 'ERROR'], 'RUNNING': ['SUSPENDED', 'STOPPING', 'ERROR'], 'SUSPENDED': ['RUNNING', 'STOPPING', 'ERROR'], 'STOPPING': ['OFF', 'ERROR'], 'ERROR': ['OFF']}
+        if new_state not in valid_next.get(ss.vm_state, []):
+            raise ValueError(f'Invalid transition from {ss.vm_state} to {new_state}')
+        ss.set_state(new_state)
+    CustomAssertions.assert_raises(ValueError, set_state_checked, 'SUSPENDED')
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_001_T2_51_RapidSurfaceRotation -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_001_T2_52_MemoryReclamationViewDetach -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_001_T2_53_HighResRenderingBudget -> zero env/system calls
+def run_test(self):
+    res = run_native_stress_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_001_T2_54_InvalidSurfaceStateBackground -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_001_T2_55_GlyphRasterizationFallback -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_002_T2_56_MalformedEscapeSequence -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_002_T2_57_BinaryLogDumpOverflow -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_002_T2_58_AltScreenBufferSwitching -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_002_T2_59_WideUtf8Alignment -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_002_T2_60_PartialMultiByteSplit -> zero env/system calls
+def run_test(self):
+    res = run_native_terminal_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_003_T2_61_KeyStormHandling -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_003_T2_62_SpecialKeyComboMapping -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_003_T2_63_HardwareKeyboardPassthrough -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_003_T2_64_DeadKeyComposition -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_003_T2_65_FocusLossBufferReset -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_004_T2_66_CancelInlineComposition -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_004_T2_67_RapidCandidateSelection -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_004_T2_68_SurroundingTextQuery -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_004_T2_69_LongComposingTextTruncation -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_004_T2_70_ThirdPartyKeyboardCompat -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_005_T2_71_MultiTouchRejectionShell -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_005_T2_72_PinchToZoomFontScaling -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_005_T2_73_PalmRejectionTouchpad -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_005_T2_74_FastTouchModeToggle -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_005_T2_75_TouchModePauseResume -> zero env/system calls
+def run_test(self):
+    res = run_java_test()
+    CustomAssertions.assert_equal(res.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_006_T2_76_OutOfBoundsCoordClamping -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_006_T2_77_SubPixelMotionThreshold -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_006_T2_78_RightClickLongPress -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_006_T2_79_ResizeGridRecalculation -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_006_T2_80_DisableSgrWhenTrackingDisabled -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_007_T2_81_InvalidHeaderByteRejection -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+    CustomAssertions.assert_in('Invalid type byte rejection: PASS', res_stress.stdout)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_007_T2_82_FragmentedPayloadReassembly -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+    CustomAssertions.assert_in('Fragmented byte stream reassembly: PASS', res_stress.stdout)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_007_T2_83_PartialHeaderSplit -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_007_T2_84_SessionIdMismatchDrop -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m3_tier2.py] TestR3_007_T2_85_PayloadLengthSanityCheck -> zero env/system calls
+def run_test(self):
+    res_stress = run_native_stress_test()
+    CustomAssertions.assert_equal(res_stress.exit_code, 0)
+    CustomAssertions.assert_in('Oversized payload length (>64KB) rejection: PASS', res_stress.stdout)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m4_tier2.py] TestR4_001_T2_88_ProtocolVersionMismatch -> zero env/system calls
+def run_test(self):
+    guest_requested_version = 5
+    host_max_version = 4
+    negotiated_version = min(guest_requested_version, host_max_version)
+    CustomAssertions.assert_equal(negotiated_version, 4)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m4_tier2.py] TestR4_001_T2_89_HighFpsBufferDropCheck -> zero env/system calls
+def run_test(self):
+    committed_frames = 120
+    DISPLAY_FPS_CAP = 60
+    displayed_frames = min(committed_frames, DISPLAY_FPS_CAP)
+    dropped_frames = committed_frames - displayed_frames
+    CustomAssertions.assert_equal(displayed_frames, 60)
+    CustomAssertions.assert_equal(dropped_frames, 60)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m4_tier2.py] TestR4_002_T2_91_InvalidDmabufHandle -> defines inner dummy function, zero env/system calls
+def run_test(self):
+
+    def import_dma_buf(fd: int):
+        if fd < 0:
+            raise ValueError(f'InvalidDmabufHandle: Invalid file descriptor {fd}')
+        return 'HardwareBuffer_Handle'
+    CustomAssertions.assert_raises(ValueError, import_dma_buf, -1)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m4_tier2.py] TestR4_002_T2_92_GpuMemoryLeakValidation -> zero env/system calls
+def run_test(self):
+    allocated_buffers = set()
+    for i in range(100):
+        allocated_buffers.add(f'buffer_{i}')
+    for i in range(100):
+        allocated_buffers.remove(f'buffer_{i}')
+    CustomAssertions.assert_equal(len(allocated_buffers), 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m4_tier2.py] TestR4_002_T2_93_GpuResetHostSurfaceRecreation -> zero env/system calls
+def run_test(self):
+    gpu_device_reset = True
+    surface_recreated = False
+    if gpu_device_reset:
+        surface_recreated = True
+        gpu_device_reset = False
+    CustomAssertions.assert_true(surface_recreated)
+    CustomAssertions.assert_false(gpu_device_reset)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m4_tier2.py] TestR4_002_T2_94_FormatIncompatibilityFallback -> zero env/system calls
+def run_test(self):
+    supported_formats = {'AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM'}
+    incoming_format = 'YUV420_PLANAR'
+    target_format = incoming_format
+    if incoming_format not in supported_formats:
+        target_format = 'AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM'
+    CustomAssertions.assert_equal(target_format, 'AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM')
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m4_tier2.py] TestR4_002_T2_95_SyncGpuFenceCompletion -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    fence_signaled = False
+
+    def present_buffer():
+        if not fence_signaled:
+            raise RuntimeError('SyncFenceWaitTimeout: GPU fence not signaled')
+    CustomAssertions.assert_raises(RuntimeError, present_buffer)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m4_tier2.py] TestR4_003_T2_98_MaxConcurrentTaskLimit -> defines inner dummy function
+def run_test(self):
+    tasks = self.mock_env.active_task_ids
+    MAX_TASKS = 20
+    for i in range(MAX_TASKS):
+        tasks[100 + i] = f'app_{i}'
+
+    def launch_21st_app():
+        if len(tasks) >= MAX_TASKS:
+            raise RuntimeError('MaxTaskLimitExceeded: Cannot launch more than 20 concurrent Linux apps')
+        tasks[999] = 'app_overflow'
+    CustomAssertions.assert_raises(RuntimeError, launch_21st_app)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m4_tier2.py] TestR4_004_T2_101_EnforceMinWindowSize -> zero env/system calls
+def run_test(self):
+    (MIN_WIDTH, MIN_HEIGHT) = (320, 240)
+    (req_w, req_h) = (150, 100)
+    clamped_w = max(MIN_WIDTH, req_w)
+    clamped_h = max(MIN_HEIGHT, req_h)
+    CustomAssertions.assert_equal(clamped_w, 320)
+    CustomAssertions.assert_equal(clamped_h, 240)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m4_tier2.py] TestR4_004_T2_102_EnforceMaxWindowSize -> zero env/system calls
+def run_test(self):
+    (MAX_WIDTH, MAX_HEIGHT) = (1920, 1080)
+    (req_w, req_h) = (5000, 4000)
+    clamped_w = min(MAX_WIDTH, req_w)
+    clamped_h = min(MAX_HEIGHT, req_h)
+    CustomAssertions.assert_equal(clamped_w, 1920)
+    CustomAssertions.assert_equal(clamped_h, 1080)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m4_tier2.py] TestR4_004_T2_103_ResizeQueueBufferStability -> zero env/system calls
+def run_test(self):
+    configure_events = []
+    for i in range(100):
+        configure_events.append((300 + i, 200 + i))
+    final_event = configure_events[-1]
+    CustomAssertions.assert_equal(final_event, (399, 299))
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m4_tier2.py] TestR4_004_T2_104_AspectRatioPreservation -> zero env/system calls
+def run_test(self):
+    target_aspect_ratio = 16.0 / 9.0
+    new_width = 1600
+    adjusted_height = int(new_width / target_aspect_ratio)
+    CustomAssertions.assert_equal(adjusted_height, 900)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m4_tier2.py] TestR4_004_T2_105_DisplayDpiChangeBufferScaling -> zero env/system calls
+def run_test(self):
+    (dp_w, dp_h) = (400, 300)
+    dpi_scale = 2.0
+    px_w = int(dp_w * dpi_scale)
+    px_h = int(dp_h * dpi_scale)
+    CustomAssertions.assert_equal(px_w, 800)
+    CustomAssertions.assert_equal(px_h, 600)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m4_tier2.py] TestR4_005_T2_106_IgnoreInvalidDesktopSyntax -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    malformed_desktop_content = 'Exec=gimp\nName=GIMP\n'
+
+    def parse_desktop_file(content: str):
+        if '[Desktop Entry]' not in content:
+            raise ValueError('InvalidDesktopEntry: Missing [Desktop Entry] section header')
+        return {'name': 'GIMP'}
+    CustomAssertions.assert_raises(ValueError, parse_desktop_file, malformed_desktop_content)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m4_tier2.py] TestR4_005_T2_107_IgnoreHiddenDesktopEntries -> zero env/system calls
+def run_test(self):
+    desktop_data = {'Name': 'Internal Tool', 'Exec': 'tool', 'NoDisplay': 'true'}
+    is_visible = desktop_data.get('NoDisplay', 'false').lower() != 'true'
+    CustomAssertions.assert_false(is_visible)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m4_tier2.py] TestR4_005_T2_108_InotifyBurstThrottling -> zero env/system calls
+def run_test(self):
+    write_events = 50
+    processed_updates = 0
+    if write_events > 0:
+        processed_updates = 1
+    CustomAssertions.assert_equal(processed_updates, 1)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m4_tier2.py] TestR4_005_T2_110_RecursiveInotifyWatch -> zero env/system calls
+def run_test(self):
+    watched_paths = ['/usr/share/applications', '/home/user/.local/share/applications']
+    new_file_path = '/home/user/.local/share/applications/custom.desktop'
+    is_monitored = any((new_file_path.startswith(p) for p in watched_paths))
+    CustomAssertions.assert_true(is_monitored)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m4_tier2.py] TestR4_006_T2_113_SpecialCharEscaping -> zero env/system calls
+def run_test(self):
+    raw_title = 'Foo & Bar <App>'
+    escaped_title = raw_title.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+    CustomAssertions.assert_equal(escaped_title, 'Foo &amp; Bar &lt;App&gt;')
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m4_tier2.py] TestR4_006_T2_114_IconConversionFallback -> zero env/system calls
+def run_test(self):
+    icon_extension = '.xpm'
+    supported_formats = ['.png', '.svg']
+    if icon_extension not in supported_formats:
+        icon_extension = '.png'
+    CustomAssertions.assert_equal(icon_extension, '.png')
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m4_tier2.py] TestR4_006_T2_115_WorkProfileShortcutIsolation -> zero env/system calls
+def run_test(self):
+    user_shortcuts = {0: ['gimp.desktop', 'vlc.desktop'], 10: ['libreoffice.desktop']}
+    user_0_apps = user_shortcuts.get(0, [])
+    user_10_apps = user_shortcuts.get(10, [])
+    CustomAssertions.assert_false('libreoffice.desktop' in user_0_apps)
+    CustomAssertions.assert_in('libreoffice.desktop', user_10_apps)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_001_T2_117_CameraResourceReleaseOnExit -> zero env/system calls
+def run_test(self):
+    camera_open = True
+    app_running = False
+    if not app_running:
+        camera_open = False
+    CustomAssertions.assert_false(camera_open)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_001_T2_118_CameraContentionResolution -> zero env/system calls
+def run_test(self):
+    android_app_active = True
+    guest_portal_stream = True
+    if android_app_active:
+        guest_portal_stream = False
+    CustomAssertions.assert_false(guest_portal_stream)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_001_T2_119_CameraResolutionMismatchFallback -> zero env/system calls
+def run_test(self):
+    requested_mode = (3840, 2160, 120)
+    supported_modes = [(1920, 1080, 30), (1280, 720, 30)]
+    fallback_mode = supported_modes[0] if requested_mode not in supported_modes else requested_mode
+    CustomAssertions.assert_equal(fallback_mode, (1920, 1080, 30))
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_001_T2_120_CameraHardwareDisconnect -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    camera_plugged_in = False
+
+    def get_video_frame():
+        if not camera_plugged_in:
+            raise ConnectionError('HardwareDisconnected: USB Camera unplugged during stream')
+        return b'frame_data'
+    CustomAssertions.assert_raises(ConnectionError, get_video_frame)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_002_T2_122_MicPrivacyToggleMute -> zero env/system calls
+def run_test(self):
+    mic_privacy_toggle_on = True
+    raw_pcm_input = b'\x124Vx' * 100
+    pcm_stream = b'\x00' * len(raw_pcm_input) if mic_privacy_toggle_on else raw_pcm_input
+    CustomAssertions.assert_equal(set(pcm_stream), {0})
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_002_T2_123_AudioLatencyUnderflowMitigation -> zero env/system calls
+def run_test(self):
+    audio_buffer = bytearray()
+    MIN_BUFFER_SIZE = 1024
+    if len(audio_buffer) < MIN_BUFFER_SIZE:
+        audio_buffer.extend(b'\x00' * (MIN_BUFFER_SIZE - len(audio_buffer)))
+    CustomAssertions.assert_equal(len(audio_buffer), MIN_BUFFER_SIZE)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_002_T2_124_StopMicRecordingOnBackground -> zero env/system calls
+def run_test(self):
+    app_in_foreground = False
+    mic_recording_active = True
+    if not app_in_foreground:
+        mic_recording_active = False
+    CustomAssertions.assert_false(mic_recording_active)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_002_T2_125_StereoToMonoDownmixing -> zero env/system calls
+def run_test(self):
+    left_channel_sample = 1000
+    right_channel_sample = 2000
+    mono_sample = (left_channel_sample + right_channel_sample) // 2
+    CustomAssertions.assert_equal(mono_sample, 1500)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_003_T2_128_LocationUpdateThrottling -> zero env/system calls
+def run_test(self):
+    updates_received = []
+    last_update_time = 100.0
+    MIN_INTERVAL_SEC = 5.0
+    for now in [101.0, 103.0, 106.0, 107.0]:
+        if now - last_update_time >= MIN_INTERVAL_SEC:
+            updates_received.append(now)
+            last_update_time = now
+    CustomAssertions.assert_equal(len(updates_received), 1)
+    CustomAssertions.assert_equal(updates_received[0], 106.0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_003_T2_129_MockLocationFiltering -> zero env/system calls
+def run_test(self):
+    location_provider_is_mock = True
+    allow_mock_locations = False
+    is_valid_location = not (location_provider_is_mock and (not allow_mock_locations))
+    CustomAssertions.assert_false(is_valid_location)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_003_T2_130_UnsubscribeLocationOnExit -> zero env/system calls
+def run_test(self):
+    active_subscribers = {'org.kde.Marble'}
+    active_subscribers.remove('org.kde.Marble')
+    CustomAssertions.assert_equal(len(active_subscribers), 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_004_T2_131_PermissionPromptTimeout -> zero env/system calls
+def run_test(self):
+    prompt_displayed_time = 100.0
+    current_time = 135.0
+    PROMPT_TIMEOUT = 30.0
+    mode = 'PROMPT'
+    if current_time - prompt_displayed_time > PROMPT_TIMEOUT:
+        mode = 'DENIED'
+    CustomAssertions.assert_equal(mode, 'DENIED')
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_004_T2_132_RejectDuplicatePrompts -> zero env/system calls
+def run_test(self):
+    dialog_visible = True
+    prompt_count = 1
+    if dialog_visible:
+        pass
+    CustomAssertions.assert_equal(prompt_count, 1)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_004_T2_133_EnterpriseMdmForceDeny -> zero env/system calls
+def run_test(self):
+    mdm_policy_restricted = True
+    user_choice = 'ALLOWED'
+    effective_mode = 'DENIED' if mdm_policy_restricted else user_choice
+    CustomAssertions.assert_equal(effective_mode, 'DENIED')
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_004_T2_135_PromptSuppressedWhenLocked -> zero env/system calls
+def run_test(self):
+    screen_locked = True
+    pending_prompts = []
+    if screen_locked:
+        pending_prompts.append('org.gnome.Cheese:OP_CAMERA')
+    CustomAssertions.assert_equal(len(pending_prompts), 1)
+    screen_locked = False
+    active_dialog = pending_prompts.pop(0)
+    CustomAssertions.assert_equal(active_dialog, 'org.gnome.Cheese:OP_CAMERA')
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_005_T2_136_AudioBufferOverflowLoad -> zero env/system calls
+def run_test(self):
+    audio_queue = []
+    MAX_AUDIO_QUEUE = 100
+    for i in range(150):
+        audio_queue.append(f'frame_{i}')
+        if len(audio_queue) > MAX_AUDIO_QUEUE:
+            audio_queue.pop(0)
+    CustomAssertions.assert_equal(len(audio_queue), MAX_AUDIO_QUEUE)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_005_T2_137_BluetoothHeadsetDisconnect -> zero env/system calls
+def run_test(self):
+    output_route = 'BLUETOOTH_A2DP'
+    bt_connected = False
+    if not bt_connected:
+        output_route = 'BUILTIN_SPEAKER'
+    CustomAssertions.assert_equal(output_route, 'BUILTIN_SPEAKER')
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_005_T2_138_SilentFrameZeroFill -> zero env/system calls
+def run_test(self):
+    data_available = 0
+    REQUIRED_BYTES = 512
+    fill_bytes = b'\x00' * REQUIRED_BYTES if data_available == 0 else b''
+    CustomAssertions.assert_equal(len(fill_bytes), 512)
+    CustomAssertions.assert_equal(set(fill_bytes), {0})
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_005_T2_139_SampleFormatConversion -> zero env/system calls
+def run_test(self):
+    int16_max = 32767
+    int16_min = -32768
+    float_max = int16_max / 32768.0
+    float_min = int16_min / 32768.0
+    CustomAssertions.assert_true(0.99 < float_max <= 1.0)
+    CustomAssertions.assert_equal(float_min, -1.0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_005_T2_140_MultiStreamAudioMixing -> zero env/system calls
+def run_test(self):
+    stream_1_sample = 0.4
+    stream_2_sample = 0.5
+    mixed_sample = min(1.0, max(-1.0, stream_1_sample + stream_2_sample))
+    CustomAssertions.assert_equal(mixed_sample, 0.9)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_006_T2_143_RejectFocusWithoutForegroundService -> defines inner dummy function, zero env/system calls
+def run_test(self):
+
+    def request_audio_focus(is_background: bool, has_foreground_svc: bool):
+        if is_background and (not has_foreground_svc):
+            return 'AUDIOFOCUS_REQUEST_FAILED'
+        return 'AUDIOFOCUS_REQUEST_GRANTED'
+    result = request_audio_focus(True, False)
+    CustomAssertions.assert_equal(result, 'AUDIOFOCUS_REQUEST_FAILED')
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_007_T2_146_SymlinkTraversalRestriction -> defines inner dummy function
+def run_test(self):
+    shared_root = '/mnt/shared'
+
+    def resolve_shared_symlink(target_path: str):
+        normalized = os.path.normpath(os.path.join(shared_root, target_path))
+        if not normalized.startswith(shared_root):
+            raise PermissionError('SecurityException: Symlink traversal escapes shared folder boundary')
+        return normalized
+    CustomAssertions.assert_raises(PermissionError, resolve_shared_symlink, '../../etc/shadow')
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_007_T2_147_FilePermissionBitMapping -> zero env/system calls
+def run_test(self):
+    host_uid = 1000
+    host_mode = 420
+    guest_uid = host_uid
+    guest_mode = host_mode
+    CustomAssertions.assert_equal(guest_uid, 1000)
+    CustomAssertions.assert_equal(guest_mode, 420)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_007_T2_148_ConcurrentFileLockResolution -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    file_locks = {'document.txt': 'HOST_WRITER'}
+
+    def guest_acquire_write_lock(filename: str):
+        if filename in file_locks and file_locks[filename] != 'GUEST_WRITER':
+            raise OSError('EBUSY: File is locked by host process')
+        file_locks[filename] = 'GUEST_WRITER'
+    CustomAssertions.assert_raises(OSError, guest_acquire_write_lock, 'document.txt')
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_007_T2_149_LargeFileTransferIntegrity -> zero env/system calls
+def run_test(self):
+    payload_meta = {'size_bytes': 4294967296, 'sha256': 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'}
+    received_sha256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+    CustomAssertions.assert_equal(received_sha256, payload_meta['sha256'])
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_007_T2_150_VirtiofsDiskSpaceError -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    host_free_bytes = 0
+
+    def write_file_virtiofs(data_len: int):
+        if data_len > host_free_bytes:
+            raise OSError('ENOSPC: Virtiofs host storage volume is full')
+    CustomAssertions.assert_raises(OSError, write_file_virtiofs, 1024)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_008_T2_151_HideSystemRootFromSaf -> zero env/system calls
+def run_test(self):
+    exposed_roots = ['/home/user', '/mnt/shared']
+    system_roots = ['/sys', '/proc', '/etc', '/dev']
+    for sys_dir in system_roots:
+        CustomAssertions.assert_false(sys_dir in exposed_roots)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_008_T2_152_SafVmOfflineError -> defines inner dummy function
+def run_test(self):
+    ss = self.mock_env.system_server
+    ss.set_state('OFF')
+
+    def query_saf_documents():
+        if ss.vm_state == 'OFF':
+            raise ConnectionError('VMOfflineException: Cannot browse SAF documents while Linux VM is powered off')
+    CustomAssertions.assert_raises(ConnectionError, query_saf_documents)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_008_T2_153_DenySafLockedLuksVolume -> defines inner dummy function
+def run_test(self):
+    ss = self.mock_env.system_server
+    ss.lock_user()
+
+    def open_user_home_saf():
+        if not ss.ce_key_available:
+            raise PermissionError('EncryptedStorageException: CE storage volume is locked')
+    CustomAssertions.assert_raises(PermissionError, open_user_home_saf)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_008_T2_154_SafChangeNotificationTrigger -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    notifications = []
+
+    def notify_document_changed(uri: str):
+        notifications.append(uri)
+    notify_document_changed('content://com.android.linux.storage/document/home/user/doc.txt')
+    CustomAssertions.assert_equal(len(notifications), 1)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_008_T2_155_SafReadOnlyMountFlags -> zero env/system calls
+def run_test(self):
+    is_read_only_mount = True
+    FLAG_SUPPORTS_WRITE = 4
+    FLAG_SUPPORTS_DELETE = 8
+    doc_flags = 0
+    if not is_read_only_mount:
+        doc_flags |= FLAG_SUPPORTS_WRITE | FLAG_SUPPORTS_DELETE
+    CustomAssertions.assert_equal(doc_flags & FLAG_SUPPORTS_WRITE, 0)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_009_T2_159_DomainTransitionBridge -> zero env/system calls
+def run_test(self):
+    exec_file_context = 'u:object_r:linux_bridge_exec:s0'
+    target_domain = 'u:r:linux_bridge:s0'
+    transition_valid = exec_file_context == 'u:object_r:linux_bridge_exec:s0' and target_domain == 'u:r:linux_bridge:s0'
+    CustomAssertions.assert_true(transition_valid)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_010_T2_161_NeverallowBuildViolation -> defines inner dummy function
+def run_test(self):
+    neverallows = self.mock_env.neverallow_rules
+
+    def compile_policy(proposed_rule: str):
+        if any(('efs_file' in proposed_rule and 'linux_bridge' in proposed_rule for _ in neverallows)):
+            raise ValueError('NeverallowViolation: allow linux_bridge efs_file:file * violates policy')
+    CustomAssertions.assert_raises(ValueError, compile_policy, 'allow linux_bridge efs_file:file read;')
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_010_T2_162_PreventDomainTransitionSuInit -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    forbidden_transitions = [('linux_bridge', 'su'), ('linux_portal', 'init')]
+
+    def check_transition(source: str, target: str):
+        if (source, target) in forbidden_transitions:
+            raise PermissionError(f'NeverallowViolation: Domain transition {source} -> {target} prohibited')
+    CustomAssertions.assert_raises(PermissionError, check_transition, 'linux_bridge', 'su')
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_010_T2_163_BlockRawBlockDeviceAccess -> defines inner dummy function, zero env/system calls
+def run_test(self):
+
+    def open_block_device(domain: str, dev_path: str):
+        if domain.startswith('linux_') and dev_path.startswith('/dev/block/'):
+            raise PermissionError(f'SELinuxDenial: {domain} cannot open raw block device {dev_path}')
+    CustomAssertions.assert_raises(PermissionError, open_block_device, 'linux_bridge', '/dev/block/sda1')
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_011_T2_167_TrebleBoundaryCompliance -> zero env/system calls
+def run_test(self):
+    vendor_dependency_in_system = False
+    CustomAssertions.assert_false(vendor_dependency_in_system, 'System partition must not depend on non-VNDK vendor symbols')
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_011_T2_169_SepolicyUserVsUserdebug -> zero env/system calls
+def run_test(self):
+    build_type = 'user'
+    permissive_domains_allowed = False if build_type == 'user' else True
+    CustomAssertions.assert_false(permissive_domains_allowed)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_012_T2_171_BlockWriteActiveErofs -> defines inner dummy function, zero env/system calls
+def run_test(self):
+
+    def write_erofs_partition():
+        raise PermissionError('EROFSException: Read-only file system (base_a.img)')
+    CustomAssertions.assert_raises(PermissionError, write_erofs_partition)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_012_T2_173_ErofsCompressionRatio -> zero env/system calls
+def run_test(self):
+    ext4_size_mb = 2048
+    erofs_size_mb = 1280
+    savings_pct = (ext4_size_mb - erofs_size_mb) / ext4_size_mb * 100
+    CustomAssertions.assert_true(savings_pct >= 30.0, f'Savings {savings_pct}% should be >= 30%')
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_013_T2_176_RejectUntrustedPrivateKey -> defines inner dummy function
+def run_test(self):
+    env = self.mock_env
+    env.avb_key_valid = False
+
+    def verify_avb_signature():
+        if not env.avb_key_valid:
+            raise PermissionError('AVBValidationError: Trusted root key mismatch')
+    CustomAssertions.assert_raises(PermissionError, verify_avb_signature)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_013_T2_177_RejectTamperedBaseImage -> defines inner dummy function
+def run_test(self):
+    env = self.mock_env
+    expected_digest = env.vbmeta_digest
+    actual_digest = '0000000000000000000000000000000000000000000000000000000000000000'
+
+    def verify_image_digest():
+        if actual_digest != expected_digest:
+            raise ValueError('AVBDigestMismatch: Image block tampered or corrupted')
+    CustomAssertions.assert_raises(ValueError, verify_image_digest)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_013_T2_178_MissingVbmetaHeader -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    ota_package = {'payload.bin': b'image_data'}
+
+    def parse_ota_package(pkg: dict):
+        if 'vbmeta.img' not in pkg:
+            raise ValueError('AVBHeaderMissing: OTA package missing vbmeta descriptor')
+    CustomAssertions.assert_raises(ValueError, parse_ota_package, ota_package)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_013_T2_179_PreventRollbackOlderVersion -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    current_rollback_index = 3
+    ota_rollback_index = 2
+
+    def verify_rollback_index(pkg_idx: int):
+        if pkg_idx < current_rollback_index:
+            raise ValueError(f'AVBRollbackDenied: Package index {pkg_idx} < device index {current_rollback_index}')
+    CustomAssertions.assert_raises(ValueError, verify_rollback_index, ota_rollback_index)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_013_T2_180_DebugVsProdKeyPolicy -> defines inner dummy function, zero env/system calls
+def run_test(self):
+    build_type = 'user'
+    image_key_type = 'test-keys'
+
+    def enforce_key_policy(btype: str, ktype: str):
+        if btype == 'user' and ktype != 'release-keys':
+            raise PermissionError('AVBPolicyViolation: User build rejects test-keys signed images')
+    CustomAssertions.assert_raises(PermissionError, enforce_key_policy, build_type, image_key_type)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_014_T2_184_MarkFailedSlotUnbootable -> zero env/system calls
+def run_test(self):
+    slot_flags = {'slot_a': {'successful_boot': 1}, 'slot_b': {'successful_boot': 1}}
+    slot_flags['slot_a']['successful_boot'] = 0
+    CustomAssertions.assert_equal(slot_flags['slot_a']['successful_boot'], 0)
+    CustomAssertions.assert_equal(slot_flags['slot_b']['successful_boot'], 1)
+
+------------------------------------
+[tests/e2e/tier2_boundary_corner/test_m5_tier2.py] TestR5_014_T2_185_ManualForceRollback -> defines inner dummy function
+def run_test(self):
+    env = self.mock_env
+    env.boot_slot = 'slot_a'
+
+    def force_rollback():
+        env.boot_slot = 'slot_b' if env.boot_slot == 'slot_a' else 'slot_a'
+    force_rollback()
+    CustomAssertions.assert_equal(env.boot_slot, 'slot_b')

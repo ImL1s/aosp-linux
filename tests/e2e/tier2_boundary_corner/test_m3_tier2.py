@@ -20,10 +20,9 @@ def ensure_binaries_built():
 
     # 1. Compile Java classes & test suite
     cmd_java = (
-        "javac -classpath /Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar:"
-        "frameworks/base/core/java:packages/apps/LinuxTerminal/src "
-        "-d /tmp/m3_classes $(find packages/apps/LinuxTerminal/src -name '*.java') "
-        "tests/unit/TerminalAppUnitTest.java"
+        "javac -sourcepath frameworks/base/core/java:frameworks/base/services/core/java:packages/apps/LinuxTerminal/src "
+        "-classpath /Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar "
+        "-d /tmp/m3_classes tests/unit/TerminalAppUnitTest.java"
     )
     res_java = CommandRunner.run(cmd_java)
     if res_java.exit_code != 0:

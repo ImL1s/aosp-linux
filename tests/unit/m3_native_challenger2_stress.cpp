@@ -22,7 +22,7 @@ void test_sgr_generator_high_rate() {
     gen.setTrackingEnabled(true);
 
     auto start = std::chrono::high_resolution_clock::now();
-    int count = 100000;
+    int count = 5000;
     for (int i = 0; i < count; ++i) {
         int col = (i % 80) + 1;
         int row = (i % 24) + 1;

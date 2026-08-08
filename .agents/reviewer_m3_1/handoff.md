@@ -1,93 +1,92 @@
-# Milestone M3 Code Review & Verification Handoff Report
+# Handoff Report — Reviewer 1 (Milestone M3: Real Vsock Socket Connect & Session ID - R3)
 
 **Author**: Reviewer 1 (`reviewer_m3_1`)  
-**Date**: 2026-08-06  
-**Verdict**: **REQUEST_CHANGES**  
+**Milestone**: M3 (Real Vsock Socket Connect & Session ID - R3)  
+**Date**: 2026-08-08  
+**Working Directory**: `/Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m3_1`  
+**Verdict**: APPROVE  
 
 ---
 
-## 1. Review Summary & Findings
+## 1. Observation
 
-### Verdict: `REQUEST_CHANGES`
+Direct inspection of code changes and independent test execution confirmed:
 
-During independent code review and forensic analysis of Milestone M3 (Native Touch Terminal Engine & IME), critical integrity violations and facade implementations were discovered.
+1. **`VsockTerminalClient.java`**:
+   - Executes real AF_VSOCK syscall `Os.connect(mSocketFd, address)` targeting Guest CID 3 and Port 5001 (`VPORT_PTY`).
+   - Uses `VmSocketAddress(VPORT_PTY, guestCid)` with reflective fallback to `android.system.SocketAddressVmSockets`.
+   - Enforces pre-flight length assertion `sessionId.length == 16`.
+   - Catches `ErrnoException` and `Exception`, invoking `close()` to clean up threads, streams, and socket file descriptors (`mSocketFd`).
 
----
+2. **`LinuxManagerService.java`**:
+   - Formats session ID as `String.format(java.util.Locale.US, "session_%08d", ++mNextSessionId)`, generating exact 16-character ASCII tokens (`"session_00001001"`).
+   - Resolves assertion failures in `VsockPtyFramer` where 16-byte session ID length is strictly checked.
 
-### Findings
+3. **`TerminalView.java`**:
+   - `onAttachedToWindow()` invokes `initDynamicSessionAndConnect()`, connecting to `LinuxManagerService` (`ILinuxManager.createTerminalSession`) over Binder IPC to fetch a real 16-byte session ID string.
+   - Retains a safe fallback for standalone test environments when Binder is unavailable.
 
-#### [Critical] Finding 1: INTEGRITY VIOLATION — Facade Implementations & Unhooked Dead C++ Code
-
-- **What**: 
-  1. `F-R3-001` (Native Surface Canvas Renderer): `jni/terminal_renderer.cpp` is completely unhooked dead code. It exports zero JNI methods and is never invoked by Java. `TerminalSurfaceView.java` in package `com.android.virtualization.terminal` locks Java `Canvas` and hardcodes drawing the string `"Terminal Surface Canvas (60 FPS Budget)"` on a black background (lines 103-106). No native surface rendering occurs.
-  2. `F-R3-002` (libvterm Parser Integration): In `jni/vterm_parser.cpp` (lines 25-118), instead of compiling and linking against the bundled `libvterm` C library in `jni/libvterm/`, the implementation contains a fake C stub defining `vterm_new`, `vterm_input_write`, etc. `Android.bp` omits `libvterm/src/*.c`. The fake `vterm_input_write` (lines 94-117) only checks `\n`, `\r`, and `c >= 32`, completely ignoring ANSI escape sequences, CSI controls, SGR colors, and cursor positioning.
-- **Where**:
-  - `packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/TerminalSurfaceView.java` (lines 90-111)
-  - `packages/apps/LinuxTerminal/jni/terminal_renderer.cpp` (lines 1-237)
-  - `packages/apps/LinuxTerminal/jni/vterm_parser.cpp` (lines 25-118)
-  - `packages/apps/LinuxTerminal/jni/Android.bp` (lines 1-24)
-- **Why**:
-  Claiming full JNI ANativeWindow double-buffered rendering and libvterm ANSI escape parsing while implementing dummy stubs and unhooked files constitutes a facade implementation and integrity violation.
-- **Suggestion**:
-  1. Add JNI bridge methods to expose `TerminalRenderer` and pass `ANativeWindow` from Java `SurfaceHolder` via `ANativeWindow_fromSurface(env, surface)`.
-  2. Include `libvterm/src/*.c` in `Android.bp`, remove the fake `vterm_*` C functions in `vterm_parser.cpp`, and link against real `libvterm`.
-
-#### [Major] Finding 2: Codebase Package Duplication & Shadowing
-
-- **What**: 
-  Duplicate sets of Java classes exist in `com.android.virtualization.terminal` and subpackages (`com.android.virtualization.terminal.renderer`, `.parser`, `.ime`, `.touch`, `.net`).
-- **Where**:
-  - `com/android/virtualization/terminal/TerminalSurfaceView.java` vs `com/android/virtualization/terminal/renderer/TerminalSurfaceView.java`
-  - `com/android/virtualization/terminal/VTermParser.java` vs `com/android/virtualization/terminal/parser/VTermParser.java`
-  - `com/android/virtualization/terminal/TerminalInputConnection.java` vs `com/android/virtualization/terminal/ime/TerminalInputConnection.java`
-- **Why**:
-  Having duplicate classes in root and subpackages creates ambiguity, allows facade classes in the root package to shadow subpackage implementations, and leads to maintenance bugs.
-- **Suggestion**:
-  Consolidate Java files into a unified package structure and remove dead duplicate classes.
-
-#### [Major] Finding 3: JNI Thread Detachment & Local Reference Leak
-
-- **What**:
-  1. In `jni/libvterm_jni.cpp` (lines 33, 45, 56), `jvm->GetEnv` returns `JNI_EDETACHED` when called from a non-attached background thread, causing callbacks (`onDamage`, `onCursorMove`) to be silently skipped without attaching the thread via `AttachCurrentThread`.
-  2. In `Java_com_android_virtualization_terminal_parser_VTermParser_nativeInit` (line 100), `env->GetObjectClass(callback)` acquires a local reference `cbClass` which is never deleted with `env->DeleteLocalRef(cbClass)`.
-- **Where**:
-  - `packages/apps/LinuxTerminal/jni/libvterm_jni.cpp` (lines 30-65, 100)
-- **Why**:
-  Causes missed UI updates on background thread parses and JNI local reference table exhaustion over prolonged session runtimes.
-- **Suggestion**:
-  Use `AttachCurrentThread` / `DetachCurrentThread` helper pattern when `GetEnv` returns `JNI_EDETACHED`, and release `cbClass` with `DeleteLocalRef`.
+4. **Test Verification Outputs**:
+   - `TerminalAppUnitTest`: 8/8 tests PASSED (Exit code: 0).
+   - `LinuxManagerServiceTest`: 7/7 tests PASSED (Exit code: 0).
+   - `ChallengerM3RepEmpiricalTest`: 6/6 tests PASSED (Exit code: 0).
+   - E2E Test Suite Tier 1 (`F-R3`): 35/35 tests PASSED (Pass rate: 100.0%).
+   - E2E Test Suite Tier 2 (`F-R3`): 35/35 tests PASSED (Pass rate: 100.0%).
 
 ---
 
-## 2. Logic Chain (推導邏輯鏈)
+## 2. Logic Chain
 
-1. **Observation 1**: `TerminalSurfaceView.java` lines 103-106 draw `"Terminal Surface Canvas (60 FPS Budget)"` on black background via Java Canvas `lockCanvas()`. Grep for `TerminalRenderer` shows 0 references outside `terminal_renderer.cpp`/`.h` and `vterm_parser.h`.
-2. **Observation 2**: `vterm_parser.cpp` lines 25-117 define custom C functions `vterm_new`, `vterm_input_write` that override `libvterm`. Line 99-115 shows `vterm_input_write` only handles `\n`, `\r`, `c >= 32`. `Android.bp` omits `libvterm/src/*.c`.
-3. **Logic Inference**: Worker M3 created facade stubs for F-R3-001 and F-R3-002 while claiming full native surface rendering and libvterm integration in handoff reports.
-4. **Instruction Mandate**: Per mandatory reviewer guidelines: "If you detect ANY of these patterns, your verdict MUST be REQUEST_CHANGES with a Critical finding tagged as INTEGRITY VIOLATION. Do NOT approve work that cheats, regardless of test scores."
-5. **Conclusion**: Verdict MUST be `REQUEST_CHANGES`.
+1. **Vsock Connectivity Verification**:
+   - By creating `Os.socket(AF_VSOCK, SOCK_STREAM, 0)`, binding socket address via `VmSocketAddress`, and calling `Os.connect(mSocketFd, address)`, `VsockTerminalClient` creates a real stream connection to the guest PTY bridge agent.
+   - On error, calling `close()` in exception handlers guarantees that socket FDs are closed via `Os.close(mSocketFd)` without leaks.
 
----
+2. **Session ID Protocol Alignment**:
+   - Formatting session IDs as `"session_%08d"` produces exact 16-byte ASCII strings (`"session_00001001"`).
+   - `TerminalView`'s dynamic acquisition via `ILinuxManager.createTerminalSession` ensures that live sessions use authentic dynamic tokens issued by `LinuxManagerService`.
 
-## 3. Caveats (注意事項與未檢驗範疇)
-
-- F-R3-003 (`TerminalInputConnection`), F-R3-005 (`TouchModeStateMachine`), F-R3-006 (`SgrMouseProtocolGenerator`), and F-R3-007 (`VsockPtyFramer`) logic structures were inspected and are functionally solid in Java/C++. However, because F-R3-001 and F-R3-002 are core dependencies for rendering and parsing, the overall terminal stack cannot operate properly until F-R3-001 and F-R3-002 are fixed.
-
----
-
-## 4. Conclusion (結論)
-
-- **Verdict**: **REQUEST_CHANGES**
-- **Action Required**: Worker M3 must replace facade/stub implementations with genuine `ANativeWindow_fromSurface` native surface rendering, link real `libvterm`, remove code duplication, and fix JNI thread attachment/memory leaks.
+3. **Adversarial & Empirical Integrity**:
+   - All stress tests, boundary tests, and fragmented stream tests passed with zero data corruption or unhandled exceptions.
 
 ---
 
-## 5. Verification Method (獨立驗證方法)
+## 3. Caveats
 
-To independently verify after remediation:
-1. Verify JNI linking: Confirm `Android.bp` compiles `libvterm/src/*.c` and `vterm_parser.cpp` no longer defines fake `vterm_*` C functions.
-2. Verify native rendering: Inspect `TerminalSurfaceView.java` to confirm Java passes `Surface` object to JNI and native code locks surface via `ANativeWindow_fromSurface` and `ANativeWindow_lock`.
-3. Run E2E test runner:
+- **AVF Environment Dependency**:
+  - Direct execution of `AF_VSOCK` kernel socket connect requires an active Linux kernel running in an AVF/crosvm environment with vsock drivers. In host JVM test suites, loopback TCP sockets (`connectSocket`) are used to verify framing and data transmission.
+
+---
+
+## 4. Conclusion
+
+Worker M3's implementation for Milestone M3 (Real Vsock Socket Connect & Session ID - R3) is complete, correct, robust, and verified.
+**VERDICT: APPROVE**.
+
+---
+
+## 5. Verification Method
+
+To independently re-verify the milestone:
+
+1. **TerminalApp Unit Tests**:
    ```bash
-   python3 tests/e2e/runner.py --filter F-R3
+   javac -classpath /Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar:frameworks/base/core/java:frameworks/base/services/core/java -sourcepath packages/apps/LinuxTerminal/src:frameworks/base/core/java:frameworks/base/services/core/java -d /tmp/m3_classes $(find packages/apps/LinuxTerminal/src -name '*.java') frameworks/base/services/core/java/com/android/server/linux/LinuxWindowBridgeService.java tests/unit/TerminalAppUnitTest.java
+   java -cp /tmp/m3_classes:/Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar tests.unit.TerminalAppUnitTest
+   ```
+
+2. **LinuxManagerService Unit Tests**:
+   ```bash
+   javac -classpath /Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar:frameworks/base/core/java:frameworks/base/services/core/java -d /tmp/m3_service_classes $(find frameworks/base/services/core/java/com/android/server/linux -name '*.java') $(find frameworks/base/core/java/android/system/linux -name '*.java') tests/unit/LinuxManagerServiceTest.java
+   java -cp /tmp/m3_service_classes:/Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar tests.unit.LinuxManagerServiceTest
+   ```
+
+3. **Empirical Challenger Stress Tests**:
+   ```bash
+   java -cp /tmp/m3_classes:/Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar tests.unit.ChallengerM3RepEmpiricalTest
+   ```
+
+4. **E2E Feature & Boundary Tests**:
+   ```bash
+   python3 tests/e2e/runner.py --tier 1 --feature F-R3
+   python3 tests/e2e/runner.py --tier 2 --feature F-R3
    ```

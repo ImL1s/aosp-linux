@@ -53,6 +53,14 @@ public class LinuxPortalServiceTest {
         }
         portal.stopMicStream("m1");
 
+        // Test Mono mic session behavior under mono channel config
+        LinuxPortalService.MicSession monoMicSession = new LinuxPortalService.MicSession("org.audacity.Audacity", "m2", 48000, 1);
+        byte[] rawMonoInput = new byte[]{ 0x10, 0x00, 0x20, 0x00 }; // 2 mono 16-bit samples
+        byte[] processedMono = portal.processMicPcmFrame(monoMicSession, rawMonoInput);
+        if (processedMono[0] != 0x10 || processedMono[2] != 0x20) {
+            throw new RuntimeException("Test Failed: Mono PCM was incorrectly downmixed under mono channel config");
+        }
+
         // Location coarse rounding
         double[] obfuscated = portal.getObfuscatedLocation(25.0330123, 121.5654987, true);
         if (obfuscated[0] != 25.03 || obfuscated[1] != 121.57) {

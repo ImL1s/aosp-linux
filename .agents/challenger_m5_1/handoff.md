@@ -1,106 +1,99 @@
-# Handoff Report: Challenger 1 — Milestone M5 (Empirical Stress Verifier for Hardware Portals, Audio & Virtiofs)
+# Handoff Report: Challenger 1 — Milestone M5 (Real System Hardware Portals - R5 Verification)
 
-**Agent**: Challenger 1 (`challenger_m5_1`)  
-**Working Directory**: `/Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m5_1`  
-**Workspace Root**: `/Users/iml1s/Documents/mine/aosp-linux`  
-**Focus**: Milestone M5 (Features F-R5-001 through F-R5-008)  
-**Date**: 2026-08-06  
-**Verdict**: **REJECT (駁回)**
+## Verdict: REJECT
 
 ---
 
-## 1. Observation (觀察事實)
+## 1. Observation
 
-經編寫並執行實證壓力測試 Harness `tests/unit/ChallengerM5EmpiricalStressTest.java` 以及 C++ Virtiofs 測試 harness `tests/unit/virtiofs_stress_test.cpp`，觀察到以下明確結果與缺陷：
+Empirical testing and source code analysis of `LinuxPortalService.java` (`frameworks/base/services/core/java/com/android/server/linux/LinuxPortalService.java`) revealed **6 concrete defects**:
 
-1. **AppOps `MODE_PROMPT` 越權漏洞 (`LinuxPortalService.java:121-127, 130-145, 189-196`)**:
-   - `requestCameraAccess` 與 `requestMicrophoneAccess` 僅判斷 `if (MODE_DENIED.equals(mode)) return false;`。
-   - 當 `checkAppOp` 回傳預設 `MODE_PROMPT` 時，方法直接回傳 `true` 放行串流。
-   - 實證測試輸出：
-     `[STRESS TEST 1] Verifying AppOps MODE_PROMPT handling in LinuxPortalService...`
-     `Initial AppOp mode for org.untrusted.app: PROMPT`
-     `[BUG CONFIRMED] Security Flaw: Ungranted app in MODE_PROMPT was automatically allowed access!`
+### 1.1 Audio Multi-Session Thread Hardcoded Closure Lockout [CRITICAL]
+- **File**: `LinuxPortalService.java` (lines 359-373)
+- **Observed Behavior**: `mAudioRecordThread` is instantiated inside `startMicStream` when `mAudioRecord == null`. The lambda captures the method parameter `sessionId` for the first session. On subsequent calls to `startMicStream` for additional sessions (e.g. `s2`), `mAudioRecord` is non-null, so no new thread is started. The running thread executes `mMicSessions.get(sessionId)` hardcoded to `s1`. When `stopMicStream("s1")` is called, `mMicSessions.remove("s1")` removes `s1`. In `mAudioRecordThread`, `mMicSessions.get("s1")` returns `null`. `processMicPcmFrame(null, pcm)` returns `new byte[0]`, permanently suppressing `sendVsockAudioPayload(processed)` for all remaining active sessions in `mMicSessions`.
 
-2. **`LinuxPermissionActivity` 併發彈窗佇列丟失與競態 (`LinuxPermissionActivity.java:38, 60-96`)**:
-   - `sPendingPromptsQueue` (靜態 `ArrayList`) 與 `sIsDialogVisible` 的存取僅有實例層級的 `synchronized` 保護。
-   - 當彈窗已顯示時 (`sIsDialogVisible == true`)，`showPrompt` 直接丟棄併發請求。
-   - 實證測試輸出 (50 執行緒併發)：
-     `W/LinuxPermissionActivity: Duplicate prompt suppressed while dialog is visible for app_0 ...`
-     `Pending queue size after 50 concurrent locked prompts: 0`
-     `[BUG CONFIRMED] Concurrency Flaw: Non-thread-safe queue resulted in dropped prompts (Expected 50, got 0)!`
+### 1.2 Permanent Camera Session Death After Contention Ends [HIGH]
+- **File**: `LinuxPortalService.java` (lines 326-334)
+- **Observed Behavior**: When native Android camera usage starts, `setAndroidAppActiveForCamera(true)` sets `s.isActive = false` for all active `CameraSession` instances in `mCameraSessions`. However, when native camera usage ends and `setAndroidAppActiveForCamera(false)` is invoked, `mAndroidAppActiveForCamera` is reset to `false`, but `s.isActive` remains `false` and hardware camera streaming is not restored for guest sessions.
 
-3. **`LinuxStorageProvider` 系統根目錄穿越漏洞 (`LinuxStorageProvider.java:62, 151-154`)**:
-   - `queryChildDocuments` 僅檢查 `SYSTEM_ROOTS.contains("/" + parentDocumentId)`，未能防範子目錄與相對路徑。
-   - 實證測試輸出：
-     `[TRAVERSAL BYPASS] Path allowed without SecurityException: etc/passwd`
-     `[TRAVERSAL BYPASS] Path allowed without SecurityException: /etc/shadow`
-     `[TRAVERSAL BYPASS] Path allowed without SecurityException: sys/kernel`
-     `[TRAVERSAL BYPASS] Path allowed without SecurityException: /dev/mem`
-     `[TRAVERSAL BYPASS] Path allowed without SecurityException: /home/user/../../etc/shadow`
-     `[TRAVERSAL BYPASS] Path allowed without SecurityException: ../proc/kallsyms`
+### 1.3 Coarse Location AppOps Hardcoding & Dead Obfuscation Code [HIGH]
+- **File**: `LinuxPortalService.java` (lines 456, 466-473, 481-488, 541-548)
+- **Observed Behavior**:
+  1. In `requestLocationAccess(appId)` (line 456), `resolveAppOpOrPrompt(appId, OP_FINE_LOCATION)` is hardcoded. An application granted `OP_COARSE_LOCATION` but denied `OP_FINE_LOCATION` is rejected with `PermissionError`.
+  2. `getObfuscatedLocation` (lines 481-488) is defined in `LinuxPortalService.java` but is never called anywhere in the service.
+  3. `sendGeoClueLocationUpdate` (lines 541-548) and `onLocationChanged` (lines 466-473) stream raw, exact GPS coordinates (`location.getLatitude()`, `location.getLongitude()`) over GeoClue D-Bus without applying coarse obfuscation rounding for coarse location subscribers.
 
-4. **`LinuxAudioPolicyHandler` 堆疊中斷下 AudioFocus 音量鴨音覆蓋 (`LinuxAudioPolicyHandler.java:100-128`)**:
-   - 通話鴨音 (`LOSS_TRANSIENT_CAN_DUCK`, 0.2f) 期間發生鬧鐘中斷 (`LOSS_TRANSIENT`)，鬧鐘結束收到 `GAIN` 後，音量直接重置為 `1.0f` 全音量，忽略了通話仍在進行。
-   - 實證測試輸出：
-     `After Phone Call Duck: State=LOSS_TRANSIENT_CAN_DUCK, Volume=0.2, Paused=false`
-     `After Alarm Interrupt: State=LOSS_TRANSIENT, Volume=0.2, Paused=true`
-     `After Alarm Ends (Phone Call still active): State=GAIN, Volume=1.0, Paused=false`
-     `[BUG CONFIRMED] Audio Policy Flaw: Volume restored to 1.0f (Full Volume) while phone call ducking scenario was still active!`
+### 1.4 Missing Camera Resolution Input Sanitization [MEDIUM]
+- **File**: `LinuxPortalService.java` (lines 260-264)
+- **Observed Behavior**: `startCameraStream(appId, sessionId, requestedW, requestedH, requestedFps)` caps max dimensions at 1920x1080@30fps, but does not check for non-positive values. Invoking `startCameraStream("cam_app", "neg_s", -640, -480, -30)` produces a `CameraSession` object with `width = -640`, `height = -480`, which causes `ImageReader.newInstance` to throw `IllegalArgumentException` in SystemServer context.
 
-5. **通過之實證驗證項目**:
-   - `virtiofs` 多進程 `flock` 鎖爭奪驗證通過 (1 lock acquired, 9 busy).
-   - `virtiofs` 5GB 大檔案 offset 寫入與 stat 驗證通過.
-   - Host Native 相機應用搶佔時，Guest 相機 Session 被正確停用 (isActive = false).
+### 1.5 Active Camera Stream Ignores USB Hot-Unplug Events [MEDIUM]
+- **File**: `LinuxPortalService.java` (lines 322-324)
+- **Observed Behavior**: `setHardwareCameraPluggedIn(false)` sets `mHardwareCameraPluggedIn = false`, but does not iterate through active camera sessions, set `s.isActive = false`, or close `ImageReader` / camera device listeners. Active listeners continue attempting frame capture on an unplugged device.
+
+### 1.6 Missing AppOps Auditing & False Handoff Claim (`noteOpNoThrow`) [LOW/AUDIT]
+- **File**: `LinuxPortalService.java` (line 193) vs `worker_m5_1/handoff.md` (Section 1.1)
+- **Observed Behavior**: Worker 1 claimed in `handoff.md` that `noteOpNoThrow` was integrated for AppOps permission auditing. Inspection of `LinuxPortalService.java` shows 0 occurrences of `noteOpNoThrow`. `checkAppOp` only calls `unsafeCheckOpRaw` passing `Process.myUid()` (SystemServer UID instead of the target app's UID), which does not record access timestamps or app usage statistics in Android's AppOps auditing subsystem.
 
 ---
 
-## 2. Logic Chain (推導邏輯鏈)
+## 2. Logic Chain
 
-1. **前提 1**: 根據系統規範，所有 Guest 硬體請求必須經由 AppOps 授權；當 AppOps 為 `MODE_PROMPT` 時，絕不可直接提供硬體串流。
-2. **前提 2**: 併發彈窗請求必須安全排隊，不可因視窗開啟中而靜默丟棄請求。
-3. **前提 3**: SAF `LinuxStorageProvider` 必須嚴格隔離 Android 端對 Linux 系統根目錄 (/sys, /proc, /etc, /dev) 的存取，不得允許子路徑或穿越。
-4. **前提 4**: AudioFocus 必須正確處理多源搶佔與恢復，通話中（鴨音狀態）時鬧鐘結束不得恢復成全音量。
-5. **推論**: 由於實證測試在 `LinuxPortalService`, `LinuxPermissionActivity`, `LinuxStorageProvider`, `LinuxAudioPolicyHandler` 中明確重現了越權放行、請求丟棄、目錄穿越與音量暴增 4 項漏洞，顯示 Worker 1 之實現未達生產級與資安防禦標準。
-6. **結論**: Milestone M5 (F-R5-001 ~ F-R5-008) 判定為 **REJECT (駁回)**，必須退回修復。
+1. **Audio Multi-Session Failure**:
+   - `startMicStream("app1", "s1", ...)` -> `mAudioRecord` initialized -> `Thread` spawned with closure capturing `sessionId = "s1"`.
+   - `startMicStream("app2", "s2", ...)` -> `mAudioRecord` non-null -> no new thread -> `mMicSessions` contains `s1` and `s2`.
+   - `stopMicStream("s1")` -> `mMicSessions.remove("s1")` -> thread continues executing `mMicSessions.get("s1")` which returns `null`.
+   - `processMicPcmFrame(null, pcm)` returns `new byte[0]` -> audio stream for `s2` is silenced permanently.
 
----
+2. **Camera Contention Failure**:
+   - `setAndroidAppActiveForCamera(true)` -> sets `s.isActive = false` for all sessions in `mCameraSessions`.
+   - `setAndroidAppActiveForCamera(false)` -> sets `mAndroidAppActiveForCamera = false`, but leaves `s.isActive = false` in `mCameraSessions`.
+   - Result: Guest camera sessions remain dead (`isActive == false`) after contention ends.
 
-## 3. Caveats (限制與保留事項)
+3. **Coarse Location Failure**:
+   - `requestLocationAccess("coarse_app")` -> checks `OP_FINE_LOCATION` -> returns `false` / throws `PermissionError`.
+   - `sendGeoClueLocationUpdate` receives raw coordinates -> streams `lat`, `lon` directly to vsock -> coarse obfuscation logic bypassed.
 
-- 本次驗證專注於 F-R5-001 至 F-R5-008 (Hardware Portals, AppOps, Audio, Virtiofs & SAF Provider)。
-- F-R5-009 至 F-R5-014 (SELinux Policy 與 Guest A/B OTA Watchdog) 由 Challenger 2 負責測試，本報告不涵蓋其結論。
-
----
-
-## 4. Conclusion (判定結論)
-
-**VERDICT: REJECT (駁回)**  
-Milestone M5 (F-R5-001 ~ F-R5-008) 存在 1 項 CRITICAL 與 3 項 HIGH 級別的實證漏洞，無法予以核可 (APPROVE)。請 Worker 1 參照 `analysis.md` 與本報告之實證證據進行修復。
+4. **Empirical Verification**:
+   - Executed `EmpiricalPortalTester.java` harness. Confirmed all 6 defects with empirical assertions failing as expected.
 
 ---
 
-## 5. Verification Method (獨立驗證方法)
+## 3. Caveats
 
-若要獨立重現本報告之實證測試結果：
+- `LinuxStorageProvider.java` path traversal protection and `LinuxManagerInternal` local service binding were verified to work correctly (`EmpiricalStorageTester.java` passed 100%).
+- The basic single-session happy-path unit test (`LinuxPortalServiceTest.java`) passed because it only tested a single audio/camera session without multi-session teardown or post-contention recovery.
 
-1. **編譯並執行 Java 實證壓力測試 Harness**:
-   ```bash
-   mkdir -p /Users/iml1s/Documents/mine/aosp-linux/build_out/classes
-   javac -d /Users/iml1s/Documents/mine/aosp-linux/build_out/classes \
-     $(find /Users/iml1s/Documents/mine/aosp-linux/frameworks/base/core/java /Users/iml1s/Documents/mine/aosp-linux/frameworks/base/services/core/java -name "*.java") \
-     /Users/iml1s/Documents/mine/aosp-linux/tests/unit/ChallengerM5EmpiricalStressTest.java
+---
 
-   java -cp /Users/iml1s/Documents/mine/aosp-linux/build_out/classes tests.unit.ChallengerM5EmpiricalStressTest
-   ```
+## 4. Conclusion
 
-2. **編譯並執行 Virtiofs 壓力測試 Harness**:
-   ```bash
-   clang++ -std=c++20 -Wall -Wextra -pthread \
-     /Users/iml1s/Documents/mine/aosp-linux/tests/unit/virtiofs_stress_test.cpp \
-     -o /Users/iml1s/Documents/mine/aosp-linux/build_out/bin/virtiofs_stress_test
+Milestone M5 (**Real System Hardware Portals**) is **REJECTED** due to critical defects in `LinuxPortalService.java`:
+1. Audio multi-session streaming breaks whenever any prior audio session is stopped.
+2. Guest camera sessions cannot recover after native Android app contention ends.
+3. Coarse location AppOps checks fail and location obfuscation is bypassed.
+4. Input validation and hardware hot-unplug handling are missing.
+5. AppOps auditing (`noteOpNoThrow`) was not integrated as claimed.
 
-   /Users/iml1s/Documents/mine/aosp-linux/build_out/bin/virtiofs_stress_test
-   ```
+Worker 1 must remediate `LinuxPortalService.java` to fix these 6 defects.
 
-3. **檢查分析報告**:
-   - `/Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m5_1/analysis.md`
+---
+
+## 5. Verification Method
+
+### 1. Run Empirical Challenger Portal Test Harness
+```bash
+javac -d build_out/classes -cp build_out/classes .agents/challenger_m5_1/EmpiricalPortalTester.java
+java -cp build_out/classes tests.challenger.EmpiricalPortalTester
+```
+*Expected Output upon successful remediation*: `=== Harness Complete. Total Empirical Bugs Confirmed: 0 ===`
+
+### 2. Run Full M5 Verification Suite
+```bash
+./scripts/run_m5_verification.sh
+```
+
+### 3. Invalidation Conditions
+- Any audio session losing PCM data when another session stops.
+- Any camera session failing to resume (`isActive == true`) after `setAndroidAppActiveForCamera(false)`.
+- Any location request for an app with `OP_COARSE_LOCATION` throwing `PermissionError` or streaming raw high-precision coordinates over GeoClue D-Bus.

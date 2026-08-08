@@ -1,38 +1,46 @@
-# BRIEFING — 2026-08-06T10:59:51Z
+# BRIEFING — 2026-08-08T14:13:40Z
 
 ## Mission
-Investigate existing codebase and design complete technical implementation strategy for F-R3-001 (Native Surface Canvas Renderer) and F-R3-002 (libvterm Parser Integration) for M3.
+Investigate VsockTerminalClient.java implementation details for replacing unconnected socket creation with real AF_VSOCK connect(guestCid, 5001) syscall invocation.
 
 ## 🔒 My Identity
-- Archetype: Explorer
-- Roles: Technical investigation, design analysis, architecture report writer
+- Archetype: Teamwork Explorer
+- Roles: Explorer 1 for Milestone M3 (Real Vsock Socket Connect & Session ID - R3)
 - Working directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_1
-- Original parent: e59b61e1-0f0d-4f47-b56c-a89db7f43106
-- Milestone: M3 (Native Touch Terminal & IME)
+- Original parent: 5c184781-7153-420e-a9f4-56c517ccd32e
+- Milestone: M3 (Real Vsock Socket Connect & Session ID - R3)
 
 ## 🔒 Key Constraints
-- Read-only investigation — do NOT implement production source code outside .agents/explorer_m3_1/
-- Focus on F-R3-001 (Native Surface Canvas Renderer) and F-R3-002 (libvterm Parser Integration)
-- Provide precise class structures, file locations, method signatures, build configurations, and test strategies
-- Use Traditional Chinese in user communications and reports as required by user rules
+- Read-only investigation — do NOT implement code changes in packages/
+- Write investigation report to /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_1/analysis.md
+- Write handoff report to /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_1/handoff.md
+- Communicate findings via send_message to parent (5c184781-7153-420e-a9f4-56c517ccd32e)
+- Traditional Chinese output (請使用繁體中文)
 
 ## Current Parent
-- Conversation ID: e59b61e1-0f0d-4f47-b56c-a89db7f43106
-- Updated: 2026-08-06T10:59:51Z
+- Conversation ID: 5c184781-7153-420e-a9f4-56c517ccd32e
+- Updated: 2026-08-08T14:13:40Z
 
 ## Investigation State
-- **Explored paths**: `packages/apps/LinuxTerminal/`, `frameworks/base/`, `system/linux_bridge/`, `tests/e2e/`, `tests/unit/`
-- **Key findings**: Designed Native Surface Canvas Renderer architecture (`NativeSurfaceCanvasRenderer.java`) and `libvterm` C99 parser integration with JNI bridge (`libvterm_jni.cpp` / `VTermParser.java`). Completed `analysis.md` and `handoff.md`.
-- **Unexplored areas**: None for F-R3-001 and F-R3-002 scope.
+- **Explored paths**:
+  - `packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/net/VsockTerminalClient.java`
+  - `packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/net/VsockPtyFramer.java`
+  - `packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/TerminalView.java`
+  - `frameworks/base/services/core/java/com/android/server/linux/LinuxManagerService.java`
+  - `packages/apps/LinuxTerminal/Android.bp`
+  - `tests/unit/TerminalAppUnitTest.java`
+  - `tests/unit/ChallengerM3EmpiricalTest.java`
+  - `tests/e2e/tier1_feature_coverage/test_m3_tier1.py`
+- **Key findings**:
+  - `VsockTerminalClient.java` line 33 calls `Os.socket(AF_VSOCK, ...)` but omits `Os.connect(...)`.
+  - Fix: Use `Os.connect(mSocketFd, new SocketAddressVmSockets(5001, guestCid))` (`AF_VSOCK=40`).
+  - `TerminalView.java` hardcodes `mSessionId = "0123456789abcdef".getBytes()`.
+  - `LinuxManagerService.java` produces 12-byte session string `"session_1001"`, violating 16-byte framing requirement.
+- **Unexplored areas**: None (all R3 defects completely mapped).
 
 ## Key Decisions Made
-- Selected Native `SurfaceView` with hardware acceleration over legacy WebView/xterm.js MVP.
-- Selected C99 `libvterm` library with JNI bridge for zero-allocation stream parsing and VT100/xterm compliance.
-- Written complete technical analysis to `analysis.md` and handoff report to `handoff.md`.
+- Mirrored repo to `/Users/iml1s/aosp-linux` for investigation, synchronized report artifacts back to `/Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_1/` via AppleScript HFS duplication.
 
 ## Artifact Index
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_1/DISPATCH.md — Dispatch log
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_1/BRIEFING.md — Working memory index
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_1/progress.md — Liveness progress log
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_1/analysis.md — Technical design and architecture report
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_1/handoff.md — 5-Component handoff report
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_1/analysis.md — Investigation Report
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_1/handoff.md — Handoff Report

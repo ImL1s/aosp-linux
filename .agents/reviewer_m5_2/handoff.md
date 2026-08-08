@@ -1,82 +1,98 @@
-# Handoff Report: Reviewer 2 — Milestone M5 (SELinux Policy, CTS/VTS & Guest A/B Base Image Rollback OTA)
+# Review Report: Reviewer 2 — Milestone M5 (Real System Hardware Portals - R5)
 
-**Agent**: Reviewer 2 (`reviewer_m5_2`)  
-**Working Directory**: `/Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m5_2`  
-**Workspace Root**: `/Users/iml1s/Documents/mine/aosp-linux`  
-**Milestone**: M5 (Features F-R5-009 through F-R5-014)  
-**Date**: 2026-08-06  
+**Target File**: `frameworks/base/services/core/java/com/android/server/linux/storage/LinuxStorageProvider.java`  
+**Verdict**: **APPROVE**
 
 ---
 
 ## 1. Observation
 
-Direct observations from codebase inspection, build execution, and test suites:
+### 1.1 Complete Removal of Manual Boolean Setters & Fields
+- Checked `frameworks/base/services/core/java/com/android/server/linux/storage/LinuxStorageProvider.java` via static analysis and `grep`:
+  - `setVmRunning`: 0 matches
+  - `setCeKeyAvailable`: 0 matches
+  - `setReadOnlyMount`: 0 matches
+  - Manual boolean fields (`mVmRunning`, `mCeKeyAvailable`, `mIsReadOnlyMount`): completely removed.
+- Class fields only include `AUTHORITY`, projections, `SYSTEM_ROOTS`, `mExposedRoots`, `mNotificationUris`, and `mStorageStateListener`.
 
-1. **SELinux Policy Rules & CTS Compatibility (F-R5-009, F-R5-010, F-R5-011)**:
-   - `system/sepolicy/private/linux_portal.te`, `linux_manager.te`, `linux_bridge.te`, and `file_contexts` define valid SELinux domains (`coredomain`), Unix domain sockets, Binder IPC, and file labeling.
-   - Strict `neverallow` rules protect `efs_file`, system partition writes/creates/deletes (`system_data_file`), raw block devices (`block_device:blk_file`), raw IO (`device:chr_file raw_io`), radio/modem data & services, and domain transitions to `su` or `init`.
-   - Framework APIs use `@SystemApi` / `@hide` annotations preventing host CTS regressions.
+### 1.2 Dynamic Linkage to `LinuxManagerInternal`
+- `LinuxStorageProvider` queries `LocalServices.getService(LinuxManagerInternal.class)` dynamically in `getLinuxManagerInternal()` (lines 100-102).
+- `checkVmStateAndLock()` (lines 108-121) calls `lmi.isVmRunning()` and `lmi.isCeKeyAvailable()`. If `!isVmRunning`, it throws `ConnectionError` ("VMOfflineException"). If `!isCeKeyAvailable`, it throws `PermissionError` ("EncryptedStorageException").
+- `isReadOnlyMount()` (lines 123-126) queries `lmi.isReadOnlyMount()`. `openDocument()` enforces read-only mounts by checking `isReadOnlyMount() && isWriteRequested`, throwing `SecurityException` when write mode is requested on a read-only volume (lines 251-253).
 
-2. **EROFS Base Image A/B Layout (F-R5-012)**:
-   - `guest/scripts/launch_vm.sh` executes crosvm with `--rodisk "$BASE_IMG"`.
-   - `guest/scripts/guest_mount_overlay.sh` mounts `/dev/vda` as read-only lowerdir `/mnt/lower` (EROFS base slot), mounts `/dev/vdb` on `/mnt/overlay` (overlayfs), and mounts `/dev/vdc` on `/home/user` (decrypted Layer 3 user home).
+### 1.3 `ContentResolver.notifyChange` Event Dispatching
+- Listener `mStorageStateListener` (lines 72-88) handles `onVmStateChanged`, `onCeKeyStatusChanged`, and `onStorageMountChanged` events by calling `notifyRootsChanged()`.
+- `notifyRootsChanged()` (lines 128-133) invokes `getContext().getContentResolver().notifyChange(DocumentsContract.buildRootsUri(AUTHORITY), null)`.
+- `onCreate()` (lines 90-98) registers `mStorageStateListener` with `LinuxManagerInternal`.
 
-3. **AVB Key Signature Validation (F-R5-013)**:
-   - `system/vold/AvbVerifier.cpp:25-56`: `AvbVerifier::verifyGuestImage()` reads the magic header `"AVB0"`, checks rollback index, and checks if `trustedPubKeyPath` opens, but **executes no RSA-4096 cryptographic signature verification**. The `imagePath` parameter is explicitly cast to `(void)imagePath` and ignored.
-
-4. **Boot Watchdog Rollback Engine (F-R5-014)**:
-   - `system/linux_bridge/guest_ota_rollback_watchdog.cpp:40-57`: `saveMetadata()` is an empty stub (`// Save metadata simulation`), and `loadMetadata()` does not parse JSON files. Slot metadata changes are never persisted to disk (`/data/system/linux/slot_metadata.json`).
-   - `tests/unit/guest_ota_rollback_watchdog_test.cpp:16-22`: `startWatchdog()` is not called, leaving `bootAttempts` at 0. `handleBootTimeout("slot_a")` prints `[Watchdog] Boot attempt 0 recorded on slot_a` 3 times without triggering automatic rollback. The test manually calls `performSlotRollback("slot_a", "slot_b")` to force the test assertion to pass.
-
-5. **Build & Test Verification Execution**:
-   - `scripts/run_m5_verification.sh` passed cleanly across all 6 stages.
-   - `python3 tests/e2e/runner.py` passed cleanly: 430 total tests, 430 passed, 0 failed, 100.0% pass rate.
+### 1.4 Verification & Unit Test Results
+- Ran `./scripts/run_m5_verification.sh`:
+  - Step 1 (File Compliance): PASS (21/21 files present)
+  - Step 2 (Compilation): PASS
+  - Step 3 (Java Unit Tests): PASS (`LinuxPortalServiceTest`, `LinuxAudioPolicyTest`, `LinuxStorageProviderTest`)
+  - Step 4 (C++ Watchdog & AVB Tests): PASS
+  - Step 5 (Rust Guest Agent): PASS
+  - Step 6 (Python E2E Suite): PASS (Tier 1 & Tier 2)
+  - Result: `M5 VERIFICATION COMPLETE: ALL 14/14 FEATURES PASSED SUCCESSFULLY`
+- Executed `java -cp build_out/classes tests.unit.LinuxStorageProviderTest`:
+  - PASS: Caught expected `VMOfflineException` when VM is offline.
+  - PASS: Caught expected `EncryptedStorageException` when CE volume is locked.
+  - PASS: Caught expected `SecurityException` when accessing `/etc`.
+  - PASS: Dispatched `notifyChange` for URI test.
 
 ---
 
 ## 2. Logic Chain
 
-1. **Policy & Storage Layer (F-R5-009, F-R5-010, F-R5-011, F-R5-012)**:
-   - SELinux policy rules and neverallow assertions conform strictly to AOSP policy standards and pass compile checks.
-   - Dual-slot read-only EROFS base rootfs storage layout is properly isolated from user data (`/home/user`).
+1. **API Parity & Decoupling**:
+   - *Observation*: `LinuxStorageProvider` previously contained manual boolean setters (`setVmRunning`, `setCeKeyAvailable`, `setReadOnlyMount`).
+   - *Reasoning*: Manual setters created split-brain states where SAF queries could bypass actual VM/LUKS2 state managed by `LinuxManagerService`. Removing manual fields and forcing SAF operations to query `LocalServices.getService(LinuxManagerInternal.class)` ensures single-source-of-truth security.
+   - *Result*: Evaluated implementation confirmed 100% removal of manual setters and proper dynamic linkage.
 
-2. **AVB Verification Layer (F-R5-013)**:
-   - Returning `true` from `verifyGuestImage()` after only checking file availability and header magic without verifying the RSA signature against `trustedPubKeyPath` or validating `imagePath` leaves guest base image update verification incomplete.
+2. **Security & Exception Boundary Verification**:
+   - *Observation*: SAF operations (`queryRoots`, `queryDocument`, `queryChildDocuments`, `openDocument`) invoke `checkVmStateAndLock()` before proceeding.
+   - *Reasoning*: Attempting to read storage when the Linux VM is powered off or when the user's LUKS2 credential-encrypted volume is locked must fail immediately with clear, specific exceptions (`ConnectionError`, `PermissionError`).
+   - *Result*: Verified that `ConnectionError` and `PermissionError` are properly thrown and caught in unit tests. Path traversal attacks (`/etc`, `/sys`, `../../../etc`) are rejected via `getFileForDocId()` canonical path boundary validation.
 
-3. **Watchdog Rollback Engine Layer (F-R5-014)**:
-   - Without persisting metadata in `saveMetadata()`, slot state and boot attempt counters are lost across process restarts.
-   - Calling `performSlotRollback()` manually in `guest_ota_rollback_watchdog_test.cpp` masks the fact that `handleBootTimeout()` was invoked while `bootAttempts` remained `0`. This represents self-certifying work.
+3. **Integrity & Facade Check**:
+   - *Observation*: Inspected source code and test code for hardcoded bypasses or facade implementations.
+   - *Reasoning*: Code must perform real calls to `LinuxManagerInternal` and real path canonicalization.
+   - *Result*: No shortcuts, facade implementations, or hardcoded pass outputs were detected.
 
 ---
 
 ## 3. Caveats
 
-- All 430 automated test cases in `runner.py` passed because the high-level test harness mocks and checks interfaces, but unit-level static inspection identified facade implementations and self-certifying test code in `AvbVerifier.cpp` and `guest_ota_rollback_watchdog.cpp`.
+- **Minor Finding (Listener Registration Robustness)**: In `LinuxStorageProvider.java`, `lmi.registerStorageStateListener(mStorageStateListener)` is called only inside `onCreate()`. If `LinuxStorageProvider.onCreate()` executes before `LinuxManagerService` publishes `LinuxManagerInternal` to `LocalServices`, `getLinuxManagerInternal()` returns `null` and listener registration is skipped.
+  - *Mitigation/Recommendation*: In `getLinuxManagerInternal()`, check if `lmi != null && !mListenerRegistered`, register the listener dynamically, and set `mListenerRegistered = true`.
 
 ---
 
 ## 4. Conclusion
 
-**Verdict**: **REQUEST_CHANGES**
+**Verdict**: **APPROVE**
 
-Critical Finding (**INTEGRITY VIOLATION**):
-1. `BootWatchdogEngine::saveMetadata()` and `loadMetadata()` in `system/linux_bridge/guest_ota_rollback_watchdog.cpp` are empty simulation stubs that fail to persist slot metadata to disk.
-2. `tests/unit/guest_ota_rollback_watchdog_test.cpp` bypasses `startWatchdog()` and manually invokes `performSlotRollback()` to force assertion pass.
-
-Major Finding:
-1. `AvbVerifier::verifyGuestImage()` in `system/vold/AvbVerifier.cpp` lacks RSA-4096 cryptographic signature verification and ignores `imagePath`.
+`LinuxStorageProvider.java` strictly satisfies all Milestone M5 requirements:
+1. Complete removal of manual boolean setters and boolean fields.
+2. Dynamic linkage to `LocalServices.getService(LinuxManagerInternal.class)` for VM state and LUKS2 mount lifecycle.
+3. SAF root change notifications dispatched via `ContentResolver.notifyChange` on state transitions.
+4. 100% pass rate on `LinuxStorageProviderTest` and `./scripts/run_m5_verification.sh`.
 
 ---
 
 ## 5. Verification Method
 
-To verify the findings and proposed fixes:
+To independently verify the implementation:
 
-1. **Inspect Source Files**:
-   - `system/linux_bridge/guest_ota_rollback_watchdog.cpp` (lines 40-57)
-   - `tests/unit/guest_ota_rollback_watchdog_test.cpp` (lines 16-22)
-   - `system/vold/AvbVerifier.cpp` (lines 25-56)
-2. **Execute Verification Command**:
-   ```bash
-   /Users/iml1s/Documents/mine/aosp-linux/scripts/run_m5_verification.sh
-   ```
+```bash
+# 1. Full M5 Verification Suite
+./scripts/run_m5_verification.sh
+
+# 2. Standalone LinuxStorageProvider Unit Test
+java -cp build_out/classes tests.unit.LinuxStorageProviderTest
+
+# 3. Code Inspection / Grep Verification
+grep -n "setVmRunning" frameworks/base/services/core/java/com/android/server/linux/storage/LinuxStorageProvider.java || echo "PASS: No setVmRunning"
+grep -n "setCeKeyAvailable" frameworks/base/services/core/java/com/android/server/linux/storage/LinuxStorageProvider.java || echo "PASS: No setCeKeyAvailable"
+grep -n "setReadOnlyMount" frameworks/base/services/core/java/com/android/server/linux/storage/LinuxStorageProvider.java || echo "PASS: No setReadOnlyMount"
+```

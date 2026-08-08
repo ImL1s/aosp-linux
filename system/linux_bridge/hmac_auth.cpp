@@ -8,7 +8,7 @@
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
+ * distributed under the License is distributed on an AS IS BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
@@ -38,14 +38,14 @@ std::mutex HmacAuth::sTokenMutex;
 std::unordered_set<std::string> HmacAuth::sUsedTokens;
 
 static bool constantTimeCompare(const uint8_t* a, const uint8_t* b, size_t length) {
+    if (a == nullptr || b == nullptr) return false;
     uint8_t result = 0;
     for (size_t i = 0; i < length; ++i) {
-        result |= a[i] ^ b[i];
+        result |= (a[i] ^ b[i]);
     }
     return result == 0;
 }
 
-// Standalone FIPS 180-4 SHA-256 implementation
 namespace sha256_internal {
 
 static inline uint32_t rotr(uint32_t x, uint32_t n) {
@@ -93,7 +93,6 @@ static std::vector<uint8_t> sha256(const uint8_t* data, size_t len) {
         0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
     };
 
-    // Pre-processing (Padding)
     size_t paddedLen = len + 1 + 8;
     while (paddedLen % 64 != 0) {
         paddedLen++;
@@ -110,7 +109,6 @@ static std::vector<uint8_t> sha256(const uint8_t* data, size_t len) {
         msg[paddedLen - 1 - i] = static_cast<uint8_t>(bitsLen >> (i * 8));
     }
 
-    // Process the message in successive 512-bit (64-byte) chunks
     for (size_t chunk = 0; chunk < paddedLen; chunk += 64) {
         uint32_t w[64];
         for (int i = 0; i < 16; ++i) {
@@ -172,6 +170,17 @@ std::vector<uint8_t> HmacAuth::generateRandomToken() {
     return token;
 }
 
+std::string HmacAuth::hexEncode(const std::vector<uint8_t>& bytes) {
+    std::string hexStr;
+    hexStr.reserve(bytes.size() * 2);
+    static const char hexChars[] = "0123456789abcdef";
+    for (uint8_t b : bytes) {
+        hexStr.push_back(hexChars[(b >> 4) & 0x0F]);
+        hexStr.push_back(hexChars[b & 0x0F]);
+    }
+    return hexStr;
+}
+
 std::vector<uint8_t> HmacAuth::computeHmacSha256(const std::vector<uint8_t>& secret, const std::vector<uint8_t>& token) {
 #if HAS_OPENSSL
     std::vector<uint8_t> hmacResult(32, 0);
@@ -179,7 +188,6 @@ std::vector<uint8_t> HmacAuth::computeHmacSha256(const std::vector<uint8_t>& sec
     HMAC(EVP_sha256(), secret.data(), secret.size(), token.data(), token.size(), hmacResult.data(), &len);
     return hmacResult;
 #else
-    // Authentic C++ RFC 2104 HMAC-SHA256 calculation engine
     std::vector<uint8_t> k(64, 0);
     if (secret.size() > 64) {
         std::vector<uint8_t> keyHash = sha256_internal::sha256(secret.data(), secret.size());
@@ -194,14 +202,12 @@ std::vector<uint8_t> HmacAuth::computeHmacSha256(const std::vector<uint8_t>& sec
         opad[i] = k[i] ^ 0x5C;
     }
 
-    // inner_hash = SHA256(ipad || token)
     std::vector<uint8_t> innerMsg;
     innerMsg.reserve(64 + token.size());
     innerMsg.insert(innerMsg.end(), ipad.begin(), ipad.end());
     innerMsg.insert(innerMsg.end(), token.begin(), token.end());
     std::vector<uint8_t> innerHash = sha256_internal::sha256(innerMsg.data(), innerMsg.size());
 
-    // outer_hash = SHA256(opad || inner_hash)
     std::vector<uint8_t> outerMsg;
     outerMsg.reserve(64 + innerHash.size());
     outerMsg.insert(outerMsg.end(), opad.begin(), opad.end());
@@ -212,25 +218,13 @@ std::vector<uint8_t> HmacAuth::computeHmacSha256(const std::vector<uint8_t>& sec
 
 void HmacAuth::markTokenUsed(const std::vector<uint8_t>& token) {
     std::lock_guard<std::mutex> lock(sTokenMutex);
-    std::string hexStr;
-    hexStr.reserve(token.size() * 2);
-    static const char hexChars[] = "0123456789abcdef";
-    for (uint8_t b : token) {
-        hexStr.push_back(hexChars[(b >> 4) & 0x0F]);
-        hexStr.push_back(hexChars[b & 0x0F]);
-    }
+    std::string hexStr = hexEncode(token);
     sUsedTokens.insert(hexStr);
 }
 
 bool HmacAuth::isTokenUsed(const std::vector<uint8_t>& token) {
     std::lock_guard<std::mutex> lock(sTokenMutex);
-    std::string hexStr;
-    hexStr.reserve(token.size() * 2);
-    static const char hexChars[] = "0123456789abcdef";
-    for (uint8_t b : token) {
-        hexStr.push_back(hexChars[(b >> 4) & 0x0F]);
-        hexStr.push_back(hexChars[b & 0x0F]);
-    }
+    std::string hexStr = hexEncode(token);
     return sUsedTokens.find(hexStr) != sUsedTokens.end();
 }
 
@@ -245,7 +239,6 @@ bool HmacAuth::verifyHandshake(
     const AuthHandshakePayload& payload,
     std::chrono::steady_clock::time_point tokenCreatedAt
 ) {
-    // 1. Check Handshake 5-second timeout window
     auto now = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed = now - tokenCreatedAt;
     if (elapsed.count() > HANDSHAKE_TIMEOUT_SEC) {
@@ -255,28 +248,23 @@ bool HmacAuth::verifyHandshake(
 
     std::vector<uint8_t> payloadToken(payload.token, payload.token + 32);
 
-    // 2. Check token match
     if (!constantTimeCompare(payloadToken.data(), expectedToken.data(), 32)) {
         std::cerr << "[HmacAuth] Token mismatch during handshake" << std::endl;
         return false;
     }
 
-    // 3. Single-use token enforcement (Replay Attack Prevention)
     if (isTokenUsed(payloadToken)) {
         std::cerr << "[HmacAuth] Replayed token rejected during handshake" << std::endl;
         return false;
     }
 
-    // 4. Calculate expected HMAC-SHA256 signature
     std::vector<uint8_t> expectedSig = computeHmacSha256(secret, payloadToken);
 
-    // 5. Constant-time signature comparison
     if (!constantTimeCompare(payload.signature, expectedSig.data(), 32)) {
         std::cerr << "[HmacAuth] SECURITY_ALERT: HMAC signature mismatch during guest handshake" << std::endl;
         return false;
     }
 
-    // Mark token as used
     markTokenUsed(payloadToken);
     return true;
 }

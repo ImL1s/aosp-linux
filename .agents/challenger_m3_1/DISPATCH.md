@@ -1,20 +1,20 @@
-## 2026-08-06T11:02:53Z
-You are Challenger 1 for Milestone M3: Native Touch Terminal Engine & IME.
-Working Directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_1
+## 2026-08-08T14:22:37Z
 
-MANDATORY INPUT FILES TO READ FIRST:
-1. /Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md
-2. /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
-3. /Users/iml1s/Documents/mine/aosp-linux/.agents/sub_orch_m3/SCOPE.md
-4. /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m3/handoff.md
+You are Challenger 1 for Milestone M3 (Real Vsock Socket Connect & Session ID - R3).
+Your working directory is /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_1.
 
-YOUR OBJECTIVES:
-Empirically challenge and stress-test the implementation of:
-1. F-R3-001 Native Surface Canvas Renderer (60FPS budget under rapid terminal output, window resize/rotation, font metrics).
-2. F-R3-002 libvterm Parser Integration (10,000 line scrollback buffer boundary overflow, malformed ESC sequences, 256/TrueColor palette, Alt Screen switching).
-3. F-R3-003 TerminalInputConnection & F-R3-004 Multi-stage CJK IME Commit (high-frequency input, UTF-8 multi-byte partial byte buffering across socket boundaries, composing span cancellation).
+Paths to read before starting:
+- /Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md
+- /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m3_1/changes.md
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m3_1/handoff.md
 
-VERIFICATION REQUIREMENTS:
-- Run test suites and stress test scripts: `pytest tests/e2e/tier1_feature_coverage/test_m3_tier1.py` and `pytest tests/e2e/tier2_boundary_corner/test_m3_tier2.py`.
-- Write your structured handoff report to `/Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_1/handoff.md` with an explicit verdict: `APPROVE` or `REJECT`.
-- Send a message when complete.
+Challenge Task:
+1. Empirically verify AF_VSOCK socket connection behavior in VsockTerminalClient.java.
+2. Test valid vsock connect(guestCid, 5001) as well as error conditions (invalid CID, closed port, connection refusal).
+3. Ensure socket descriptors are not leaked on failed connection attempts.
+4. Execute test suites and empirical validation routines.
+5. Render a clear verdict: APPROVE or REJECT.
+
+Write your findings report to /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_1/challenge.md and handoff report to /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_1/handoff.md.
+When finished, send a message to parent with your verdict, summary, and artifact path.

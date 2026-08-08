@@ -1,16 +1,20 @@
-## Current Status
-Last visited: 2026-08-06T21:40:00+08:00
+# Progress Tracking — AOSP Dual-OS Production Remediation
 
-## Checklist
-- [x] Initialized DISPATCH.md, BRIEFING.md, plan.md, progress.md
-- [x] Phase 0: Survey codebase with 3 Explorers
-- [x] Phase 0: Create PROJECT.md
-- [/] Phase 1: Execute Milestones
-  - [x] Milestone M1: Automated E2E & Empirical Stress Test Execution (R1) — Gate PASSED (430/430 tests, 100% pass rate, CLEAN audit)
-  - [/] Milestone M2: Soong Module Compilation, Rust Build & AVB 2.0 Image Packaging (R2) — IN_PROGRESS
-  - [ ] Milestone M3: Artifact Deployment & Simulated Target Verification (R3) — PLANNED
-- [ ] Phase 2: Forensic Integrity Audit
-- [ ] Phase 3: Final Synthesis & Human Reporting
+## Current Status
+Last visited: 2026-08-08T19:00:05+08:00
 
 ## Iteration Status
 Current iteration: 2 / 32
+
+## Checklist
+- [x] Received dispatch and initialized BRIEFING.md / DISPATCH.md
+- [x] Phase 0: Survey codebase with 3 Explorers
+- [x] Phase 1: Create PROJECT.md with architecture, feature inventory, milestone plan, and interface contracts
+- [x] Phase 2a: Milestone M1 (Real AVF VM Launch - R1) — Gate PASS (Auditor CLEAN)
+- [x] Phase 2b: Milestone M2 (Production Guest Agent Loop - R2) — Gate PASS (Auditor CLEAN)
+- [x] Phase 2c: Milestone M3 (Real Vsock Socket Connect & Session ID - R3) — Gate PASS (Auditor CLEAN)
+- [x] Phase 2d: Milestone M4 (Real Wayland dma-buf & SurfaceControl Binding - R4) — Gate PASS (Auditor CLEAN)
+- [x] Phase 2e: Milestone M5 (Real System Hardware Portals - R5) — Gate PASS (Auditor CLEAN)
+- [/] Phase 2f: Milestone M6 (Clean & Honest E2E Test Suite - R6) — Worker Gen 5 completed harness & test case fixes; Iteration 5 Gate verification underway (2 Reviewers, 2 Challengers, 1 Forensic Auditor running)
+- [ ] Phase 3: Final verification of all 6 milestones (Auditor CLEAN + Reviewer APPROVE + Challenger APPROVE for all)
+- [ ] Phase 4: Final victory report to parent

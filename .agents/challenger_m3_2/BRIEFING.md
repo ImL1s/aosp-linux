@@ -1,53 +1,52 @@
-# BRIEFING — 2026-08-06T19:05:00Z
+# BRIEFING — 2026-08-08T14:22:50+08:00
 
 ## Mission
-Empirically challenge and stress-test M3 implementation (F-R3-005 Touch Modes State Machine, F-R3-006 SGR Mouse Generator, F-R3-007 Vsock Port 5001 PTY Framing).
+Empirically challenge and stress-test M3 implementation (dynamic session ID generation, 16-byte framing alignment, VsockPtyFramer, LinuxManagerService) and render an APPROVE/REJECT verdict.
 
 ## 🔒 My Identity
 - Archetype: EMPIRICAL CHALLENGER
 - Roles: critic, specialist
 - Working directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2
-- Original parent: e9ca9d37-df09-4105-a542-22e0563f38bd
-- Milestone: M3
-- Instance: 2 of 2
+- Original parent: 5c184781-7153-420e-a9f4-56c517ccd32e
+- Milestone: M3 (Real Vsock Socket Connect & Session ID - R3)
+- Instance: 1 of 1
 
 ## 🔒 Key Constraints
-- Review-only — do NOT modify implementation code (report findings as bugs if any, do not fix them yourself)
-- Must run verification code directly; do NOT trust worker claims
-- Must write handoff report with explicit verdict: APPROVE or REJECT
-- Must send message to parent upon completion
+- Review-only — do NOT modify implementation code (report findings/bugs, do not fix them in project source)
+- EMPIRICAL verification mandatory — write and run real tests / stress harnesses
+- Output reports to challenge.md and handoff.md in /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2/
 
 ## Current Parent
-- Conversation ID: e9ca9d37-df09-4105-a542-22e0563f38bd
-- Updated: 2026-08-06T19:05:00Z
+- Conversation ID: 5c184781-7153-420e-a9f4-56c517ccd32e
+- Updated: 2026-08-08T14:22:50+08:00
 
 ## Review Scope
-- **Files to review**: F-R3-005, F-R3-006, F-R3-007 implementation files and test suites
-- **Interface contracts**: PROJECT.md, SCOPE.md
-- **Review criteria**: Correctness under stress, boundary/edge conditions, concurrency/buffers, spec compliance
-
-## Loaded Skills
-- None specified in dispatch.
+- **Files to review**:
+  - ORIGINAL_REQUEST.md
+  - PROJECT.md
+  - .agents/worker_m3_1/changes.md
+  - .agents/worker_m3_1/handoff.md
+- **Interface contracts**: PROJECT.md
+- **Review criteria**: correctness, dynamic session ID 16-byte format/alignment, VsockPtyFramer under rapid/sequential session creation, build & test passing.
 
 ## Attack Surface
-- **Hypotheses tested**:
-  - F-R3-005: Rapid concurrent mode switching, mid-gesture mode switching.
-  - F-R3-006: 1-based coordinate bounds, high rate SGR generation, modifier key combinations, scroll wheel quantization.
-  - F-R3-007: Header fuzzing (invalid type bytes), negative payload length integer overflow, fragmented stream parsing, CRC32 checksums.
-- **Vulnerabilities found**:
-  1. `VsockPtyFramer.java` Signed Integer Overflow / Negative Payload Length Bypass.
-  2. `VsockPtyFramer.java` Invalid Frame Type Stream Desynchronization.
-  3. `SgrMouseProtocolGenerator.java` Lacks Modifier Key Support in Touch Event Dispatch.
-  4. `SgrMouseProtocolGenerator.java` Scroll Wheel Quantization Loss during Fast Swipes.
-  5. `SgrMouseProtocolGenerator.java` Stale Gesture Coordinates on Mid-Gesture Mode Transition.
-  6. Transport framing header lacks CRC32 field.
-- **Untested angles**: Hardware vsock kernel driver throughput under physical VM execution.
+- **Hypotheses tested**: Dynamic session ID 16-byte length, 21-byte framing alignment, multithreaded session ID collision, 1-byte stream chunking fragmentation, VsockTerminalClient pre-flight assertions, TerminalView dynamic binder acquisition.
+- **Vulnerabilities found**: None. Analyzed integer formatting boundary at 99,999,999 sessions per boot, which is well within operating parameters.
+- **Untested angles**: Hardware AF_VSOCK kernel socket on real device (tested via loopback / mock in desktop JVM).
+
+## Loaded Skills
+[None]
 
 ## Key Decisions Made
-- Executed E2E test suite via `python3 tests/e2e/runner.py --filter F-R3` (80/80 passed).
-- Created and executed Python empirical stress harness `tests/e2e/test_m3_challenger2_stress.py` (6/6 passed).
-- Created and compiled native C++ stress harness `tests/unit/m3_native_challenger2_stress.cpp` (4/4 passed, 6.25M pkts/sec).
-- Rendered Verdict: APPROVE.
+- Initialized BRIEFING.md and DISPATCH.md.
+- Created `ChallengerM3Challenger2StressTest.java` to stress test sequential generation (10,000 IDs), multithreaded concurrent generation (20 threads x 500 requests), 1-byte stream chunking (1,000 frames), client pre-flight assertions, and TerminalView dynamic session acquisition.
+- Executed Java unit tests, Java service tests, native C++ stress test, Java Challenger 2 stress suite, and Python E2E runner (Tier 1 & Tier 2 for F-R3).
+- Issued verdict: **APPROVE**.
 
 ## Artifact Index
-- handoff.md — Final handoff report with verdict: APPROVE
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2/DISPATCH.md — Incoming dispatch message log
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2/BRIEFING.md — Working memory briefing
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2/challenge.md — Detailed challenge findings report & empirical test matrix
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2/handoff.md — 5-component handoff report
+- /Users/iml1s/Documents/mine/aosp-linux/tests/unit/ChallengerM3Challenger2StressTest.java — Challenger 2 Java empirical stress test harness
+

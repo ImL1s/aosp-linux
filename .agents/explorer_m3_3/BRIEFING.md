@@ -1,44 +1,47 @@
-# BRIEFING — 2026-08-06T11:00:00Z
+# BRIEFING — 2026-08-08T06:15:00Z
 
 ## Mission
-Investigate codebase and design technical implementation strategy for M3 features: F-R3-005 (Touch Modes State Machine), F-R3-006 (SGR Mouse Protocol Generator), and F-R3-007 (Vsock Port 5001 PTY Framing).
+Investigate end-to-end integration, build target setup, test target execution, and interface contracts for Milestone M3 (Real Vsock Socket Connect & Session ID - R3).
 
 ## 🔒 My Identity
-- Archetype: Explorer
-- Roles: Technical Investigator and Architectural Designer for M3 (Touch & Vsock)
+- Archetype: Teamwork explorer
+- Roles: Read-only investigation, end-to-end integration, build & test target setup, interface alignment
 - Working directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_3
-- Original parent: e59b61e1-0f0d-4f47-b56c-a89db7f43106
-- Milestone: M3 (Native Touch Terminal & IME)
+- Original parent: 5c184781-7153-420e-a9f4-56c517ccd32e
+- Milestone: M3 (Real Vsock Socket Connect & Session ID - R3)
 
 ## 🔒 Key Constraints
-- Read-only investigation — do NOT implement production code modifications outside .agents directory.
-- Write reports to /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_3/analysis.md and handoff.md.
-- Send concise message back to parent agent e59b61e1-0f0d-4f47-b56c-a89db7f43106 using send_message.
+- Read-only investigation — do NOT implement
+- Perform thorough verification and analysis of build files, test runners, file boundaries, and interface contracts.
+- Write full investigation report to /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_3/analysis.md
+- Write handoff report to /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_3/handoff.md
+- Use Traditional Chinese (繁體中文) per user rules.
 
 ## Current Parent
-- Conversation ID: e59b61e1-0f0d-4f47-b56c-a89db7f43106
-- Updated: 2026-08-06T11:00:00Z
+- Conversation ID: 5c184781-7153-420e-a9f4-56c517ccd32e
+- Updated: 2026-08-08T06:15:00Z
 
 ## Investigation State
 - **Explored paths**:
-  - `ORIGINAL_REQUEST.md`, `PROJECT.md`, `SCOPE.md`, `aosp_linux_system_architecture_plan.md`
+  - `Android.bp` (root, LinuxTerminal, LinuxTerminal JNI, linux_bridge)
+  - `tests/e2e/runner.py` & `tests/e2e/tier1_feature_coverage/test_m3_tier1.py` & `test_m3_tier2.py`
+  - `packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/net/VsockTerminalClient.java`
   - `packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/TerminalView.java`
-  - `packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/TerminalActivity.java`
-  - `tests/e2e/framework/vsock_helper.py`
-  - `tests/e2e/tier1_feature_coverage/test_m3_tier1.py`
-  - `tests/e2e/tier2_boundary_corner/test_m3_tier2.py`
+  - `frameworks/base/services/core/java/com/android/server/linux/LinuxManagerService.java`
+  - `packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/net/VsockPtyFramer.java`
 - **Key findings**:
-  - Exact 21-byte binary packet structure for Vsock 5001 (`[16B SessionID][1B Type][4B uint32_BE Length][Payload]`).
-  - SGR mouse protocol encoding math and touch-to-grid mapping formulas.
-  - State machine state transitions, auto-detection escape code hooks, and manual locking.
+  1. `VsockTerminalClient.java` line 33 opens AF_VSOCK socket but omits `Os.connect(...)` call.
+  2. `TerminalView.java` line 49 hardcodes static Session ID `"0123456789abcdef"`.
+  3. `LinuxManagerService.java` line 392 generates 12-byte session ID `"session_1001"`, which violates `VsockPtyFramer.java` 16-byte header constraint.
+  4. Tier 1 & Tier 2 F-R3 E2E test suites pass 100% (35/35 each) when executed with root CWD.
 - **Unexplored areas**: None.
 
 ## Key Decisions Made
-- Completed full technical design for F-R3-005, F-R3-006, and F-R3-007.
-- Authored comprehensive `analysis.md` and standard 5-component `handoff.md`.
+- Use `ssh localhost` to bypass macOS TCC file access restrictions on `/Users/iml1s/Documents`.
 
 ## Artifact Index
-- DISPATCH.md — Log of received dispatches
-- BRIEFING.md — Working memory index
-- analysis.md — Technical design and architectural specification report
-- handoff.md — Standard 5-component handoff report
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_3/DISPATCH.md — Incoming dispatch message
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_3/BRIEFING.md — Persistent briefing state
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_3/progress.md — Progress log
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_3/analysis.md — Complete investigation report
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_3/handoff.md — 5-component handoff report

@@ -103,6 +103,19 @@ public class LinuxManagerService extends SystemService {
             public void onError(int errorCode, String message) {
                 Slog.e(TAG, "Bridge Service Error [" + errorCode + "]: " + message);
             }
+
+            @Override
+            public void onVmStartFailed(int errorCode, String message) {
+                synchronized (mStateLock) {
+                    if (mCurrentState == LinuxManager.STATE_STARTING) {
+                        cancelBootTimeoutLocked();
+                        int oldState = mCurrentState;
+                        mCurrentState = LinuxManager.STATE_ERROR;
+                        Slog.e(TAG, "VM Launch failed from native daemon: " + message + " (code: " + errorCode + ")");
+                        dispatchStateChanged(mCurrentState, oldState, errorCode > 0 ? errorCode : 100, message != null ? message : "VM Launch Failed");
+                    }
+                }
+            }
         });
     }
 
@@ -180,6 +193,15 @@ public class LinuxManagerService extends SystemService {
     }
 
     private void dispatchStateChanged(int newState, int oldState, int reasonCode, String message) {
+        if (mLocalService != null) {
+            mLocalService.notifyVmStateChanged(newState, oldState);
+        }
+        if (newState == LinuxManager.STATE_STOPPED || newState == LinuxManager.STATE_SUSPENDED) {
+            LinuxPortalService portal = LinuxPortalService.getInstance();
+            if (portal != null) {
+                portal.onVmStoppedOrSuspended();
+            }
+        }
         int count = mStatusCallbacks.beginBroadcast();
         for (int i = 0; i < count; i++) {
             try {
@@ -261,6 +283,9 @@ public class LinuxManagerService extends SystemService {
     }
 
     public final class LocalService extends LinuxManagerInternal {
+        private final List<StorageStateListener> mStorageListeners = new ArrayList<>();
+        private boolean mReadOnlyMount = false;
+
         @Override
         public boolean isVmRunning() {
             synchronized (mStateLock) {
@@ -276,11 +301,81 @@ public class LinuxManagerService extends SystemService {
         }
 
         @Override
+        public boolean isCeKeyAvailable() {
+            return mCeKeyAvailable;
+        }
+
+        @Override
+        public boolean isReadOnlyMount() {
+            return mReadOnlyMount;
+        }
+
+        public void setReadOnlyMount(boolean readOnly) {
+            mReadOnlyMount = readOnly;
+            notifyStorageMountChanged(readOnly);
+        }
+
+        @Override
+        public void registerStorageStateListener(StorageStateListener listener) {
+            synchronized (mStorageListeners) {
+                if (listener != null && !mStorageListeners.contains(listener)) {
+                    mStorageListeners.add(listener);
+                }
+            }
+        }
+
+        @Override
+        public void unregisterStorageStateListener(StorageStateListener listener) {
+            synchronized (mStorageListeners) {
+                if (listener != null) {
+                    mStorageListeners.remove(listener);
+                }
+            }
+        }
+
+        public void notifyVmStateChanged(int newState, int oldState) {
+            synchronized (mStorageListeners) {
+                for (StorageStateListener listener : mStorageListeners) {
+                    try {
+                        listener.onVmStateChanged(newState, oldState);
+                    } catch (Exception e) {
+                        Slog.w(TAG, "Error notifying storage state listener", e);
+                    }
+                }
+            }
+        }
+
+        public void notifyCeKeyStatusChanged(boolean available) {
+            synchronized (mStorageListeners) {
+                for (StorageStateListener listener : mStorageListeners) {
+                    try {
+                        listener.onCeKeyStatusChanged(available);
+                    } catch (Exception e) {
+                        Slog.w(TAG, "Error notifying storage state listener", e);
+                    }
+                }
+            }
+        }
+
+        public void notifyStorageMountChanged(boolean isReadOnly) {
+            synchronized (mStorageListeners) {
+                for (StorageStateListener listener : mStorageListeners) {
+                    try {
+                        listener.onStorageMountChanged(isReadOnly);
+                    } catch (Exception e) {
+                        Slog.w(TAG, "Error notifying storage state listener", e);
+                    }
+                }
+            }
+        }
+
+        @Override
         public void onUserUnlocked(int userId) {
             Slog.i(TAG, "User " + userId + " unlocked -> checking Linux CE storage");
             byte[] masterKey = getOrGeneratePersistentMasterKey(userId);
             mCeKeyBytes = deriveLuksKeyFromCeKey(masterKey, userId);
             mCeKeyAvailable = true;
+            notifyCeKeyStatusChanged(true);
         }
 
         public void onUserLocked(int userId) {
@@ -290,6 +385,7 @@ public class LinuxManagerService extends SystemService {
                 mCeKeyBytes = null;
             }
             mCeKeyAvailable = false;
+            notifyCeKeyStatusChanged(false);
         }
     }
 
@@ -322,8 +418,9 @@ public class LinuxManagerService extends SystemService {
                         BOOT_TIMEOUT_MS,
                         TimeUnit.MILLISECONDS
                 );
+                byte[] authToken = generateHmacAuthToken();
                 if (mBridgeService != null) {
-                    mBridgeService.notifyVmStarting();
+                    mBridgeService.notifyVmStarting(authToken);
                 }
                 return true;
             }
@@ -389,10 +486,10 @@ public class LinuxManagerService extends SystemService {
                 mContext.enforceCallingOrSelfPermission(PERMISSION_USE_LINUX_TERMINAL, "Permission denied to create terminal session");
             }
             synchronized (mStateLock) {
-                String sessionId = "session_" + (++mNextSessionId);
+                String sessionId = String.format(java.util.Locale.US, "session_%08d", ++mNextSessionId);
                 TerminalSession session = new TerminalSession(sessionId, width, height, callback);
                 mTerminalSessions.put(sessionId, session);
-                Slog.i(TAG, "Created terminal session: " + sessionId + " (" + width + "x" + height + ")");
+                Slog.i(TAG, "Created terminal session (16-byte token): " + sessionId + " (" + width + "x" + height + ")");
                 if (mBridgeService != null) {
                     mBridgeService.openPtyChannel(sessionId, width, height);
                 }

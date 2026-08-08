@@ -18,12 +18,17 @@ package com.android.server.linux.storage;
 
 import android.database.Cursor;
 import android.database.MatrixCursor;
+import android.net.Uri;
 import android.os.CancellationSignal;
 import android.os.ParcelFileDescriptor;
+import android.provider.DocumentsContract;
 import android.provider.DocumentsContract.Document;
 import android.provider.DocumentsContract.Root;
 import android.provider.DocumentsProvider;
 import android.util.Slog;
+
+import com.android.server.LocalServices;
+import com.android.server.linux.LinuxManagerInternal;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -64,26 +69,36 @@ public class LinuxStorageProvider extends DocumentsProvider {
     private final List<String> mExposedRoots = new ArrayList<>(Arrays.asList("/home/user", "/mnt/shared"));
     private final List<String> mNotificationUris = new ArrayList<>();
 
-    private boolean mVmRunning = true;
-    private boolean mCeKeyAvailable = true;
-    private boolean mIsReadOnlyMount = false;
+    private final LinuxManagerInternal.StorageStateListener mStorageStateListener =
+            new LinuxManagerInternal.StorageStateListener() {
+                @Override
+                public void onVmStateChanged(int newState, int oldState) {
+                    notifyRootsChanged();
+                }
+
+                @Override
+                public void onCeKeyStatusChanged(boolean available) {
+                    notifyRootsChanged();
+                }
+
+                @Override
+                public void onStorageMountChanged(boolean isReadOnly) {
+                    notifyRootsChanged();
+                }
+            };
 
     @Override
     public boolean onCreate() {
         Slog.i(TAG, "LinuxStorageProvider created under authority: " + AUTHORITY);
+        LinuxManagerInternal lmi = getLinuxManagerInternal();
+        if (lmi != null) {
+            lmi.registerStorageStateListener(mStorageStateListener);
+        }
         return true;
     }
 
-    public void setVmRunning(boolean running) {
-        mVmRunning = running;
-    }
-
-    public void setCeKeyAvailable(boolean available) {
-        mCeKeyAvailable = available;
-    }
-
-    public void setReadOnlyMount(boolean readOnly) {
-        mIsReadOnlyMount = readOnly;
+    private LinuxManagerInternal getLinuxManagerInternal() {
+        return LocalServices.getService(LinuxManagerInternal.class);
     }
 
     public List<String> getExposedRoots() {
@@ -91,14 +106,30 @@ public class LinuxStorageProvider extends DocumentsProvider {
     }
 
     private void checkVmStateAndLock() {
-        if (!mVmRunning) {
+        LinuxManagerInternal lmi = getLinuxManagerInternal();
+        boolean isVmRunning = (lmi != null) && lmi.isVmRunning();
+        if (!isVmRunning) {
             Slog.e(TAG, "VM is offline when SAF accessed");
             throw new ConnectionError("VMOfflineException: Cannot browse SAF documents while Linux VM is powered off");
         }
-        if (!mCeKeyAvailable) {
+
+        boolean isCeKeyAvailable = (lmi != null) && lmi.isCeKeyAvailable();
+        if (!isCeKeyAvailable) {
             Slog.e(TAG, "CE Key unavailable (locked) when SAF accessed");
             throw new PermissionError("EncryptedStorageException: CE storage volume is locked");
         }
+    }
+
+    private boolean isReadOnlyMount() {
+        LinuxManagerInternal lmi = getLinuxManagerInternal();
+        return lmi != null && lmi.isReadOnlyMount();
+    }
+
+    private void notifyRootsChanged() {
+        if (getContext() != null) {
+            getContext().getContentResolver().notifyChange(DocumentsContract.buildRootsUri(AUTHORITY), null);
+        }
+        Slog.i(TAG, "Dispatched notifyChange for roots URI: content://" + AUTHORITY + "/root");
     }
 
     private File getFileForDocId(String documentId) throws SecurityException {
@@ -217,7 +248,7 @@ public class LinuxStorageProvider extends DocumentsProvider {
         int pfdMode = parseMode(mode);
         boolean isWriteRequested = (pfdMode & (ParcelFileDescriptor.MODE_WRITE_ONLY | ParcelFileDescriptor.MODE_READ_WRITE)) != 0;
 
-        if (mIsReadOnlyMount && isWriteRequested) {
+        if (isReadOnlyMount() && isWriteRequested) {
             throw new SecurityException("Cannot open document for writing: Storage is mounted read-only");
         }
 
@@ -232,10 +263,9 @@ public class LinuxStorageProvider extends DocumentsProvider {
         }
     }
 
-
     private void includeFile(MatrixCursor result, String docId, File file) {
         int flags = 0;
-        if (!mIsReadOnlyMount) {
+        if (!isReadOnlyMount()) {
             flags |= (Document.FLAG_SUPPORTS_WRITE | Document.FLAG_SUPPORTS_DELETE | Document.FLAG_SUPPORTS_RENAME);
             if (file.isDirectory()) {
                 flags |= Document.FLAG_DIR_SUPPORTS_CREATE;
@@ -279,7 +309,7 @@ public class LinuxStorageProvider extends DocumentsProvider {
     public void notifyDocumentChanged(String uri) {
         mNotificationUris.add(uri);
         if (getContext() != null) {
-            getContext().getContentResolver().notifyChange(android.net.Uri.parse(uri), null);
+            getContext().getContentResolver().notifyChange(Uri.parse(uri), null);
         }
         Slog.i(TAG, "Dispatched notifyChange for URI: " + uri);
     }
@@ -309,4 +339,3 @@ public class LinuxStorageProvider extends DocumentsProvider {
         }
     }
 }
-

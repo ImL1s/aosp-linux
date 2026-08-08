@@ -27,19 +27,19 @@ class TestT3Pair01_ShutdownLuksUnmount(BaseTestCase):
 class TestT3Pair02_VsockConcurrency(BaseTestCase):
     test_id = "T3-PAIR-02"
     feature_id = "F-R2-004+F-R3-007"
-    title = "Port 5001 socket framing stream integrity under concurrent Port 5000 control RPC"
+    title = "Port 15001 socket framing stream integrity under concurrent Port 15000 control RPC"
     tier = 3
 
     def run_test(self):
-        self.mock_env.vsock.bind(5000)
-        self.mock_env.vsock.bind(5001)
+        self.mock_env.vsock.bind(15000)
+        self.mock_env.vsock.bind(15001)
         session_id = b"0123456789abcdef"
         frame_ctrl = VsockFramingHelper.create_frame(session_id, VsockPacketType.PING, b"")
         frame_pty = VsockFramingHelper.create_frame(session_id, VsockPacketType.DATA, b"echo hello\n")
-        self.mock_env.vsock.send(5000, frame_ctrl)
-        self.mock_env.vsock.send(5001, frame_pty)
-        ctrl_pkts = self.mock_env.vsock.receive_all(5000)
-        pty_pkts = self.mock_env.vsock.receive_all(5001)
+        self.mock_env.vsock.send(15000, frame_ctrl)
+        self.mock_env.vsock.send(15001, frame_pty)
+        ctrl_pkts = self.mock_env.vsock.receive_all(15000)
+        pty_pkts = self.mock_env.vsock.receive_all(15001)
         CustomAssertions.assert_equal(len(ctrl_pkts), 1)
         CustomAssertions.assert_equal(len(pty_pkts), 1)
         CustomAssertions.assert_vsock_frame(pty_pkts[0], session_id, VsockPacketType.DATA)
@@ -52,12 +52,12 @@ class TestT3Pair03_ImeLibvtermIntegration(BaseTestCase):
 
     def run_test(self):
         commit_text = "測試"
-        self.mock_env.vsock.bind(5001)
+        self.mock_env.vsock.bind(15001)
         session_id = b"session_ime_vter"
         payload = commit_text.encode("utf-8")
         frame = VsockFramingHelper.create_frame(session_id, VsockPacketType.DATA, payload)
-        self.mock_env.vsock.send(5001, frame)
-        received = self.mock_env.vsock.receive_all(5001)
+        self.mock_env.vsock.send(15001, frame)
+        received = self.mock_env.vsock.receive_all(15001)
         CustomAssertions.assert_equal(len(received), 1)
         parsed_session, pkt_type, data = VsockFramingHelper.parse_frame(received[0])
         CustomAssertions.assert_equal(data.decode("utf-8"), commit_text)
@@ -191,16 +191,16 @@ class TestT3Pair13_FrameworkApiSystemServer(BaseTestCase):
 class TestT3Pair14_AidlVsockRouting(BaseTestCase):
     test_id = "T3-PAIR-14"
     feature_id = "F-R1-002+F-R2-004"
-    title = "AIDL ILinuxTerminalCallback byte stream routed through Vsock Port 5001 PTY socket"
+    title = "AIDL ILinuxTerminalCallback byte stream routed through Vsock Port 15001 PTY socket"
     tier = 3
 
     def run_test(self):
-        self.mock_env.vsock.bind(5001)
+        self.mock_env.vsock.bind(15001)
         session_id = b"aidl_pty_stream!"
         payload = b"root@debian:~# ls -la\n"
         frame = VsockFramingHelper.create_frame(session_id, VsockPacketType.DATA, payload)
-        self.mock_env.vsock.send(5001, frame)
-        pkts = self.mock_env.vsock.receive_all(5001)
+        self.mock_env.vsock.send(15001, frame)
+        pkts = self.mock_env.vsock.receive_all(15001)
         CustomAssertions.assert_equal(len(pkts), 1)
         _, _, data = VsockFramingHelper.parse_frame(pkts[0])
         CustomAssertions.assert_equal(data, payload)
@@ -278,9 +278,9 @@ class TestT3Pair20_InputConnectionPtyFraming(BaseTestCase):
         session_id = b"input_pty_sess20"
         typed_text = b"apt update\n"
         frame = VsockFramingHelper.create_frame(session_id, VsockPacketType.DATA, typed_text)
-        self.mock_env.vsock.bind(5001)
-        self.mock_env.vsock.send(5001, frame)
-        received = self.mock_env.vsock.receive_all(5001)
+        self.mock_env.vsock.bind(15001)
+        self.mock_env.vsock.send(15001, frame)
+        received = self.mock_env.vsock.receive_all(15001)
         CustomAssertions.assert_equal(len(received), 1)
         CustomAssertions.assert_vsock_frame(received[0], session_id, VsockPacketType.DATA)
 
@@ -406,35 +406,35 @@ class TestT3Pair30_LifecycleDebianVm(BaseTestCase):
 class TestT3Pair31_VsockHmacHandshake(BaseTestCase):
     test_id = "T3-PAIR-31"
     feature_id = "F-R2-004+F-R2-005"
-    title = "Vsock Port 5000 control channel executes HMAC-SHA256 handshake before opening Ports 5001/5002"
+    title = "Vsock Port 15000 control channel executes HMAC-SHA256 handshake before opening Ports 15001/15002"
     tier = 3
 
     def run_test(self):
-        self.mock_env.vsock.bind(5000)
+        self.mock_env.vsock.bind(15000)
         secret = b"handshake_secret_key_32_bytes!!"
         token = HmacAuthHelper.generate_random_token()
         sig = HmacAuthHelper.compute_hmac(secret, token)
         auth_ok = self.mock_env.vsock.authenticate_handshake(token, sig, secret)
         CustomAssertions.assert_true(auth_ok)
         if auth_ok:
-            self.mock_env.vsock.bind(5001)
-            self.mock_env.vsock.bind(5002)
-        CustomAssertions.assert_true(self.mock_env.vsock.bound_ports[5001])
-        CustomAssertions.assert_true(self.mock_env.vsock.bound_ports[5002])
+            self.mock_env.vsock.bind(15001)
+            self.mock_env.vsock.bind(15002)
+        CustomAssertions.assert_true(self.mock_env.vsock.bound_ports[15001])
+        CustomAssertions.assert_true(self.mock_env.vsock.bound_ports[15002])
 
 class TestT3Pair32_CjkImePtyFraming(BaseTestCase):
     test_id = "T3-PAIR-32"
     feature_id = "F-R3-004+F-R3-007"
-    title = "Multi-stage CJK IME commit streams multi-byte UTF-8 payload through Vsock Port 5001 PTY framing"
+    title = "Multi-stage CJK IME commit streams multi-byte UTF-8 payload through Vsock Port 15001 PTY framing"
     tier = 3
 
     def run_test(self):
         cjk_payload = "倉頡輸入法測試".encode("utf-8")
         session_id = b"cjk_pty_session!"
         frame = VsockFramingHelper.create_frame(session_id, VsockPacketType.DATA, cjk_payload)
-        self.mock_env.vsock.bind(5001)
-        self.mock_env.vsock.send(5001, frame)
-        pkts = self.mock_env.vsock.receive_all(5001)
+        self.mock_env.vsock.bind(15001)
+        self.mock_env.vsock.send(15001, frame)
+        pkts = self.mock_env.vsock.receive_all(15001)
         CustomAssertions.assert_equal(len(pkts), 1)
         _, _, data = VsockFramingHelper.parse_frame(pkts[0])
         CustomAssertions.assert_equal(data.decode("utf-8"), "倉頡輸入法測試")
