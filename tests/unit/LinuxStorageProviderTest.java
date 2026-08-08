@@ -2,7 +2,7 @@ package tests.unit;
 
 import com.android.server.LocalServices;
 import com.android.server.linux.LinuxManagerInternal;
-import com.android.server.linux.storage.LinuxStorageProvider;
+import com.android.server.linux.LinuxStorageProvider;
 
 public class LinuxStorageProviderTest {
 

@@ -59,7 +59,8 @@ class BaseTestCase:
 
     def teardown(self):
         """Post-test cleanup hook."""
-        pass
+        if self.mock_env and hasattr(self.mock_env, "reset"):
+            self.mock_env.reset()
 
     def run_test(self):
         """Override this method in subclasses to execute test logic."""

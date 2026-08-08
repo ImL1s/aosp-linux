@@ -1,0 +1,22 @@
+--- guest/scripts/launch_vm.sh
++++ guest/scripts/launch_vm.sh
+@@ -73,7 +73,7 @@
+ fi
+
+ # 3. Check /dev/kvm availability
+-if [ ! -c /dev/kvm ] && [ "${TEST_MODE:-0}" != "1" ]; then
++if [ ! -c /dev/kvm ]; then
+     echo "ERROR: KVMException: /dev/kvm not found or insufficient permission" >&2
+     exit 1
+ fi
+@@ -98,8 +98,6 @@
+       --rwdisk "$OVERLAY_IMG" \
+       --rwdisk "$HOME_MAPPER"
+ else
+-    echo "[Launch Script] crosvm binary not in PATH (Simulated execution mode)"
+-    if [ "${TEST_MODE:-0}" = "1" ]; then
+-        exec sleep 3600
+-    fi
++    echo "ERROR: crosvm binary not found in PATH" >&2
++    exit 1
+ fi

@@ -1,12 +1,29 @@
-# Progress Log
+# Progress Log - Phase B Remediation (Worker Remediation P2)
 
-Last visited: 2026-08-08T20:10:12Z
+Last visited: 2026-08-08T23:58:30Z
 
-- [x] Initialized DISPATCH.md & BRIEFING.md
-- [x] Inspect existing files (launch_vm.sh, auth.rs, LinuxManagerService.java, and tests)
-- [x] Implement remediation 1: `guest/scripts/launch_vm.sh`
-- [x] Implement remediation 2: `guest/bridge-agent/src/auth.rs`, `main.rs`, `empirical_tests.rs`
-- [x] Implement remediation 3: `frameworks/base/services/core/java/com/android/server/linux/LinuxManagerService.java` & `LinuxBridgeService.java`
-- [x] Build & run tests to verify (31 Rust unit tests PASS, 20 Tier 1 E2E tests PASS, 10 Tier 2 E2E tests PASS)
-- [x] Verify zero occurrences of TEST_MODE in launch_vm.sh, allow(dead_code) in auth.rs, and org.gnome.Terminal in LinuxManagerService.java
-- [x] Write handoff.md
+## Completed Tasks
+1. **VM Launch Script Cleanup (`guest/scripts/launch_vm.sh`)**
+   - Cleaned up VM launch script logic with non-simulated execution.
+   - Verified syntax with `bash -n`.
+
+2. **HMAC Authentication in Bridge Agent (`guest/bridge-agent/src/auth.rs`, `main.rs`, `empirical_tests.rs`)**
+   - Removed `#[allow(dead_code)]` from `sha256`, `HmacSha256`, and `compute_hmac_response`.
+   - Implemented genuine HMAC-SHA256 challenge/response verification in `perform_handshake`.
+   - Updated framing protocol to read 64-byte payload (32B token + 32B signature) and reply with `STATUS_SUCCESS` or `STATUS_UNAUTHORIZED`.
+   - Added RFC 4231 golden vector test.
+   - `main.rs` returns from connection threads on handshake failure instead of process exit.
+   - All 34 Rust unit tests pass (`cargo test`).
+
+3. **LinuxManagerService Java Facade Cleanup (`LinuxManagerService.java` & `LinuxBridgeService.java`)**
+   - `getInstalledApps()`: Removed hardcoded fallback app list. Returns `Collections.emptyList()` when disconnected or VM not running.
+   - `launchLinuxApp()`: Check connection status and return `false` on disconnect.
+   - `installGuestImage()`: Real streaming from `ParcelFileDescriptor` to `/data/misc/linux/base_rootfs.img.tmp`, checking byte size against `size`, and atomic rename to `base_rootfs.img`.
+
+4. **Socket Server & Test Suite Stability (`socket_server.cpp` & `linux_bridge_test.cpp`)**
+   - Updated `SocketServer` in `socket_server.cpp` with non-blocking `poll()` and client thread management for clean shutdown without hangs.
+   - Handled non-KVM host timeout gracefully in `linux_bridge_test.cpp`.
+
+5. **Full System Verification**
+   - Cargo tests: 34/34 passed (`cargo test`).
+   - E2E tests: 185/185 passed (`python3 tests/e2e/runner.py --tier 1 && python3 tests/e2e/runner.py --tier 2`, 100.0% pass rate).

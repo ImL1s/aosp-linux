@@ -201,20 +201,22 @@ class TestR2_001_T2_35_MultiProcessMountLock(BaseTestCase):
             with open(config_file, "w") as f:
                 json.dump(config_data, f)
 
-            # 2. Execute launch_vm.sh with TEST_MODE=1 and verify base_rootfs.img file size remains 2621440000 bytes (not truncated)
-            res_launch1 = CommandRunner.run(f"TEST_MODE=1 bash '{launch_script}' '{config_file}'", cwd=PROJECT_ROOT)
+            # 2. Execute launch_vm.sh and verify base_rootfs.img file size remains 2621440000 bytes (not truncated)
+            res_launch1 = CommandRunner.run(f"bash '{launch_script}' '{config_file}'", cwd=PROJECT_ROOT)
             CustomAssertions.assert_equal(os.path.getsize(base_img), 2621440000, "base_rootfs.img truncated by launch_vm.sh!")
             CustomAssertions.assert_equal(os.path.getsize(overlay_img), 4194304000, "custom_overlay.img truncated by launch_vm.sh!")
 
-            # 3. Lock base_rootfs.img to simulate concurrent process execution
             lock_file = open(base_img, "r")
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             try:
-                res_launch2 = CommandRunner.run(f"TEST_MODE=1 bash '{launch_script}' '{config_file}'", cwd=PROJECT_ROOT)
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                res_launch2 = CommandRunner.run(f"bash '{launch_script}' '{config_file}'", cwd=PROJECT_ROOT)
                 CustomAssertions.assert_equal(res_launch2.exit_code, 3, f"Expected exit code 3 for locked file, got {res_launch2.exit_code}")
                 CustomAssertions.assert_in("ResourceBusy", res_launch2.stderr + res_launch2.stdout)
             finally:
-                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                try:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                except OSError:
+                    pass
                 lock_file.close()
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)

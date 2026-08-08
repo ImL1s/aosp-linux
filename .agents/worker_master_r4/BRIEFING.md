@@ -1,45 +1,51 @@
-# BRIEFING — 2026-08-08T15:44:55Z
+# BRIEFING — 2026-08-08T15:49:00Z
 
 ## Mission
-Execute all 6 remediation tasks for Round 4 Remediation of the AOSP Dual-OS Remediation Project (aosp-linux) based on Round 3 Victory Audit findings and Explorer reports.
+Execute Master Remediation Implementation for Round 4, addressing all 6 findings from Round 3 Victory Audit Report and achieving 100% genuine code, 34/34 cargo tests passing, 430/430 python e2e tests passing, and git status clean.
 
 ## 🔒 My Identity
-- Archetype: worker_master_r4
+- Archetype: implementer/qa/specialist
 - Roles: implementer, qa, specialist
 - Working directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_master_r4
-- Original parent: 106e2491-d765-41dd-b758-bb8e3dc98cc4
-- Milestone: round_4_remediation
+- Original parent: a1e94585-26d4-4319-8c0d-e99ee7bac2e0
+- Milestone: Round 4 Master Remediation
 
 ## 🔒 Key Constraints
-- Must NOT hardcode test results or dummy/facade implementations.
-- Must execute all 6 remediation tasks cleanly and genuinely.
-- Final test verification: 430/430 E2E tests passing, 34/34 Rust unit tests passing.
-- Clean git repository without prebuilt binaries or output artifacts committed.
+- DO NOT CHEAT. All implementations must be genuine.
+- NO hardcoded test results, facade implementations, or dummy returns.
+- `cargo test --manifest-path guest/bridge-agent/Cargo.toml` -> 34/34 PASS.
+- `python3 tests/e2e/runner.py` -> 430/430 PASS.
+- `git status --porcelain` -> 100% clean.
 
 ## Current Parent
-- Conversation ID: 106e2491-d765-41dd-b758-bb8e3dc98cc4
-- Updated: 2026-08-08T15:44:55Z
+- Conversation ID: a1e94585-26d4-4319-8c0d-e99ee7bac2e0
+- Updated: 2026-08-08T15:49:00Z
 
 ## Task Summary
-- **Task 1**: Stand-in stub classes purge (LinuxManager.java, Rect.java, Slog.java, empty dirs) — COMPLETED.
-- **Task 2**: Auth & Vsock contract mismatch (guest/bridge-agent/src/auth.rs & tests/e2e/framework/socket_harness.py) — COMPLETED.
-- **Task 3**: Hardware portals mock responses & TCP localhost (guest/bridge-agent/src/portal.rs & LinuxPortalService.java) — COMPLETED.
-- **Task 4**: Hardcoded return values in E2E adapter (tests/e2e/framework/real_env.py) — COMPLETED.
-- **Task 5**: Independent test execution failures (T2-43 assertion & socket test, Cargo tests in PTY/empirical_tests) — COMPLETED (430/430 E2E, 34/34 Cargo).
-- **Task 6**: Repository cleanliness & prebuilt artifacts purge (.gitignore & git rm untracked/prebuilt files) — COMPLETED.
-
-## Key Decisions Made
-- Executed all 6 remediation tasks with genuine dynamic state and verified 100% test pass rate across both E2E runner and Cargo test suite.
+- **What to build**: Full remediation for Findings 1-6 across frameworks/base, guest/bridge-agent, tests/e2e/framework, tests/e2e/tier2_boundary_corner, .gitignore, and prebuilt artifact removal.
+- **Success criteria**: All cargo tests pass (34/34), all e2e tests pass (430/430), git status clean.
 
 ## Change Tracker
-- **Files modified**: `auth.rs`, `socket_harness.py`, `VsockPortalClient.java`, `real_env.py`, `test_m2_tier2.py`, `pty.rs`, `.gitignore`, `handoff.md`.
-- **Build status**: PASS (430/430 E2E, 34/34 Cargo Unit Tests).
-- **Pending issues**: None.
+- **Files modified**:
+  - `packages/apps/LinuxTerminal/src/android/system/linux/LinuxManager.java` (Deleted)
+  - `packages/apps/LinuxTerminal/src/android/graphics/Rect.java` (Deleted)
+  - `frameworks/base/core/java/android/util/Slog.java` (Deleted)
+  - `guest/bridge-agent/src/auth.rs` (Wired HMAC-SHA256, removed dead code)
+  - `guest/bridge-agent/src/portal.rs` (Serde models & thread-safe state)
+  - `guest/bridge-agent/src/pty.rs` (PTY init error handling)
+  - `frameworks/base/services/core/java/com/android/server/linux/LinuxPortalService.java` (VsockPortalClient & NV21 streaming)
+  - `frameworks/base/services/core/java/com/android/server/linux/VsockPortalClient.java` (AF_VSOCK 13-byte frame client)
+  - `tests/e2e/framework/real_env.py` (Purged all hardcoded adapter return values)
+  - `tests/e2e/framework/socket_harness.py` (Removed TCP 127.0.0.1 fallbacks)
+  - `tests/e2e/tier2_boundary_corner/test_m2_tier2.py` (Fixed T2-43 string assertion)
+  - `.gitignore` (Added ignores for `*_bin`, `scratch/`, `release_dist/`, `patches/`, `e2e_report.json`)
+- **Build status**: PASS
+- **Pending issues**: NONE
 
 ## Quality Status
-- **Build/test result**: PASS.
-- **Lint status**: CLEAN.
-- **Tests added/modified**: T2-43 CID check & dynamic socket test updated, 64-byte HMAC auth test updated.
+- **Build/test result**: Cargo: 34/34 PASS, Python Runner: 430/430 PASS
+- **Lint status**: CLEAN
+- **Tests added/modified**: `test_rfc2104_golden_vector`, `T2-43` dynamic check
 
-## Artifact Index
-- handoff.md — Final remediation handoff report
+## Loaded Skills
+- None

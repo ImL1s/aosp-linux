@@ -97,6 +97,39 @@ def list_tests(tests: list):
     print("-" * 80)
     print(f"Total Discovered Tests: {len(tests)}\n")
 
+def cleanup_orphaned_processes():
+    """
+    Explicitly terminates any leftover background processes or daemons
+    (e.g., linux_bridge_test, sleep 3600) spawned during E2E testing.
+    """
+    import subprocess
+    import signal
+
+    targets = ["sleep 3600", "linux_bridge_test"]
+    my_pid = os.getpid()
+    for target in targets:
+        try:
+            res = subprocess.run(
+                f"pgrep -f '{target}'", shell=True, capture_output=True, text=True
+            )
+            if res.returncode == 0 and res.stdout.strip():
+                pids = [int(p) for p in res.stdout.strip().splitlines() if p.isdigit()]
+                for pid in pids:
+                    if pid != my_pid:
+                        try:
+                            os.kill(pid, signal.SIGTERM)
+                        except OSError:
+                            pass
+                time.sleep(0.05)
+                for pid in pids:
+                    if pid != my_pid:
+                        try:
+                            os.kill(pid, signal.SIGKILL)
+                        except OSError:
+                            pass
+        except Exception as e:
+            print(f"Warning during process cleanup for '{target}': {e}", file=sys.stderr)
+
 def main():
     parser = argparse.ArgumentParser(description="AOSP Dual-OS E2E Test Suite Runner")
     parser.add_argument(
@@ -191,6 +224,7 @@ def main():
                     print(f"{result.stack_trace}")
     finally:
         env.stop_harness()
+        cleanup_orphaned_processes()
 
     elapsed = time.time() - start_time
 

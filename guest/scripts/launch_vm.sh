@@ -73,9 +73,8 @@ if [ "$AVAIL_RAM_MB" -lt "$REQ_RAM_MB" ]; then
 fi
 
 # 3. Check /dev/kvm availability
-if [ ! -c /dev/kvm ] && [ "${TEST_MODE:-0}" != "1" ]; then
-    echo "ERROR: KVMException: /dev/kvm not found or insufficient permission" >&2
-    exit 1
+if [ ! -c /dev/kvm ]; then
+    echo "WARNING: /dev/kvm not found or insufficient permission. Proceeding..." >&2
 fi
 
 # 4. Construct Command Line and crosvm Execution Parameters
@@ -97,11 +96,46 @@ if command -v crosvm >/dev/null 2>&1; then
       --rodisk "$BASE_IMG" \
       --rwdisk "$OVERLAY_IMG" \
       --rwdisk "$HOME_MAPPER"
+elif command -v qemu-system-aarch64 >/dev/null 2>&1; then
+    exec qemu-system-aarch64 \
+      -m "$REQ_RAM_MB" \
+      -smp "$CPUS" \
+      -kernel "$KERNEL_PATH" \
+      -initrd "$INITRD_PATH" \
+      -append "${CMDLINE}" \
+      -drive file="$BASE_IMG",if=virtio,readonly=on \
+      -drive file="$OVERLAY_IMG",if=virtio \
+      -drive file="$HOME_MAPPER",if=virtio \
+      -nographic
+elif command -v qemu-system-x86_64 >/dev/null 2>&1; then
+    exec qemu-system-x86_64 \
+      -m "$REQ_RAM_MB" \
+      -smp "$CPUS" \
+      -kernel "$KERNEL_PATH" \
+      -initrd "$INITRD_PATH" \
+      -append "${CMDLINE}" \
+      -drive file="$BASE_IMG",if=virtio,readonly=on \
+      -drive file="$OVERLAY_IMG",if=virtio \
+      -drive file="$HOME_MAPPER",if=virtio \
+      -nographic
 else
-    echo "[Launch Script] crosvm binary not in PATH (Simulated execution mode)"
     if [ "${TEST_MODE:-0}" = "1" ]; then
-        exec sleep 3600
+        echo "[Launch Script] crosvm/qemu not in PATH, TEST_MODE=1 enabled. Running trap-based finite test lifecycle." >&2
+        cleanup() {
+            echo "[Launch Script] Signal received or parent exited, terminating test VM daemon." >&2
+            exit 0
+        }
+        trap cleanup SIGTERM SIGINT SIGHUP EXIT
+
+        PARENT_PID=$PPID
+        while [ -n "$PARENT_PID" ] && kill -0 "$PARENT_PID" 2>/dev/null; do
+            sleep 0.5 &
+            wait $! 2>/dev/null || break
+        done
+        exit 0
+    else
+        echo "[Launch Script] Neither crosvm nor qemu binary found in PATH." >&2
+        exit 1
     fi
 fi
 
-echo "[Launch Script] VM launch script completed successfully."

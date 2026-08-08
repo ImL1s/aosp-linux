@@ -1,18 +1,19 @@
-## 2026-08-08T15:45:21Z
+## 2026-08-08T15:49:49Z
+Task: Perform Independent Architecture & Repo Cleanliness Review for Round 4
 
-<USER_REQUEST>
-You are dispatched as Reviewer 2 (teamwork_preview_reviewer) for the Round 4 Verification Gate of AOSP Dual-OS Remediation Project (aosp-linux).
+Context Files to Review:
+- Original Request: /Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md
+- Master Blueprint: /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
+- Master Worker Handoff: /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_master_r4/handoff.md
 
-Working directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_r4_2
-Original Request File: /Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md
-Worker Handoff Report: /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_master_r4/handoff.md
-Project Blueprint: /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
+Review Requirements:
+1. Framework Class Purge & Patches: Confirm duplicate/stub classes (`LinuxManager.java`, `Rect.java`, `Slog.java`) under `frameworks/base/` are purged (`find frameworks/base -type f | wc -l` == 20). Confirm `patches/aosp_frameworks_base.patch` documents canonical AOSP modifications.
+2. Repo Cleanliness & Prebuilt Purge: Confirm prebuilt archives (`release_dist/aosp-linux-deployment-v1.0.0.tar.gz`), untracked binary executables in `tests/unit/`, and committed static `tests/e2e_report.json` are purged. Confirm `.gitignore` ignores all generated test binaries and report artifacts.
+3. Socket Harness: Confirm `tests/e2e/framework/socket_harness.py` contains 0 TCP 127.0.0.1 loopback fallbacks and uses `SO_REUSEADDR` / `SO_REUSEPORT` with proper socket teardown.
 
-Your task is to independently review security, protocol framing, and socket lifecycle for Round 4:
-1. Verify 64-byte AuthHandshakePayload constant-time HMAC verification in guest/bridge-agent/src/auth.rs and removal of raw secret byte equality.
-2. Verify complete purging of IPv4 TCP 127.0.0.1 loopbacks in socket_harness.py and LinuxPortalService.java.
-3. Verify VsockFrameHeader binary header framing (magic 0x56534F4B) and structured dma-buf/PCM/location payload streaming in LinuxPortalService.java and portal.rs.
-4. Run build and test commands (python3 tests/e2e/runner.py and cargo test in guest/bridge-agent).
-
-Write your review findings and explicit verdict (APPROVE or REQUEST_CHANGES) into /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_r4_2/handoff.md and send a completion message back.
-</USER_REQUEST>
+Deliverable:
+Write a comprehensive Code Review Report to `/Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_r4_2/handoff.md` with:
+- Observation
+- Conformance & Cleanliness Checklist
+- Caveats
+- Verdict: `APPROVE` or `REQUEST_CHANGES`

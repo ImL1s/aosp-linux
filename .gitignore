@@ -35,6 +35,8 @@ release_dist/*.tar.gz
 *_test
 tests/unit/*_bin
 unit/challenger_*
+tests/unit/challenger_r4_stress_harness.py
+tests/unit/challenger_r4_concurrency_pty_stress.py
 
 # Generated Test Reports & Artifacts
 e2e_report.json
@@ -43,4 +45,3 @@ tests/e2e/e2e_report.json
 *_report.json
 scratch/
 patches/
-

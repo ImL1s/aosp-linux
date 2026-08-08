@@ -83,6 +83,14 @@ pub fn get_portal_state() -> &'static Arc<RwLock<PortalState>> {
     GLOBAL_PORTAL_STATE.get_or_init(|| Arc::new(RwLock::new(PortalState::default())))
 }
 
+pub fn reset_portal_state() {
+    let mut state = match get_portal_state().write() {
+        Ok(guard) => guard,
+        Err(e) => e.into_inner(),
+    };
+    *state = PortalState::default();
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PortalRequest {
     pub id: u64,
@@ -121,7 +129,7 @@ impl PortalResponse {
 pub fn dispatch_portal_request(req: PortalRequest) -> PortalResponse {
     let state = match get_portal_state().read() {
         Ok(guard) => guard,
-        Err(e) => return PortalResponse::err(req.id, format!("PortalState lock error: {}", e)),
+        Err(e) => e.into_inner(),
     };
 
     match req.method.as_str() {
@@ -238,22 +246,26 @@ where
 
         // 1. Demux Serde-tagged HostPortalEvent
         if let Ok(event) = serde_json::from_str::<HostPortalEvent>(trimmed) {
-            if let Ok(mut state) = get_portal_state().write() {
-                match event {
-                    HostPortalEvent::Location(loc) => state.last_location = Some(loc),
-                    HostPortalEvent::Camera(cam) => state.last_camera = Some(cam),
-                    HostPortalEvent::Audio(aud) => state.last_audio = Some(aud),
-                }
+            let mut state = match get_portal_state().write() {
+                Ok(guard) => guard,
+                Err(e) => e.into_inner(),
+            };
+            match event {
+                HostPortalEvent::Location(loc) => state.last_location = Some(loc),
+                HostPortalEvent::Camera(cam) => state.last_camera = Some(cam),
+                HostPortalEvent::Audio(aud) => state.last_audio = Some(aud),
             }
             continue;
         }
 
         // 2. Demux untagged Host location event format: {"Latitude": 25.033, "Longitude": 121.565, "Accuracy": 5.0}
         if let Ok(loc) = serde_json::from_str::<LocationEvent>(trimmed) {
-            if loc.latitude != 0.0 || loc.longitude != 0.0 {
-                if let Ok(mut state) = get_portal_state().write() {
-                    state.last_location = Some(loc);
-                }
+            if loc.latitude.abs() > f64::EPSILON || loc.longitude.abs() > f64::EPSILON {
+                let mut state = match get_portal_state().write() {
+                    Ok(guard) => guard,
+                    Err(e) => e.into_inner(),
+                };
+                state.last_location = Some(loc);
                 continue;
             }
         }
@@ -278,12 +290,17 @@ where
 mod tests {
     use super::*;
     use std::io::Cursor;
+    use std::sync::Mutex;
     use tempfile::NamedTempFile;
+
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_dispatch_camera_status() {
+        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_portal_state();
         {
-            let mut state = get_portal_state().write().unwrap();
+            let mut state = get_portal_state().write().unwrap_or_else(|e| e.into_inner());
             state.last_camera = Some(CameraFrameEvent {
                 device: "/dev/video0".to_string(),
                 width: 1920,
@@ -305,8 +322,10 @@ mod tests {
 
     #[test]
     fn test_dispatch_audio_status() {
+        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_portal_state();
         {
-            let mut state = get_portal_state().write().unwrap();
+            let mut state = get_portal_state().write().unwrap_or_else(|e| e.into_inner());
             state.last_audio = Some(AudioPcmEvent {
                 backend: "pipewire".to_string(),
                 sample_rate: 44100,
@@ -327,8 +346,10 @@ mod tests {
 
     #[test]
     fn test_dispatch_location_get() {
+        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_portal_state();
         {
-            let mut state = get_portal_state().write().unwrap();
+            let mut state = get_portal_state().write().unwrap_or_else(|e| e.into_inner());
             state.last_location = Some(LocationEvent {
                 latitude: 25.033,
                 longitude: 121.565,
@@ -349,10 +370,8 @@ mod tests {
 
     #[test]
     fn test_dispatch_location_uninitialized_returns_error() {
-        {
-            let mut state = get_portal_state().write().unwrap();
-            state.last_location = None;
-        }
+        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_portal_state();
         let req = PortalRequest {
             id: 30,
             method: "location.get".to_string(),
@@ -365,6 +384,8 @@ mod tests {
 
     #[test]
     fn test_dispatch_location_with_host_event() {
+        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_portal_state();
         let stream_bytes = b"{\"type\":\"location\",\"latitude\":25.033,\"longitude\":121.565,\"accuracy\":5.0}\n{\"id\":99,\"method\":\"location.get\",\"params\":{}}\n";
         let mut cursor = Cursor::new(stream_bytes.to_vec());
         let res = handle_portal_session(&mut cursor);
@@ -383,6 +404,8 @@ mod tests {
 
     #[test]
     fn test_dispatch_file_write_and_read() {
+        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_portal_state();
         let tmp = NamedTempFile::new().unwrap();
         let tmp_path = tmp.path().to_str().unwrap().to_string();
 
@@ -411,8 +434,10 @@ mod tests {
 
     #[test]
     fn test_handle_portal_session_stream() {
+        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_portal_state();
         {
-            let mut state = get_portal_state().write().unwrap();
+            let mut state = get_portal_state().write().unwrap_or_else(|e| e.into_inner());
             state.last_camera = Some(CameraFrameEvent {
                 device: "/dev/video0".to_string(),
                 width: 1920,
@@ -437,6 +462,8 @@ mod tests {
 
     #[test]
     fn test_handle_portal_session_payload_size_limit() {
+        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_portal_state();
         let large_req = vec![b'a'; MAX_PAYLOAD_SIZE + 100];
         let mut cursor = Cursor::new(large_req);
         let res = handle_portal_session(&mut cursor);
