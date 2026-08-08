@@ -1,8 +1,87 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{self, BufRead, BufReader, Read, Write};
+use std::sync::{Arc, OnceLock, RwLock};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const MAX_PAYLOAD_SIZE: usize = 65536; // 64 KB limit
+
+fn current_timestamp() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+fn default_available() -> String {
+    "available".to_string()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct LocationEvent {
+    #[serde(alias = "Latitude")]
+    pub latitude: f64,
+    #[serde(alias = "Longitude")]
+    pub longitude: f64,
+    #[serde(alias = "Accuracy")]
+    pub accuracy: f32,
+    #[serde(default = "current_timestamp")]
+    pub timestamp: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CameraFrameEvent {
+    #[serde(default, alias = "device")]
+    pub device: String,
+    #[serde(default)]
+    pub width: u32,
+    #[serde(default)]
+    pub height: u32,
+    #[serde(default)]
+    pub fps: u32,
+    #[serde(default = "default_available", alias = "status")]
+    pub status: String,
+    #[serde(default = "current_timestamp")]
+    pub timestamp: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AudioPcmEvent {
+    #[serde(default, alias = "backend")]
+    pub backend: String,
+    #[serde(default)]
+    pub sample_rate: u32,
+    #[serde(default)]
+    pub channels: u16,
+    #[serde(default = "default_available", alias = "status")]
+    pub status: String,
+    #[serde(default = "current_timestamp")]
+    pub timestamp: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum HostPortalEvent {
+    #[serde(rename = "location", alias = "location_update")]
+    Location(LocationEvent),
+    #[serde(rename = "camera", alias = "camera_update")]
+    Camera(CameraFrameEvent),
+    #[serde(rename = "audio", alias = "audio_update")]
+    Audio(AudioPcmEvent),
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct PortalState {
+    pub last_location: Option<LocationEvent>,
+    pub last_camera: Option<CameraFrameEvent>,
+    pub last_audio: Option<AudioPcmEvent>,
+}
+
+pub static GLOBAL_PORTAL_STATE: OnceLock<Arc<RwLock<PortalState>>> = OnceLock::new();
+
+pub fn get_portal_state() -> &'static Arc<RwLock<PortalState>> {
+    GLOBAL_PORTAL_STATE.get_or_init(|| Arc::new(RwLock::new(PortalState::default())))
+}
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PortalRequest {
@@ -40,25 +119,50 @@ impl PortalResponse {
 }
 
 pub fn dispatch_portal_request(req: PortalRequest) -> PortalResponse {
+    let state = match get_portal_state().read() {
+        Ok(guard) => guard,
+        Err(e) => return PortalResponse::err(req.id, format!("PortalState lock error: {}", e)),
+    };
+
     match req.method.as_str() {
         "camera.request" | "camera.status" => {
-            PortalResponse::ok(req.id, serde_json::json!({
-                "status": "available",
-                "device": "/dev/video0"
-            }))
+            if let Some(cam) = &state.last_camera {
+                PortalResponse::ok(req.id, serde_json::json!({
+                    "status": cam.status,
+                    "device": if cam.device.is_empty() { "/dev/video0" } else { &cam.device },
+                    "width": cam.width,
+                    "height": cam.height,
+                    "fps": cam.fps,
+                    "timestamp": cam.timestamp
+                }))
+            } else {
+                PortalResponse::err(req.id, "Camera unavailable: No active Host camera stream".to_string())
+            }
         }
         "audio.request" | "audio.status" => {
-            PortalResponse::ok(req.id, serde_json::json!({
-                "status": "available",
-                "backend": "pipewire"
-            }))
+            if let Some(aud) = &state.last_audio {
+                PortalResponse::ok(req.id, serde_json::json!({
+                    "status": aud.status,
+                    "backend": if aud.backend.is_empty() { "pipewire" } else { &aud.backend },
+                    "sample_rate": aud.sample_rate,
+                    "channels": aud.channels,
+                    "timestamp": aud.timestamp
+                }))
+            } else {
+                PortalResponse::err(req.id, "Audio unavailable: No active Host audio stream".to_string())
+            }
         }
         "location.get" | "location.request" => {
-            PortalResponse::ok(req.id, serde_json::json!({
-                "latitude": 0.0,
-                "longitude": 0.0,
-                "accuracy": "mock"
-            }))
+            if let Some(loc) = &state.last_location {
+                PortalResponse::ok(req.id, serde_json::json!({
+                    "latitude": loc.latitude,
+                    "longitude": loc.longitude,
+                    "accuracy": loc.accuracy,
+                    "timestamp": loc.timestamp
+                }))
+            } else {
+                PortalResponse::err(req.id, "Location unavailable: No Host location update received".to_string())
+            }
         }
         "file.read" => {
             if let Some(path_str) = req.params.get("path").and_then(|v| v.as_str()) {
@@ -132,6 +236,29 @@ where
             continue;
         }
 
+        // 1. Demux Serde-tagged HostPortalEvent
+        if let Ok(event) = serde_json::from_str::<HostPortalEvent>(trimmed) {
+            if let Ok(mut state) = get_portal_state().write() {
+                match event {
+                    HostPortalEvent::Location(loc) => state.last_location = Some(loc),
+                    HostPortalEvent::Camera(cam) => state.last_camera = Some(cam),
+                    HostPortalEvent::Audio(aud) => state.last_audio = Some(aud),
+                }
+            }
+            continue;
+        }
+
+        // 2. Demux untagged Host location event format: {"Latitude": 25.033, "Longitude": 121.565, "Accuracy": 5.0}
+        if let Ok(loc) = serde_json::from_str::<LocationEvent>(trimmed) {
+            if loc.latitude != 0.0 || loc.longitude != 0.0 {
+                if let Ok(mut state) = get_portal_state().write() {
+                    state.last_location = Some(loc);
+                }
+                continue;
+            }
+        }
+
+        // 3. Dispatch Guest RPC PortalRequest
         let response = match serde_json::from_str::<PortalRequest>(trimmed) {
             Ok(req) => dispatch_portal_request(req),
             Err(e) => PortalResponse::err(0, format!("Invalid JSON request: {}", e)),
@@ -155,6 +282,17 @@ mod tests {
 
     #[test]
     fn test_dispatch_camera_status() {
+        {
+            let mut state = get_portal_state().write().unwrap();
+            state.last_camera = Some(CameraFrameEvent {
+                device: "/dev/video0".to_string(),
+                width: 1920,
+                height: 1080,
+                fps: 30,
+                status: "available".to_string(),
+                timestamp: current_timestamp(),
+            });
+        }
         let req = PortalRequest {
             id: 1,
             method: "camera.status".to_string(),
@@ -167,6 +305,16 @@ mod tests {
 
     #[test]
     fn test_dispatch_audio_status() {
+        {
+            let mut state = get_portal_state().write().unwrap();
+            state.last_audio = Some(AudioPcmEvent {
+                backend: "pipewire".to_string(),
+                sample_rate: 44100,
+                channels: 2,
+                status: "available".to_string(),
+                timestamp: current_timestamp(),
+            });
+        }
         let req = PortalRequest {
             id: 2,
             method: "audio.status".to_string(),
@@ -179,6 +327,15 @@ mod tests {
 
     #[test]
     fn test_dispatch_location_get() {
+        {
+            let mut state = get_portal_state().write().unwrap();
+            state.last_location = Some(LocationEvent {
+                latitude: 25.033,
+                longitude: 121.565,
+                accuracy: 5.0,
+                timestamp: current_timestamp(),
+            });
+        }
         let req = PortalRequest {
             id: 3,
             method: "location.get".to_string(),
@@ -186,6 +343,42 @@ mod tests {
         };
         let resp = dispatch_portal_request(req);
         assert!(resp.success);
+        assert_eq!(resp.result.get("latitude").unwrap(), 25.033);
+        assert_eq!(resp.result.get("longitude").unwrap(), 121.565);
+    }
+
+    #[test]
+    fn test_dispatch_location_uninitialized_returns_error() {
+        {
+            let mut state = get_portal_state().write().unwrap();
+            state.last_location = None;
+        }
+        let req = PortalRequest {
+            id: 30,
+            method: "location.get".to_string(),
+            params: serde_json::json!({}),
+        };
+        let resp = dispatch_portal_request(req);
+        assert!(!resp.success);
+        assert!(resp.error.is_some());
+    }
+
+    #[test]
+    fn test_dispatch_location_with_host_event() {
+        let stream_bytes = b"{\"type\":\"location\",\"latitude\":25.033,\"longitude\":121.565,\"accuracy\":5.0}\n{\"id\":99,\"method\":\"location.get\",\"params\":{}}\n";
+        let mut cursor = Cursor::new(stream_bytes.to_vec());
+        let res = handle_portal_session(&mut cursor);
+        assert!(res.is_ok());
+
+        let req = PortalRequest {
+            id: 100,
+            method: "location.get".to_string(),
+            params: serde_json::json!({}),
+        };
+        let resp = dispatch_portal_request(req);
+        assert!(resp.success);
+        assert_eq!(resp.result.get("latitude").unwrap(), 25.033);
+        assert_eq!(resp.result.get("longitude").unwrap(), 121.565);
     }
 
     #[test]
@@ -218,6 +411,17 @@ mod tests {
 
     #[test]
     fn test_handle_portal_session_stream() {
+        {
+            let mut state = get_portal_state().write().unwrap();
+            state.last_camera = Some(CameraFrameEvent {
+                device: "/dev/video0".to_string(),
+                width: 1920,
+                height: 1080,
+                fps: 30,
+                status: "available".to_string(),
+                timestamp: current_timestamp(),
+            });
+        }
         let req = PortalRequest {
             id: 10,
             method: "camera.status".to_string(),

@@ -1,1 +1,0 @@
-/Users/iml1s/Documents/mine/aosp-linux/guest/bridge-agent/target/debug/android-bridge-agent: /Users/iml1s/Documents/mine/aosp-linux/guest/bridge-agent/src/auth.rs /Users/iml1s/Documents/mine/aosp-linux/guest/bridge-agent/src/main.rs /Users/iml1s/Documents/mine/aosp-linux/guest/bridge-agent/src/ota_rollback.rs /Users/iml1s/Documents/mine/aosp-linux/guest/bridge-agent/src/vsock.rs

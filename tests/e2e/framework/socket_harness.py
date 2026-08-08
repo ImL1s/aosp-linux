@@ -27,6 +27,21 @@ def resolve_socket_path(raw_path: str) -> str:
     os.makedirs(fallback_dir, exist_ok=True)
     return os.path.join(fallback_dir, os.path.basename(raw_path))
 
+def _apply_socket_options(sock: socket.socket):
+    """
+    Applies SO_REUSEADDR and (where supported by OS) SO_REUSEPORT socket options
+    to prevent EADDRINUSE binding collisions and ECONNRESET during rapid test restarts.
+    """
+    try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    except OSError:
+        pass
+    if hasattr(socket, "SO_REUSEPORT"):
+        try:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        except OSError:
+            pass
+
 def _recv_exact(conn: socket.socket, length: int) -> bytes:
     """
     Helper that loops until exactly length bytes are read from conn or EOF/timeout occurs.
@@ -69,14 +84,15 @@ class RealVsockBridge:
 
     def send(self, port: int, payload: bytes):
         self.sent_packets.setdefault(port, []).append(payload)
-        # Transmit payload over real OS socket stream to 127.0.0.1:port
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.settimeout(2.0)
-                s.connect(("127.0.0.1", port))
-                s.sendall(payload)
-        except Exception:
-            pass
+        if hasattr(socket, "AF_VSOCK"):
+            try:
+                with socket.socket(socket.AF_VSOCK, socket.SOCK_STREAM) as s:
+                    _apply_socket_options(s)
+                    s.settimeout(2.0)
+                    s.connect((socket.VMADDR_CID_HOST, port))
+                    s.sendall(payload)
+            except Exception:
+                pass
 
     def receive_all(self, port: int) -> List[bytes]:
         pkts = list(self.sent_packets.get(port, []))
@@ -86,13 +102,13 @@ class RealVsockBridge:
 
     def bind_unix_socket(self, raw_path: str) -> socket.socket:
         path = resolve_socket_path(raw_path)
-        if os.path.exists(path):
+        if os.path.exists(path) or os.path.lexists(path):
             try:
                 os.unlink(path)
             except OSError:
                 pass
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        _apply_socket_options(sock)
         sock.bind(path)
         sock.listen(512)
         return sock
@@ -100,24 +116,29 @@ class RealVsockBridge:
     def connect_unix_socket(self, raw_path: str, timeout: float = 5.0) -> socket.socket:
         path = resolve_socket_path(raw_path)
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        _apply_socket_options(sock)
         sock.settimeout(timeout)
-        sock.connect(path)
+        last_err = None
+        for attempt in range(5):
+            try:
+                sock.connect(path)
+                return sock
+            except (OSError, ConnectionRefusedError) as e:
+                last_err = e
+                time.sleep(0.02)
+        if last_err:
+            raise last_err
         return sock
 
     def create_port_socket(self, port: int) -> socket.socket:
         """
-        Creates AF_VSOCK socket if available, otherwise falls back to TCP loopback (127.0.0.1).
+        Creates AF_VSOCK socket for VSOCK communication.
         """
         if hasattr(socket, "AF_VSOCK"):
-            try:
-                sock = socket.socket(socket.AF_VSOCK, socket.SOCK_STREAM)
-                return sock
-            except OSError:
-                pass
-        # Fallback to TCP loopback socket
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        return sock
+            sock = socket.socket(socket.AF_VSOCK, socket.SOCK_STREAM)
+            _apply_socket_options(sock)
+            return sock
+        raise OSError("AF_VSOCK socket family is not supported on this platform")
 
     def send_vsock_frame(self, sock: socket.socket, session_id: bytes, packet_type: VsockPacketType, payload: bytes):
         frame = VsockFramingHelper.create_frame(session_id, packet_type, payload)
@@ -178,13 +199,13 @@ class SocketHarnessServer:
 
         # 1. UNIX Domain Socket for /dev/socket/linux_bridge
         bridge_path = resolve_socket_path("/dev/socket/linux_bridge")
-        if os.path.exists(bridge_path):
+        if os.path.exists(bridge_path) or os.path.lexists(bridge_path):
             try:
                 os.unlink(bridge_path)
             except OSError:
                 pass
         self.unix_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.unix_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        _apply_socket_options(self.unix_sock)
         self.unix_sock.bind(bridge_path)
         self.unix_sock.listen(512)
         
@@ -194,29 +215,20 @@ class SocketHarnessServer:
             self.threads.append(t_unix)
 
         # 2. Port listeners for 15000 (Control), 15001 (PTY), 15002 (Wayland), 5000, 5001, 5002
-        for port in (15000, 15001, 15002, 5000, 5001, 5002):
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            bound = False
-            for attempt in range(5):
+        if hasattr(socket, "AF_VSOCK"):
+            for port in (15000, 15001, 15002, 5000, 5001, 5002):
                 try:
-                    s.bind(("127.0.0.1", port))
-                    bound = True
-                    break
+                    s = socket.socket(socket.AF_VSOCK, socket.SOCK_STREAM)
+                    _apply_socket_options(s)
+                    s.bind((socket.VMADDR_CID_ANY, port))
+                    s.listen(512)
+                    self.port_listeners[port] = s
+                    t_port = threading.Thread(target=self._run_port_listener, args=(port, s), daemon=True)
+                    t_port.start()
+                    with self.threads_lock:
+                        self.threads.append(t_port)
                 except OSError:
-                    time.sleep(0.01)
-            if not bound:
-                s.close()
-                continue
-            try:
-                s.listen(512)
-                self.port_listeners[port] = s
-                t_port = threading.Thread(target=self._run_port_listener, args=(port, s), daemon=True)
-                t_port.start()
-                with self.threads_lock:
-                    self.threads.append(t_port)
-            except OSError:
-                s.close()
+                    s.close()
 
         time.sleep(0.1)  # allow sockets to bind and listen
 
@@ -226,31 +238,7 @@ class SocketHarnessServer:
         self.running = False
         self.stop_event.set()
 
-        # 1. Close UNIX domain listener socket
-        if self.unix_sock:
-            try:
-                self.unix_sock.shutdown(socket.SHUT_RDWR)
-            except Exception:
-                pass
-            try:
-                self.unix_sock.close()
-            except Exception:
-                pass
-            self.unix_sock = None
-
-        # 2. Close Port listener sockets
-        for s in list(self.port_listeners.values()):
-            try:
-                s.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
-            except Exception:
-                pass
-            try:
-                s.close()
-            except Exception:
-                pass
-        self.port_listeners.clear()
-
-        # 3. Close all active client connections
+        # 1. Shutdown active client connections FIRST before closing FDs and unlinking socket paths
         with self.clients_lock:
             clients = list(self.active_clients)
             self.active_clients.clear()
@@ -268,6 +256,34 @@ class SocketHarnessServer:
             except Exception:
                 pass
 
+        # 2. Close UNIX domain listener socket
+        if self.unix_sock:
+            try:
+                self.unix_sock.shutdown(socket.SHUT_RDWR)
+            except Exception:
+                pass
+            try:
+                self.unix_sock.close()
+            except Exception:
+                pass
+            self.unix_sock = None
+
+        # 3. Close Port listener sockets
+        for s in list(self.port_listeners.values()):
+            try:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
+            except Exception:
+                pass
+            try:
+                s.shutdown(socket.SHUT_RDWR)
+            except Exception:
+                pass
+            try:
+                s.close()
+            except Exception:
+                pass
+        self.port_listeners.clear()
+
         # 4. Join listener threads
         with self.threads_lock:
             listener_threads = list(self.threads)
@@ -279,7 +295,7 @@ class SocketHarnessServer:
 
         # 5. Unlink UNIX socket file
         bridge_path = resolve_socket_path("/dev/socket/linux_bridge")
-        if os.path.exists(bridge_path):
+        if os.path.exists(bridge_path) or os.path.lexists(bridge_path):
             try:
                 os.unlink(bridge_path)
             except OSError:
@@ -396,9 +412,9 @@ class SocketHarnessServer:
                         data = conn.recv(1024)
                         if not data:
                             break
-                        if len(data) == 48: # 16 byte nonce + 32 byte hmac
-                            nonce = data[:16]
-                            sig = data[16:]
+                        if len(data) == 64: # 32 byte token nonce + 32 byte hmac signature
+                            nonce = data[:32]
+                            sig = data[32:64]
                             secret = b"aosp_linux_hmac_secret_key_32b!"
                             expected = hmac.new(secret, nonce, hashlib.sha256).digest()
                             if hmac.compare_digest(sig, expected):

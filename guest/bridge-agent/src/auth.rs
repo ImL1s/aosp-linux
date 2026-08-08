@@ -52,10 +52,14 @@ pub fn parse_secret_from_cmdline(cmdline: &str) -> Option<Vec<u8>> {
     None
 }
 
-/// Verifies client token against the expected secret key.
-/// Rejects all-zero tokens, empty tokens, empty secrets, or mismatched tokens.
-pub fn verify_token(token: &[u8], secret: &[u8]) -> bool {
-    if token.is_empty() || secret.is_empty() {
+/// Verifies client token and HMAC signature against the expected secret key.
+/// Rejects all-zero tokens, empty tokens, empty secrets, or mismatched signatures.
+pub fn verify_token(token: &[u8], signature: &[u8], secret: &[u8]) -> bool {
+    if token.is_empty() || signature.is_empty() || secret.is_empty() {
+        return false;
+    }
+
+    if token.len() != 32 || signature.len() != 32 {
         return false;
     }
 
@@ -64,20 +68,17 @@ pub fn verify_token(token: &[u8], secret: &[u8]) -> bool {
         return false;
     }
 
-    if token.len() != secret.len() {
-        return false;
-    }
+    let expected_sig = HmacSha256::compute_hmac_response(secret, token);
 
     // Constant-time byte comparison
     let mut diff = 0u8;
-    for (a, b) in token.iter().zip(secret.iter()) {
+    for (a, b) in signature.iter().zip(expected_sig.iter()) {
         diff |= a ^ b;
     }
     diff == 0
 }
 
 /// Pure Rust SHA-256 implementation without external dependencies.
-#[allow(dead_code)]
 pub fn sha256(data: &[u8]) -> [u8; 32] {
     let mut h: [u32; 8] = [
         0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
@@ -158,11 +159,9 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
 }
 
 /// HMAC-SHA256 signature calculator for authentication challenge responses.
-#[allow(dead_code)]
 pub struct HmacSha256;
 
 impl HmacSha256 {
-    #[allow(dead_code)]
     pub fn compute_hmac_response(secret: &[u8], challenge: &[u8]) -> Vec<u8> {
         let mut key = [0u8; 64];
         if secret.len() > 64 {
@@ -219,8 +218,12 @@ impl<T> SetReadTimeout for std::io::Cursor<T> {
     }
 }
 
+pub const STATUS_SUCCESS: u32 = 0x00000200;
+pub const STATUS_UNAUTHORIZED: u32 = 0x00000401;
+
 /// Performs authentication handshake over a stream with a 5-second socket read timeout.
-/// Returns true if authentication succeeds, false otherwise.
+/// Reads 64-byte AuthHandshakePayload (32-byte token + 32-byte HMAC-SHA256 signature).
+/// Writes big-endian 0x00000200 (SUCCESS) or 0x00000401 (UNAUTHORIZED).
 pub fn perform_handshake<S: Read + Write + SetReadTimeout>(stream: &mut S, secret: &[u8]) -> bool {
     if secret.is_empty() {
         return false;
@@ -229,25 +232,28 @@ pub fn perform_handshake<S: Read + Write + SetReadTimeout>(stream: &mut S, secre
     // Set 5-second socket read timeout
     let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(5)));
 
-    let mut token_buf = vec![0u8; secret.len()];
-    if stream.read_exact(&mut token_buf).is_err() {
+    let mut payload_buf = [0u8; 64];
+    if stream.read_exact(&mut payload_buf).is_err() {
         let _ = stream.set_read_timeout(None);
         return false;
     }
 
-    if !verify_token(&token_buf, secret) {
-        let _ = stream.write_all(b"AUTH_FAILED\n");
+    let token = &payload_buf[0..32];
+    let signature = &payload_buf[32..64];
+
+    if !verify_token(token, signature, secret) {
+        let _ = stream.write_all(&STATUS_UNAUTHORIZED.to_be_bytes());
         let _ = stream.flush();
         let _ = stream.set_read_timeout(None);
         return false;
     }
 
-    if stream.write_all(b"AUTH_OK\n").is_err() || stream.flush().is_err() {
+    if stream.write_all(&STATUS_SUCCESS.to_be_bytes()).is_err() || stream.flush().is_err() {
         let _ = stream.set_read_timeout(None);
         return false;
     }
 
-    // Reset read timeout to None (or zero) after successful authentication
+    // Reset read timeout to None after successful authentication
     let _ = stream.set_read_timeout(None);
     true
 }
@@ -258,32 +264,51 @@ mod tests {
     use std::io::Cursor;
 
     #[test]
+    fn test_rfc2104_golden_vector() {
+        // RFC 4231 Test Case 2 / RFC 2104 HMAC specification golden vector
+        // Key = "Jefe" (4 bytes)
+        // Data = "what do ya want for nothing?" (28 bytes)
+        // HMAC-SHA256 = 5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843
+        let key = b"Jefe";
+        let data = b"what do ya want for nothing?";
+        let expected_hex = "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843";
+        let computed = HmacSha256::compute_hmac_response(key, data);
+        let computed_hex: String = computed.iter().map(|b| format!("{:02x}", b)).collect();
+        assert_eq!(computed_hex, expected_hex);
+    }
+
+    #[test]
     fn test_verify_token_valid() {
         let secret = b"my_super_secret_key_123456789012";
-        let token = b"my_super_secret_key_123456789012";
-        assert!(verify_token(token, secret));
+        let token = [1u8; 32];
+        let signature = HmacSha256::compute_hmac_response(secret, &token);
+        assert!(verify_token(&token, &signature, secret));
     }
 
     #[test]
     fn test_verify_token_all_zero_rejected() {
-        let secret = vec![0u8; 32];
-        let token = vec![0u8; 32];
-        assert!(!verify_token(&token, &secret));
+        let secret = b"my_super_secret_key_123456789012";
+        let token = [0u8; 32];
+        let signature = HmacSha256::compute_hmac_response(secret, &token);
+        assert!(!verify_token(&token, &signature, secret));
     }
 
     #[test]
     fn test_verify_token_empty_rejected() {
         let secret = b"secret";
-        let token = b"";
-        assert!(!verify_token(token, secret));
-        assert!(!verify_token(secret, b""));
+        let token = [1u8; 32];
+        let signature = HmacSha256::compute_hmac_response(secret, &token);
+        assert!(!verify_token(&[], &signature, secret));
+        assert!(!verify_token(&token, &[], secret));
+        assert!(!verify_token(&token, &signature, &[]));
     }
 
     #[test]
     fn test_verify_token_mismatch_rejected() {
         let secret = b"secret_key_12345678";
-        let token = b"wrong_token_12345678";
-        assert!(!verify_token(token, secret));
+        let token = [1u8; 32];
+        let wrong_signature = [2u8; 32];
+        assert!(!verify_token(&token, &wrong_signature, secret));
     }
 
     #[test]
@@ -304,27 +329,37 @@ mod tests {
     #[test]
     fn test_perform_handshake_success() {
         let secret = b"valid_secret_key_32bytes_long!!";
+        let token = [7u8; 32];
+        let signature = HmacSha256::compute_hmac_response(secret, &token);
+
         let mut buffer = Vec::new();
-        buffer.extend_from_slice(secret);
+        buffer.extend_from_slice(&token);
+        buffer.extend_from_slice(&signature);
         let mut cursor = Cursor::new(buffer);
 
         let success = perform_handshake(&mut cursor, secret);
         assert!(success);
 
         let output = cursor.into_inner();
-        assert_eq!(&output[secret.len()..], b"AUTH_OK\n");
+        assert_eq!(&output[64..], &STATUS_SUCCESS.to_be_bytes());
     }
 
     #[test]
     fn test_perform_handshake_failure() {
         let secret = b"valid_secret_key_32bytes_long!!";
-        let wrong_token = b"wrong_secret_key_32bytes_long!!";
+        let token = [7u8; 32];
+        let wrong_signature = [9u8; 32];
+
         let mut buffer = Vec::new();
-        buffer.extend_from_slice(wrong_token);
+        buffer.extend_from_slice(&token);
+        buffer.extend_from_slice(&wrong_signature);
         let mut cursor = Cursor::new(buffer);
 
         let success = perform_handshake(&mut cursor, secret);
         assert!(!success);
+
+        let output = cursor.into_inner();
+        assert_eq!(&output[64..], &STATUS_UNAUTHORIZED.to_be_bytes());
     }
 
     #[test]
@@ -344,3 +379,4 @@ mod tests {
         drop(_client);
     }
 }
+

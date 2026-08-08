@@ -195,21 +195,25 @@ mod empirical_tests {
     #[test]
     fn test_auth_comprehensive_empirical() {
         let secret = b"production_auth_secret_key_12345678";
+        let token = [1u8; 32];
+        let signature = crate::auth::HmacSha256::compute_hmac_response(secret, &token);
 
         // All zero token must be rejected
         let zero_token = vec![0u8; 32];
-        assert!(!verify_token(&zero_token, secret));
+        let zero_sig = crate::auth::HmacSha256::compute_hmac_response(secret, &zero_token);
+        assert!(!verify_token(&zero_token, &zero_sig, secret));
 
         // Empty token / secret must be rejected
-        assert!(!verify_token(b"", secret));
-        assert!(!verify_token(secret, b""));
+        assert!(!verify_token(&[], &signature, secret));
+        assert!(!verify_token(&token, &[], secret));
+        assert!(!verify_token(&token, &signature, &[]));
 
         // Mismatched token rejected
-        let bad_token = b"bad_auth_secret_key_1234567899999";
-        assert!(!verify_token(bad_token, secret));
+        let bad_sig = [9u8; 32];
+        assert!(!verify_token(&token, &bad_sig, secret));
 
         // Valid token accepted
-        assert!(verify_token(secret, secret));
+        assert!(verify_token(&token, &signature, secret));
 
         // Handshake test over socket stream
         let (mut client, mut server) = UnixStream::pair().unwrap();
@@ -219,13 +223,14 @@ mod empirical_tests {
             perform_handshake(&mut server, &secret_arc)
         });
 
-        // Client sends bad token (matching secret length of 35 bytes)
-        client.write_all(b"wrong_secret_key_1234567890123456789").unwrap();
+        // Client sends 64-byte bad payload
+        let bad_payload = [9u8; 64];
+        client.write_all(&bad_payload).unwrap();
         client.flush().unwrap();
 
-        let mut response = [0u8; 12];
-        let _ = client.read(&mut response);
-        assert_eq!(&response[..12], b"AUTH_FAILED\n");
+        let mut response = [0u8; 4];
+        let _ = client.read_exact(&mut response);
+        assert_eq!(u32::from_be_bytes(response), crate::auth::STATUS_UNAUTHORIZED);
 
         let handshake_ok = server_handle.join().unwrap();
         assert!(!handshake_ok, "Handshake should fail on wrong token");

@@ -37,7 +37,8 @@ import android.os.Process;
 import android.util.Slog;
 
 import java.io.OutputStream;
-import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Map;
@@ -91,9 +92,7 @@ public class LinuxPortalService {
 
     private LocationListener mSystemLocationListener;
 
-    private Socket mAudioSocket;
-    private OutputStream mAudioOutputStream;
-    private final Object mAudioSocketLock = new Object();
+    private VsockPortalClient mVsockPortalClient = new VsockPortalClient();
 
     public static class CameraSession {
         public final String appId;
@@ -335,7 +334,8 @@ public class LinuxPortalService {
                 mActiveImageReader.setOnImageAvailableListener(reader -> {
                     try (android.media.Image img = reader.acquireNextImage()) {
                         if (img != null) {
-                            sendVsockFrame("/dev/video0", width, height);
+                            byte[] nv21 = convertYuv420ToNv21(img);
+                            sendVsockCameraFramePayload(width, height, img.getTimestamp(), nv21);
                         }
                     } catch (Exception ignored) {}
                 }, mCameraHandler);
@@ -596,9 +596,7 @@ public class LinuxPortalService {
             } catch (InterruptedException ignored) {}
             mAudioRecordThread = null;
         }
-        synchronized (mAudioSocketLock) {
-            closeAudioSocketLocked();
-        }
+        // Hardware audio stopped
     }
 
     // F-R5-003: XDG Portal Location Bridge
@@ -702,54 +700,103 @@ public class LinuxPortalService {
                 mSystemLocationListener = null;
             } catch (Exception ignored) {}
         }
-        synchronized (mAudioSocketLock) {
-            closeAudioSocketLocked();
-        }
+        // VM stopped or suspended cleanup complete
     }
 
-    // Vsock streaming helper routines (Port 5000)
-    private void sendVsockFrame(String devNode, int width, int height) {
-        try (Socket s = new Socket("localhost", VSOCK_PORTAL_PORT)) {
-            OutputStream out = s.getOutputStream();
-            String msg = "CAM_FRAME:" + devNode + ":" + width + "x" + height + "\n";
-            out.write(msg.getBytes(StandardCharsets.UTF_8));
-            out.flush();
-        } catch (Exception ignored) {}
-    }
+    // YUV_420_888 to NV21 converter
+    public byte[] convertYuv420ToNv21(android.media.Image image) {
+        int width = image.getWidth();
+        int height = image.getHeight();
+        byte[] nv21 = new byte[width * height * 3 / 2];
+        android.media.Image.Plane[] planes = image.getPlanes();
+        ByteBuffer yBuffer = planes[0].getBuffer();
+        ByteBuffer uBuffer = planes[1].getBuffer();
+        ByteBuffer vBuffer = planes[2].getBuffer();
 
-    private void sendVsockAudioPayload(byte[] pcmData) {
-        synchronized (mAudioSocketLock) {
-            try {
-                if (mAudioSocket == null || mAudioSocket.isClosed() || !mAudioSocket.isConnected()) {
-                    mAudioSocket = new Socket("localhost", VSOCK_PORTAL_PORT);
-                    mAudioOutputStream = mAudioSocket.getOutputStream();
+        int ySize = yBuffer.remaining();
+        int uSize = uBuffer.remaining();
+        int vSize = vBuffer.remaining();
+
+        yBuffer.get(nv21, 0, Math.min(ySize, width * height));
+
+        int rowStride = planes[2].getRowStride();
+        int pixelStride = planes[2].getPixelStride();
+        int nv21Pos = width * height;
+
+        byte[] vBytes = new byte[vSize];
+        byte[] uBytes = new byte[uSize];
+        vBuffer.get(vBytes);
+        uBuffer.get(uBytes);
+
+        for (int row = 0; row < height / 2; row++) {
+            for (int col = 0; col < width / 2; col++) {
+                int vIndex = row * rowStride + col * pixelStride;
+                int uIndex = planes[1].getRowStride() * row + col * planes[1].getPixelStride();
+                if (vIndex < vSize) {
+                    nv21[nv21Pos++] = vBytes[vIndex];
+                } else {
+                    nv21[nv21Pos++] = 0;
                 }
-                mAudioOutputStream.write(pcmData);
-                mAudioOutputStream.flush();
-            } catch (Exception e) {
-                closeAudioSocketLocked();
+                if (uIndex < uSize) {
+                    nv21[nv21Pos++] = uBytes[uIndex];
+                } else {
+                    nv21[nv21Pos++] = 0;
+                }
             }
         }
+        return nv21;
     }
 
-    private void closeAudioSocketLocked() {
-        if (mAudioOutputStream != null) {
-            try { mAudioOutputStream.close(); } catch (Exception ignored) {}
-            mAudioOutputStream = null;
-        }
-        if (mAudioSocket != null) {
-            try { mAudioSocket.close(); } catch (Exception ignored) {}
-            mAudioSocket = null;
+    // Vsock streaming helper routines (Port 5000 over VsockPortalClient)
+    private synchronized void sendVsockCameraFramePayload(int width, int height, long timestampNs, byte[] nv21Bytes) {
+        try {
+            int payloadLen = nv21Bytes != null ? nv21Bytes.length : 0;
+            ByteBuffer buf = ByteBuffer.allocate(28 + payloadLen);
+            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.putInt(0x43414D46); // "CAMF" SubType
+            buf.putInt(width);
+            buf.putInt(height);
+            buf.putInt(ImageFormat.NV21); // 0x11
+            buf.putLong(timestampNs);
+            buf.putInt(payloadLen);
+            if (payloadLen > 0) {
+                buf.put(nv21Bytes);
+            }
+            mVsockPortalClient.sendPortalFrame((byte) 0x01, buf.array());
+        } catch (Exception e) {
+            Slog.w(TAG, "Failed to send VSOCK camera frame payload: " + e.getMessage());
         }
     }
 
-    private void sendGeoClueLocationUpdate(double lat, double lon, float accuracy) {
-        try (Socket s = new Socket("localhost", VSOCK_PORTAL_PORT)) {
-            OutputStream out = s.getOutputStream();
+    private synchronized void sendVsockAudioPayload(byte[] pcmData) {
+        try {
+            int payloadLen = pcmData != null ? pcmData.length : 0;
+            ByteBuffer buf = ByteBuffer.allocate(8 + payloadLen);
+            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.putInt(0x4155444F); // "AUDO" SubType
+            buf.putInt(payloadLen);
+            if (payloadLen > 0) {
+                buf.put(pcmData);
+            }
+            mVsockPortalClient.sendPortalFrame((byte) 0x01, buf.array());
+        } catch (Exception e) {
+            Slog.w(TAG, "Failed to send VSOCK audio payload: " + e.getMessage());
+        }
+    }
+
+    private synchronized void sendGeoClueLocationUpdate(double lat, double lon, float accuracy) {
+        try {
             String json = "{\"Latitude\":" + lat + ",\"Longitude\":" + lon + ",\"Accuracy\":" + accuracy + "}\n";
-            out.write(json.getBytes(StandardCharsets.UTF_8));
-            out.flush();
-        } catch (Exception ignored) {}
+            byte[] jsonBytes = json.getBytes(StandardCharsets.UTF_8);
+            ByteBuffer buf = ByteBuffer.allocate(8 + jsonBytes.length);
+            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.putInt(0x47454F43); // "GEOC" SubType
+            buf.putInt(jsonBytes.length);
+            buf.put(jsonBytes);
+            mVsockPortalClient.sendPortalFrame((byte) 0x01, buf.array());
+        } catch (Exception e) {
+            Slog.w(TAG, "Failed to send VSOCK location update: " + e.getMessage());
+        }
     }
 
     // Custom Runtime Exception classes matching tests

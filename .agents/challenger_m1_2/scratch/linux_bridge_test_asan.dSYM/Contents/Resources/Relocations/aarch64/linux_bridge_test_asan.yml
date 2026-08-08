@@ -1,5 +1,0 @@
----
-triple:          'arm64-apple-darwin'
-binary-path:     '/Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m1_2/scratch/linux_bridge_test_asan'
-relocations:     []
-...

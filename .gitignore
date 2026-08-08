@@ -16,9 +16,31 @@ build_out/
 *.swp
 *~
 
-# Temporary Logs
+# Temporary Logs & Cache
 *.log
-.agents/scratch/
+.agents/*/scratch/
 target/
 guest/bridge-agent/target/
+guest/portal-agent/target/
+*.tar.gz
+__pycache__/
+.pytest_cache/
+
+# Prebuilt Release Archives & Dist
+release_dist/
+release_dist/*.tar.gz
+
+# C++ & Native Test Binaries
+*_bin
+*_test
+tests/unit/*_bin
+unit/challenger_*
+
+# Generated Test Reports & Artifacts
+e2e_report.json
+tests/e2e_report.json
+tests/e2e/e2e_report.json
+*_report.json
+scratch/
+patches/
 
