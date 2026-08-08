@@ -10,6 +10,10 @@
 > **「一個 AOSP 產品，兩個隔離的執行環境，一個統一的使用者體驗」**  
 > **"One AOSP Product, Two Isolated Execution Environments, One Unified User Experience."**
 
+> [!NOTE]  
+> **Project Status: Advanced Architectural Prototype (進階架構原型)**  
+> 本專案為 AOSP 與 Linux 雙執行環境結合的**次世代作業系統進階架構原型**。相關核心組件（`LinuxManagerService`、`linux_bridge`、`LinuxTerminal`）需搭配特定 AOSP 樹進行 Platform Key 簽章與 System App 權限整合。
+
 AOSP Dual-OS 是一款直接修改 AOSP (Android Open Source Project) 打造的次世代行動與桌面融合作業系統。它同時擁有 **完整的 Android 執行環境**（Android Framework, ART, APK, Telephony, AppOps, SystemUI）與 **正統的 GNU/Linux 發行版**（Debian 12 ARM64, 獨立 Kernel 6.6, glibc, systemd, APT, Wayland, Root）。
 
 ---

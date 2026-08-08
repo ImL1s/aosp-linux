@@ -53,6 +53,9 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    // Connect VsockServer to SocketServer for handshake callbacks
+    server.setVsockServer(&vsockServer);
+
     // Bind initial Control RPC port (5000)
     vsockServer.bindPort(android::system::linux_bridge::VSOCK_PORT_CONTROL);
 

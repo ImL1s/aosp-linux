@@ -89,7 +89,10 @@ public class TerminalView extends View implements PtySender {
     private void initDynamicSessionAndConnect() {
         String sessionIdStr = null;
         try {
-            IBinder binder = ServiceManager.getService("linux_service");
+            IBinder binder = ServiceManager.getService("linux");
+            if (binder == null) {
+                binder = ServiceManager.getService("linux_service");
+            }
             if (binder != null) {
                 ILinuxManager service = ILinuxManager.Stub.asInterface(binder);
                 if (service != null) {

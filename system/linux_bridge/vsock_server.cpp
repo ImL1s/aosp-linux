@@ -140,15 +140,22 @@ void VsockServer::listenLoop(uint32_t port, int serverFd) {
             continue;
         }
 
-        // Mandatory Guest CID == 3 verification
-        if (clientAddr.svm_cid != ALLOWED_GUEST_CID) {
-            std::cerr << "[VsockServer] SecurityException: Rejecting connection from unauthorized CID " 
-                      << clientAddr.svm_cid << " (Expected CID " << ALLOWED_GUEST_CID << ")" << std::endl;
-            ::close(clientFd);
-            continue;
+        // Read AuthHandshakePayload (64 bytes) for Vsock Port 5000 Handshake
+        AuthHandshakePayload payload;
+        ssize_t n = ::read(clientFd, &payload, sizeof(payload));
+        if (n == sizeof(payload)) {
+            if (processHandshake(clientAddr.svm_cid, payload)) {
+                std::cout << "[VsockServer] Handshake process completed successfully for CID " << clientAddr.svm_cid << std::endl;
+            } else {
+                std::cerr << "[VsockServer] Handshake verification failed for CID " << clientAddr.svm_cid << std::endl;
+                ::close(clientFd);
+            }
+        } else {
+            // For data channels (5001/5002), verify authenticated state or allow streaming if session active
+            if (port != VSOCK_PORT_CONTROL && !mAuthenticated) {
+                ::close(clientFd);
+            }
         }
-
-        ::close(clientFd);
     }
 }
 
