@@ -3,34 +3,61 @@ package android.system.linux;
 import android.os.Parcel;
 import android.os.Parcelable;
 
-public class LinuxAppInfo implements Parcelable {
-    public String appId;
-    public String name;
-    public String iconPath;
-    public String execCmd;
+public final class LinuxAppInfo implements Parcelable {
+    private final String appId;
+    private final String name;
+    private final String execCommand;
+    private final String iconPath;
+    private final String mimeTypes;
 
-    public LinuxAppInfo() {}
-
-    public LinuxAppInfo(String appId, String name, String iconPath, String execCmd) {
+    public LinuxAppInfo(
+            String appId,
+            String name,
+            String execCommand,
+            String iconPath,
+            String mimeTypes) {
         this.appId = appId;
         this.name = name;
+        this.execCommand = execCommand;
         this.iconPath = iconPath;
-        this.execCmd = execCmd;
+        this.mimeTypes = mimeTypes;
     }
 
     protected LinuxAppInfo(Parcel in) {
         appId = in.readString();
         name = in.readString();
+        execCommand = in.readString();
         iconPath = in.readString();
-        execCmd = in.readString();
+        mimeTypes = in.readString();
+    }
+
+    public String getAppId() {
+        return appId;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getExecCommand() {
+        return execCommand;
+    }
+
+    public String getIconPath() {
+        return iconPath;
+    }
+
+    public String getMimeTypes() {
+        return mimeTypes;
     }
 
     @Override
     public void writeToParcel(Parcel dest, int flags) {
         dest.writeString(appId);
         dest.writeString(name);
+        dest.writeString(execCommand);
         dest.writeString(iconPath);
-        dest.writeString(execCmd);
+        dest.writeString(mimeTypes);
     }
 
     @Override

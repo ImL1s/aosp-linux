@@ -34,23 +34,40 @@ pub fn extract_auth_secret() -> Result<Vec<u8>, String> {
     Err("No auth secret key found in LINUX_AUTH_SECRET, /etc/linux_auth_secret, or /proc/cmdline".to_string())
 }
 
+fn decode_hex_or_raw(val: &str) -> Vec<u8> {
+    let trimmed = val.trim();
+    if trimmed.len() == 64 && trimmed.chars().all(|c| c.is_ascii_hexdigit()) {
+        let mut bytes = Vec::with_capacity(32);
+        for i in (0..64).step_by(2) {
+            if let Ok(b) = u8::from_str_radix(&trimmed[i..i+2], 16) {
+                bytes.push(b);
+            } else {
+                return trimmed.as_bytes().to_vec();
+            }
+        }
+        bytes
+    } else {
+        trimmed.as_bytes().to_vec()
+    }
+}
+
 /// Helper function to parse secret from a cmdline string directly (useful for testing).
 pub fn parse_secret_from_cmdline(cmdline: &str) -> Option<Vec<u8>> {
     for token in cmdline.split_whitespace() {
         if let Some(val) = token.strip_prefix("android_bridge.token=") {
-            let trimmed = val.trim();
-            if !trimmed.is_empty() {
-                return Some(trimmed.as_bytes().to_vec());
+            let decoded = decode_hex_or_raw(val);
+            if !decoded.is_empty() {
+                return Some(decoded);
             }
         } else if let Some(val) = token.strip_prefix("linux_auth_secret=") {
-            let trimmed = val.trim();
-            if !trimmed.is_empty() {
-                return Some(trimmed.as_bytes().to_vec());
+            let decoded = decode_hex_or_raw(val);
+            if !decoded.is_empty() {
+                return Some(decoded);
             }
         } else if let Some(val) = token.strip_prefix("auth_secret=") {
-            let trimmed = val.trim();
-            if !trimmed.is_empty() {
-                return Some(trimmed.as_bytes().to_vec());
+            let decoded = decode_hex_or_raw(val);
+            if !decoded.is_empty() {
+                return Some(decoded);
             }
         }
     }

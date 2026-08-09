@@ -2,6 +2,16 @@ package android.system.linux;
 
 /** {@hide} */
 oneway interface ILinuxStatusCallback {
-    void onStatusChanged(int oldState, int newState);
-    void onError(int errorCode, String errorMessage);
+    void onStateChanged(
+        int newState,
+        int oldState,
+        int reasonCode,
+        String message
+    );
+
+    void onResourceUsageUpdated(
+        long memoryUsedBytes,
+        long memoryTotalBytes,
+        float cpuUsagePercent
+    );
 }
