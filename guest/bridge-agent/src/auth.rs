@@ -37,7 +37,12 @@ pub fn extract_auth_secret() -> Result<Vec<u8>, String> {
 /// Helper function to parse secret from a cmdline string directly (useful for testing).
 pub fn parse_secret_from_cmdline(cmdline: &str) -> Option<Vec<u8>> {
     for token in cmdline.split_whitespace() {
-        if let Some(val) = token.strip_prefix("linux_auth_secret=") {
+        if let Some(val) = token.strip_prefix("android_bridge.token=") {
+            let trimmed = val.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.as_bytes().to_vec());
+            }
+        } else if let Some(val) = token.strip_prefix("linux_auth_secret=") {
             let trimmed = val.trim();
             if !trimmed.is_empty() {
                 return Some(trimmed.as_bytes().to_vec());
