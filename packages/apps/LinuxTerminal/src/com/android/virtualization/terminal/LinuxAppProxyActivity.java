@@ -38,7 +38,6 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 
-import com.android.server.linux.LinuxWindowBridgeService;
 import com.android.virtualization.terminal.window.WindowResizePacer;
 
 import java.io.DataOutputStream;
@@ -268,19 +267,12 @@ public class LinuxAppProxyActivity extends Activity implements SurfaceHolder.Cal
             return;
         }
 
-        // Path 1: Direct Class Access (when LinuxWindowBridgeService is in current classpath)
-        try {
-            LinuxWindowBridgeService service = LinuxWindowBridgeService.getInstance();
-            if (service != null) {
-                service.attachSurfaceControl(surfaceId, surfaceControl);
-                Log.i(TAG, "Successfully attached SurfaceControl via direct instance call for surfaceId: " + surfaceId);
-                return;
-            }
-        } catch (Throwable t) {
-            Log.d(TAG, "Direct LinuxWindowBridgeService access failed, attempting reflection fallback: " + t.getMessage());
+    private void attachSurfaceControlToBridge(int surfaceId, SurfaceControl surfaceControl) {
+        if (surfaceId <= 0) {
+            Log.w(TAG, "Invalid surfaceId: " + surfaceId + ", skipping attachSurfaceControl");
+            return;
         }
 
-        // Path 2: Reflection Fallback Access (for decoupled process/package environments)
         try {
             Class<?> bridgeClass = Class.forName("com.android.server.linux.LinuxWindowBridgeService");
             java.lang.reflect.Method getInstanceMethod = bridgeClass.getMethod("getInstance");
@@ -300,19 +292,6 @@ public class LinuxAppProxyActivity extends Activity implements SurfaceHolder.Cal
     private void detachSurfaceControlFromBridge(int surfaceId) {
         if (surfaceId <= 0) return;
 
-        // Path 1: Direct Class Access
-        try {
-            LinuxWindowBridgeService service = LinuxWindowBridgeService.getInstance();
-            if (service != null) {
-                service.attachSurfaceControl(surfaceId, null);
-                Log.i(TAG, "Successfully detached SurfaceControl via direct instance call for surfaceId: " + surfaceId);
-                return;
-            }
-        } catch (Throwable t) {
-            Log.d(TAG, "Direct LinuxWindowBridgeService detach failed, attempting reflection fallback: " + t.getMessage());
-        }
-
-        // Path 2: Reflection Fallback Access
         try {
             Class<?> bridgeClass = Class.forName("com.android.server.linux.LinuxWindowBridgeService");
             java.lang.reflect.Method getInstanceMethod = bridgeClass.getMethod("getInstance");

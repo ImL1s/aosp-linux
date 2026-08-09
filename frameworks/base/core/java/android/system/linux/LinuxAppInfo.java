@@ -39,6 +39,10 @@ public final class LinuxAppInfo implements Parcelable {
         return name;
     }
 
+    public String getDisplayName() {
+        return name;
+    }
+
     public String getExecCommand() {
         return execCommand;
     }

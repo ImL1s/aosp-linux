@@ -9,7 +9,9 @@ pub const PORT_PTY: u32 = 5001;
 pub const PORT_WAYLAND: u32 = 5002;
 
 #[cfg(target_os = "linux")]
-const AF_VSOCK: i32 = 37;
+const AF_VSOCK: i32 = libc::AF_VSOCK;
+#[cfg(not(target_os = "linux"))]
+const AF_VSOCK: i32 = 40;
 
 #[cfg(target_os = "linux")]
 #[repr(C)]
@@ -154,11 +156,15 @@ impl VsockListener {
                 }
                 unsafe { libc::close(fd); }
             }
+            return Err(io::Error::new(io::ErrorKind::Other, "AF_VSOCK socket bind/listen failed on Linux target"));
         }
 
-        let addr = format!("127.0.0.1:{}", port);
-        let listener = TcpListener::bind(&addr)?;
-        Ok(VsockListener::Tcp(listener, port))
+        #[cfg(not(target_os = "linux"))]
+        {
+            let addr = format!("127.0.0.1:{}", port);
+            let listener = TcpListener::bind(&addr)?;
+            Ok(VsockListener::Tcp(listener, port))
+        }
     }
 
     pub fn accept(&self) -> io::Result<(VsockStream, u32)> {
