@@ -287,8 +287,8 @@ public class LinuxBridgeService {
         }
     }
 
-    public boolean notifyVmStarting(byte[] authToken) {
-        return sendPacket(CMD_VM_START, 0, authToken != null ? authToken : new byte[0]);
+    public boolean notifyVmStarting(byte[] authPayload) {
+        return sendPacket(CMD_VM_START, 0, authPayload != null ? authPayload : new byte[0]);
     }
 
     public boolean notifyVmStarting() {

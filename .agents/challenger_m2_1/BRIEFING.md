@@ -1,44 +1,44 @@
-# BRIEFING — 2026-08-06T13:47:52Z
+# BRIEFING — 2026-08-14T01:37:45Z
 
 ## Mission
-Empirically execute and stress test Rust bridge-agent binary and Cargo unit tests for Milestone M2.
+Challenge and stress-test Milestone 2 (R2 Pure Binder IPC Window Bridge).
 
 ## 🔒 My Identity
 - Archetype: EMPIRICAL CHALLENGER
 - Roles: critic, specialist
 - Working directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m2_1
-- Original parent: 7249e5f0-af46-4f65-970f-c4ca44e9345e
-- Milestone: M2
+- Original parent: 9bf4ed43-7f01-40fa-acc0-13647ab4d92d
+- Milestone: Milestone 2
 - Instance: 1 of 1
 
 ## 🔒 Key Constraints
-- Review-only — do NOT modify implementation code
-- Run empirical verification code yourself, do not trust claims
-- If cannot reproduce bug empirically, it does not count
+- Review-only — do NOT modify implementation code unless creating empirical test scripts/harnesses in temporary scratch/build area.
+- Verify through empirical testing and javac build.
+- Report verdict: APPROVE or REQUEST_CHANGES in handoff.md.
 
 ## Current Parent
-- Conversation ID: 7249e5f0-af46-4f65-970f-c4ca44e9345e
-- Updated: 2026-08-06T13:47:52Z
+- Conversation ID: 9bf4ed43-7f01-40fa-acc0-13647ab4d92d
+- Updated: 2026-08-14T01:37:45Z
 
 ## Review Scope
-- **Files to review**: guest/bridge-agent/**
-- **Interface contracts**: PROJECT.md
-- **Review criteria**: Cargo unit tests pass, CLI help/version/dry-run execution, stress test robustness
-
-## Key Decisions Made
-- Executed `cargo test` in `guest/bridge-agent/` and confirmed build succeeds but 0 tests exist.
-- Executed `./android-bridge-agent --help` and confirmed binary hangs indefinitely in infinite loop without CLI flag parsing.
-- Issued verdict `REQUEST_CHANGES` in `handoff.md` and created `challenge.md`.
-
-## Artifact Index
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m2_1/DISPATCH.md — Received task dispatch
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m2_1/challenge.md — Detailed empirical challenge report
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m2_1/handoff.md — 5-component handoff report with REQUEST_CHANGES verdict
+- **Files to review**: `packages/apps/LinuxTerminal/src`, `frameworks/base/core/java/android/system/linux/`, `frameworks/base/services/core/java/com/android/server/linux/`.
+- **Interface contracts**: pure Binder IPC Window Bridge (R2 requirement).
+- **Review criteria**: No reflection/Class.forName for com.android.server.*, Binder IPC null pointer safety, invalid surfaceId handling, RemoteException handling, javac build passing.
 
 ## Attack Surface
-- **Hypotheses tested**: Cargo unit tests pass (0 tests present), CLI `--help`/`--version` support (fails/hangs), zeroization & HMAC logic (works).
-- **Vulnerabilities found**: No CLI flag parsing causes process hang on `--help`/`--version`; 0 unit tests in Rust crate; unused `send_boot_heartbeat` function warning.
-- **Untested angles**: Live AF_VSOCK packet transport inside Linux VM hypervisor (requires nested KVM Linux environment).
+- **Hypotheses tested**: 
+  - [VERIFIED PASS] Reflection/Class.forName targeting `com.android.server.*` fully eliminated from `LinuxTerminal`. (Only 1 unrelated `Class.forName` for `android.system.SocketAddressVmSockets` remains in `VsockTerminalClient.java`).
+  - [VERIFIED PASS] Surface IPC methods (`onSurfaceCreated`, `onSurfaceChanged`, `onSurfaceDestroyed`) are robust against null/invalid input (null Surface, invalid surfaceId -1/0/99999) and RemoteException. Tested via 12 automated empirical Java test cases.
+  - [VERIFIED PASS] Java build compiles cleanly with zero errors (`javac` exit code 0).
+- **Vulnerabilities found**: None.
+- **Untested angles**: Runtime graphics rendering requires full Android SystemServer runtime with GPU hardware buffer allocation.
 
 ## Loaded Skills
-- None loaded
+- None required directly.
+
+## Key Decisions Made
+- Executed empirical 12-case test suite (`BinderIPCTest.java`) validating null safety, boundary dimensions, invalid surface IDs, stub interface resolution, and RemoteException handling.
+- Verdict: APPROVE.
+
+## Artifact Index
+- `/Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m2_1/handoff.md` — Final handoff report

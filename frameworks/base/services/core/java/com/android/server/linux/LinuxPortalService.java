@@ -34,6 +34,7 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Process;
 
+import android.system.linux.ILinuxPortalService;
 import android.util.Slog;
 
 import java.io.OutputStream;
@@ -202,6 +203,22 @@ public class LinuxPortalService {
     public void setAppOp(String appId, String op, String mode) {
         mAppOpsStore.computeIfAbsent(appId, k -> new ConcurrentHashMap<>()).put(op, mode);
         Slog.i(TAG, "AppOps set: " + appId + " [" + op + "] -> " + mode);
+    }
+
+    public void setAppOp(String appId, String op, int mode) {
+        String modeStr = (mode == AppOpsManager.MODE_ALLOWED || mode == AppOpsManager.MODE_FOREGROUND)
+                ? MODE_ALLOWED : MODE_DENIED;
+        setAppOp(appId, op, modeStr);
+    }
+
+    public void setAppOp(String appId, int op, int mode) {
+        String opStr = LinuxPermissionActivity.mapOpIntToString(op);
+        setAppOp(appId, opStr, mode);
+    }
+
+    public void setAppOp(String appId, int op, String mode) {
+        String opStr = LinuxPermissionActivity.mapOpIntToString(op);
+        setAppOp(appId, opStr, mode);
     }
 
     public int noteAppOp(String appId, String op) {
@@ -797,6 +814,39 @@ public class LinuxPortalService {
         } catch (Exception e) {
             Slog.w(TAG, "Failed to send VSOCK location update: " + e.getMessage());
         }
+    }
+
+    public String getCameraStatus() {
+        return mCameraSessions.isEmpty() ? "IDLE" : "ACTIVE";
+    }
+
+    public String getAudioStatus() {
+        return mMicSessions.isEmpty() ? "IDLE" : "ACTIVE";
+    }
+
+    public String getLocation() {
+        return mLocationSessions.isEmpty() ? "IDLE" : "ACTIVE";
+    }
+
+    private final ILinuxPortalService.Stub mBinderService = new ILinuxPortalService.Stub() {
+        @Override
+        public String getCameraStatus() {
+            return LinuxPortalService.this.getCameraStatus();
+        }
+
+        @Override
+        public String getAudioStatus() {
+            return LinuxPortalService.this.getAudioStatus();
+        }
+
+        @Override
+        public String getLocation() {
+            return LinuxPortalService.this.getLocation();
+        }
+    };
+
+    public ILinuxPortalService.Stub getBinderService() {
+        return mBinderService;
     }
 
     // Custom Runtime Exception classes matching tests

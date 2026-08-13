@@ -1,22 +1,16 @@
-## 2026-08-08T06:20:20Z
-<USER_REQUEST>
-You are Forensic Auditor for Milestone M5 (Real System Hardware Portals - R5).
-Working directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/auditor_m5_1
+## 2026-08-14T02:07:59Z
+You are auditor_m5_1 (Milestone 5 Final Forensic Auditor).
+Your working directory is: /Users/iml1s/Documents/mine/aosp-linux/.agents/auditor_m5_1
+Original Request: /Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md
+Worker Handoff: /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m5/handoff.md
+Project Plan: /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
 
-Mandatory context files:
-1. /Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md
-2. /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
-3. /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m5_1/handoff.md
+Perform comprehensive final forensic integrity audit across the entire codebase:
+1. Audit all modified files across R1, R2, R3, R4 for fake passes, hardcoded responses, dummy facades, or disabled assertions.
+2. Audit static analysis, compilation, cryptographic HMAC-SHA256, VSOCK 5000 handshake, and AppOps integration.
+3. Report final verdict (CLEAN or INTEGRITY_VIOLATION).
 
-Target Files to Audit:
-- frameworks/base/services/core/java/com/android/server/linux/LinuxPortalService.java
-- frameworks/base/services/core/java/com/android/server/linux/storage/LinuxStorageProvider.java
+Write report in:
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/auditor_m5_1/handoff.md
 
-Objective:
-Perform integrity verification on M5 implementation:
-1. Check for any hardcoded test results, facade/dummy logic, or bypassed system calls.
-2. Verify that AppOpsManager calls, CameraManager/AudioRecord/LocationManager calls, and SAF dynamic LocalServices queries are real, genuine implementations.
-3. Verify test outputs are authentic and not mocked/fabricated.
-
-Write your integrity audit report to /Users/iml1s/Documents/mine/aosp-linux/.agents/auditor_m5_1/handoff.md with your verdict (CLEAN or INTEGRITY VIOLATION) and send message.
-</USER_REQUEST>
+Send a completion message when done.

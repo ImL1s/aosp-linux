@@ -1,17 +1,10 @@
-## 2026-08-06T13:46:51Z
-Your working directory is /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m2_1.
-Your identity is teamwork_preview_reviewer.
-Original request file: /Users/iml1s/Documents/mine/aosp-linux/.agents/ORIGINAL_REQUEST.md
-Scope document: /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
-Worker handoff: /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m2/handoff.md
+## 2026-08-14T01:33:13Z
+Review Milestone 2 (R2 Pure Binder IPC Window Bridge) implementation:
+1. Examine `frameworks/base/services/core/java/com/android/server/linux/LinuxWindowBridgeService.java` to verify it extends `ILinuxWindowBridge.Stub`, registers as "linux_window_bridge" with ServiceManager, and implements all AIDL methods (`onSurfaceCreated`, `onSurfaceChanged`, `onSurfaceDestroyed`).
+2. Examine `packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/LinuxAppProxyActivity.java` to verify reflection (`Class.forName`) is completely removed and Binder IPC via `ILinuxWindowBridge` is used for Surface lifecycle events.
+3. Execute javac compilation command to verify clean compilation (exit code 0).
 
-Objective for Milestone M2 (R2):
-Independently verify Soong Java/SELinux/APK compilation artifacts and run_m2_verification.sh.
+Write report and verdict (APPROVE or REQUEST_CHANGES) in:
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m2_1/handoff.md
 
-Tasks:
-1. Verify compiled class files in build_out/classes/ (LinuxManagerService.class, etc.).
-2. Verify linux_manager.te policy and LinuxTerminal.apk build artifacts.
-3. Execute bash scripts/run_m2_verification.sh and verify output.
-4. Issue explicit verdict: APPROVE or REQUEST_CHANGES in your handoff.md.
-
-Write review.md and complete handoff.md in your working directory. Send a message when complete.
+Send a completion message when done.

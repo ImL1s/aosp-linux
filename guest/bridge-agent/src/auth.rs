@@ -349,6 +349,16 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_secret_from_cmdline_android_bridge_token_hex() {
+        let expected_secret = [0x12u8; 32];
+        let hex_secret: String = expected_secret.iter().map(|b| format!("{:02x}", b)).collect();
+        let cmdline = format!("console=ttyS0 root=/dev/vda ro init=/sbin/init android_bridge.token={} panic=1 quiet", hex_secret);
+        let secret = parse_secret_from_cmdline(&cmdline).unwrap();
+        assert_eq!(secret.len(), 32);
+        assert_eq!(secret, expected_secret);
+    }
+
+    #[test]
     fn test_perform_handshake_success() {
         let secret = b"valid_secret_key_32bytes_long!!";
         let token = [7u8; 32];

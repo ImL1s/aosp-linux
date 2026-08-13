@@ -1,77 +1,67 @@
-# BRIEFING — 2026-08-08T23:54:30+08:00
+# BRIEFING — 2026-08-14T01:29:25Z
 
 ## Mission
-Orchestrate remediation of Round 3 Forensic Audit findings and Challenger empirical verification defects in AOSP Dual-OS (aosp-linux). Eliminate `exec sleep 3600` orphan process leak in `guest/scripts/launch_vm.sh` and `test_m2_tier2.py`, ensure all 430 E2E tests pass dynamically with exit code 0 and zero leaked background processes, and achieve 100% CLEAN verification gate across Reviewers, Challengers, and Forensic Auditor.
+Remediate AOSP Dual-OS Project: R1 (Java syntax & compilation closure), R2 (Pure Binder IPC Window Bridge), R3 (Single-Secret HMAC key agreement & startup initiator), R4 (Functional Permission Decision Component).
 
 ## 🔒 My Identity
-- Archetype: teamwork_orchestrator
+- Archetype: Project Orchestrator
 - Roles: orchestrator, user_liaison, human_reporter, successor
 - Working directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/orchestrator
-- Original parent: parent
-- Original parent conversation ID: 20d6aa05-0e46-4016-818a-bbff71e44e71
+- Original parent: top-level
+- Original parent conversation ID: 66ebf78d-5b32-49dd-a0e8-4d8702f9a903
 
 ## 🔒 My Workflow
-- Pattern: Project
-- Scope document: /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
-1. **Decompose**: Decompose Round 3 remediation into Explorer analysis -> Worker implementation -> Reviewer/Challenger/Auditor verification gate.
-2. **Dispatch & Execute**: Dispatch Explorer with full auditor/challenger evidence report, Worker for fix implementation, 2 Reviewers, 2 Challengers, and Forensic Auditor.
-3. **On failure**: Retry, Replace, Skip, Redistribute, Redesign, Escalate (in order).
-4. **Succession**: At 20 spawns or context limit, write handoff.md, spawn successor.
+- **Pattern**: Project Pattern
+- **Scope document**: /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
+1. **Decompose**: Survey codebase via 3 parallel Explorers, create PROJECT.md with Feature Inventory and Milestones.
+2. **Dispatch & Execute**: Run Explorer -> Worker -> Reviewer -> Challenger -> Auditor iteration loops for each milestone.
+3. **On failure**: Retry -> Replace -> Skip -> Redistribute -> Redesign.
+4. **Succession**: At spawn count 16, write handoff.md, spawn successor.
 - **Work items**:
-  1. Dispatch Explorer with full Round 3 audit report for real_env.py 4 failing functions [done]
-  2. Implement platform-agnostic fallback micro-benchmarks in real_env.py [done]
-  3. Verify python3 tests/e2e/runner.py achieves 430/430 PASS (100.0%, Exit Code 0) [done]
-  4. Address Challenger 1 REJECT finding (`launch_vm.sh` orphan process leak) [done]
-  5. Run Reviewers, Challengers, and Forensic Auditor verification gate [in-progress]
-- **Current phase**: 2 (Iteration Loop)
-- **Current focus**: Final Verification Gate execution (Reviewers, Challengers, Forensic Auditor).
+  1. Survey & Feature Mapping [done]
+  2. M1: R1 Java Compilation & Syntax Closure [reviewing]
+  3. M2: R2 Binder IPC Window Bridge [pending]
+  4. M3: R3 Secret HMAC Agreement & Handshake [pending]
+  5. M4: R4 Permission Activity & AppOps [pending]
+  6. M5: E2E Verification & Build Integrity [pending]
+- **Current phase**: 1 (Iteration Loop - M1 Gate)
+- **Current focus**: Waiting for M1 Reviewers, Challengers, and Auditor
 
 ## 🔒 Key Constraints
-- DISPATCH-ONLY orchestrator: NEVER write source code directly, NEVER run build/test commands directly.
-- All code inspection/analysis done via Explorer subagents.
-- Forensic Auditor (teamwork_preview_auditor) verdict is a BINARY VETO — violation means failure, no exceptions.
-- Never reuse a subagent after handoff.
-- Pass full victory audit evidence report to Explorers on remediation.
+- Never write source code directly as orchestrator.
+- Always verify all acceptance criteria including ARM64 cargo check and Java build integrity.
+- Never reuse subagents after handoff.
 
 ## Current Parent
-- Conversation ID: 20d6aa05-0e46-4016-818a-bbff71e44e71
-- Updated: 2026-08-08T21:05:58+08:00
+- Conversation ID: 66ebf78d-5b32-49dd-a0e8-4d8702f9a903
+- Updated: 2026-08-14T01:29:25Z
 
 ## Key Decisions Made
-- Successor Gen 2 taken over.
-- Initialized heartbeat cron task-17.
-- Explorer `explorer_gen2_1` completed analysis report.
-- Worker `worker_gen2_2` completed fallbacks in `real_env.py` and cleanup of `test_m5_tier2.py`.
-- Explorer `explorer_gen2_2` delivered fix design for orphan process leak.
-- Worker `worker_gen2_3` completed orphan process leak fix in `launch_vm.sh` and `test_m2_tier2.py` (runner: 430/430 PASS in 9.83s, cargo: 34/34 PASS, 0 orphan processes).
-- Dispatched Final Verification Gate team (`reviewer_gen2_3`, `reviewer_gen2_4`, `challenger_gen2_3`, `challenger_gen2_4`, `auditor_gen2_2`).
+- Dispatched 2 Reviewers, 2 Challengers, and 1 Forensic Auditor for Milestone 1.
 
 ## Team Roster
 | Agent | Type | Work Item | Status | Conv ID |
 |-------|------|-----------|--------|---------|
-| worker_master_r4_audit_fix | teamwork_preview_worker | Master Audit Fix Implementation | completed | ace4065b-7ec0-438a-a6cb-c453c63a8767 |
-| reviewer_r4_retry_1 | teamwork_preview_reviewer | Final Code Quality & Architecture Review | in-progress | fc5d2992-1f7d-4454-8236-d2b04dbce853 |
-| reviewer_r4_retry_2 | teamwork_preview_reviewer | Final Security & Process Isolation Review | in-progress | d7b64b58-7c31-4516-aa87-731a54fda006 |
-| challenger_r4_retry_1 | teamwork_preview_challenger | Final Empirical Process Leak & Concurrency Testing | in-progress | b010a471-bbfe-4cf5-acfe-3ebeab83e72b |
-| challenger_r4_retry_2 | teamwork_preview_challenger | Final Anti-Mock & File Count Verification | in-progress | b7151fa0-9eca-4629-a98f-98975dab32a9 |
-| worker_clean_git_status | teamwork_preview_worker | Update .gitignore & commit changes for clean git status | in-progress | d902a4c3-effb-4124-b211-a6a4397adf49 |
+| reviewer_m1_1 | teamwork_preview_reviewer | M1 Review 1 | running | 93669de5-7074-49a5-9584-21e9e6b29202 |
+| reviewer_m1_2 | teamwork_preview_reviewer | M1 Review 2 | running | 01a9e6f5-d253-4f7b-842a-3b490e0296b2 |
+| challenger_m1_1 | teamwork_preview_challenger | M1 Challenge 1 | running | 9734a632-3a5e-4151-a937-5bfdf3601107 |
+| challenger_m1_2 | teamwork_preview_challenger | M1 Challenge 2 | running | 0fa05658-12e6-47d7-b1c1-a7aee746bcd9 |
+| auditor_m1_1 | teamwork_preview_auditor | M1 Forensic Audit | running | 21ad8e10-1803-4a05-acc6-8ab4792b6902 |
 
 ## Succession Status
-- Succession required: yes (spawn count 31 >= 20)
-- Spawn count: 31 / 20
-- Pending subagents: d902a4c3-effb-4124-b211-a6a4397adf49
-- Predecessor: d11a6fce-c0ac-4b50-be28-813dbc06a54e (Gen 1)
-- Successor: pending subagent completion
+- Succession required: no
+- Spawn count: 9 / 16
+- Pending subagents: 93669de5-7074-49a5-9584-21e9e6b29202, 01a9e6f5-d253-4f7b-842a-3b490e0296b2, 9734a632-3a5e-4151-a937-5bfdf3601107, 0fa05658-12e6-47d7-b1c1-a7aee746bcd9, 21ad8e10-1803-4a05-acc6-8ab4792b6902
+- Predecessor: none
+- Successor: not yet spawned
 
 ## Active Timers
-- Heartbeat cron: task-17 (active, */10 * * * *)
+- Heartbeat cron: task-7 (*/10 * * * *)
 - Safety timer: none
 
 ## Artifact Index
-- /Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md — Original User Request
-- /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md — Master Blueprint
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/orchestrator/BRIEFING.md — Briefing State
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/orchestrator/progress.md — Progress Log
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/orchestrator/GATE_STATUS.md — Gate Verdict Log
-- /Users/iml1s/Documents/mine/aosp-linux/DEAD_ENDS.md — Dead Ends Log
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/teamwork_preview_worker_gen2_3/handoff.md — Worker 3 Remediation Handoff
+- ORIGINAL_REQUEST.md — Original request and requirements
+- DISPATCH.md — Workspace dispatch log
+- PROJECT.md — Global project index & milestones
+- plan.md — High-level plan
+- progress.md — Real-time execution heartbeat

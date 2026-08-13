@@ -29,7 +29,7 @@ required_files=(
     "system/linux_bridge/socket_server.h"
     "system/linux_bridge/socket_server.cpp"
     "frameworks/base/services/core/java/com/android/server/linux/LinuxManagerService.java"
-    "frameworks/base/services/core/java/com/android/server/linux/LinuxCeKeyManager.java"
+    "frameworks/base/services/core/java/com/android/server/linux/LinuxLuksProvider.java"
     "tests/e2e/tier1_feature_coverage/test_m2_tier1.py"
     "tests/e2e/tier2_boundary_corner/test_m2_tier2.py"
 )
@@ -44,10 +44,10 @@ echo "PASS: All ${#required_files[@]} required M2 files present."
 
 echo "--------------------------------------------------"
 echo "[2/6] Compiling Java Service & Key Manager..."
-find "${WORKSPACE_ROOT}/frameworks/base/core/java" "${WORKSPACE_ROOT}/frameworks/base/services/core/java" -name "*.java" > "${BUILD_DIR}/sources.txt"
+find "${WORKSPACE_ROOT}/frameworks/base/core/java" "${WORKSPACE_ROOT}/frameworks/base/services/core/java" "${WORKSPACE_ROOT}/tests/unit/stubs" -name "*.java" > "${BUILD_DIR}/sources.txt"
 echo "${WORKSPACE_ROOT}/tests/unit/LinuxManagerServiceTest.java" >> "${BUILD_DIR}/sources.txt"
-javac -d "${BUILD_DIR}/classes" @"${BUILD_DIR}/sources.txt"
-java -cp "${BUILD_DIR}/classes" tests.unit.LinuxManagerServiceTest > /dev/null
+javac -cp /Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar -d "${BUILD_DIR}/classes" @"${BUILD_DIR}/sources.txt"
+java -cp "${BUILD_DIR}/classes:/Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar" tests.unit.LinuxManagerServiceTest > /dev/null
 echo "PASS: Java framework & service modules compiled & verified."
 
 echo "--------------------------------------------------"

@@ -28,9 +28,13 @@ import android.graphics.Paint;
 import android.net.LocalSocket;
 import android.net.LocalSocketAddress;
 import android.os.Bundle;
+import android.os.RemoteException;
+import android.os.ServiceManager;
+import android.system.linux.ILinuxWindowBridge;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.MotionEvent;
+import android.view.Surface;
 import android.view.SurfaceControl;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -125,11 +129,7 @@ public class LinuxAppProxyActivity extends Activity implements SurfaceHolder.Cal
         }
 
         try {
-            ActivityManager.TaskDescription td = new ActivityManager.TaskDescription.Builder()
-                    .setTitle(displayTitle)
-                    .setIcon(iconBitmap)
-                    .setPrimaryColor(0xFF2C3E50)
-                    .build();
+            ActivityManager.TaskDescription td = new ActivityManager.TaskDescription(displayTitle, iconBitmap, 0xFF2C3E50);
             setTaskDescription(td);
         } catch (Exception e) {
             Log.w(TAG, "Failed to set TaskDescription: " + e.getMessage());
@@ -214,17 +214,31 @@ public class LinuxAppProxyActivity extends Activity implements SurfaceHolder.Cal
         return true;
     }
 
+    private ILinuxWindowBridge getWindowBridge() {
+        try {
+            return ILinuxWindowBridge.Stub.asInterface(ServiceManager.getService("linux_window_bridge"));
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to obtain ILinuxWindowBridge service: " + e.getMessage());
+            return null;
+        }
+    }
+
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
         Log.i(TAG, "Surface created for LinuxAppProxyActivity surfaceId: " + mSurfaceId);
         updateWindowDimensions();
 
-        SurfaceControl surfaceControl = mSurfaceView.getSurfaceControl();
-        if (surfaceControl != null && surfaceControl.isValid()) {
-            Log.i(TAG, "Registering SurfaceControl to LinuxWindowBridgeService for surfaceId: " + mSurfaceId);
-            attachSurfaceControlToBridge(mSurfaceId, surfaceControl);
-        } else {
-            Log.w(TAG, "SurfaceControl is null or invalid on surfaceCreated for surfaceId: " + mSurfaceId);
+        try {
+            ILinuxWindowBridge bridge = getWindowBridge();
+            if (bridge != null) {
+                Surface surface = holder != null ? holder.getSurface() : null;
+                bridge.onSurfaceCreated(mSurfaceId, surface);
+                Log.i(TAG, "Invoked onSurfaceCreated via Binder for surfaceId: " + mSurfaceId);
+            } else {
+                Log.w(TAG, "linux_window_bridge service unavailable on surfaceCreated");
+            }
+        } catch (RemoteException e) {
+            Log.e(TAG, "Failed to invoke onSurfaceCreated via Binder for surfaceId " + mSurfaceId, e);
         }
     }
 
@@ -237,22 +251,42 @@ public class LinuxAppProxyActivity extends Activity implements SurfaceHolder.Cal
             mResizePacer.requestResize(width, height);
         }
 
-        SurfaceControl surfaceControl = mSurfaceView.getSurfaceControl();
-        if (surfaceControl != null && surfaceControl.isValid()) {
-            attachSurfaceControlToBridge(mSurfaceId, surfaceControl);
+        try {
+            ILinuxWindowBridge bridge = getWindowBridge();
+            if (bridge != null) {
+                bridge.onSurfaceChanged(mSurfaceId, width, height);
+                Log.i(TAG, "Invoked onSurfaceChanged via Binder for surfaceId: " + mSurfaceId);
+            }
+        } catch (RemoteException e) {
+            Log.e(TAG, "Failed to invoke onSurfaceChanged via Binder for surfaceId " + mSurfaceId, e);
         }
     }
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
         Log.i(TAG, "Surface destroyed for LinuxAppProxyActivity surfaceId: " + mSurfaceId);
-        detachSurfaceControlFromBridge(mSurfaceId);
+        try {
+            ILinuxWindowBridge bridge = getWindowBridge();
+            if (bridge != null) {
+                bridge.onSurfaceDestroyed(mSurfaceId);
+                Log.i(TAG, "Invoked onSurfaceDestroyed via Binder for surfaceId: " + mSurfaceId);
+            }
+        } catch (RemoteException e) {
+            Log.e(TAG, "Failed to invoke onSurfaceDestroyed via Binder for surfaceId " + mSurfaceId, e);
+        }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        detachSurfaceControlFromBridge(mSurfaceId);
+        try {
+            ILinuxWindowBridge bridge = getWindowBridge();
+            if (bridge != null) {
+                bridge.onSurfaceDestroyed(mSurfaceId);
+            }
+        } catch (RemoteException e) {
+            Log.e(TAG, "Failed to invoke onSurfaceDestroyed on onDestroy for surfaceId " + mSurfaceId, e);
+        }
         Log.i(TAG, "LinuxAppProxyActivity destroyed for task " + getTaskId());
     }
 
@@ -260,51 +294,6 @@ public class LinuxAppProxyActivity extends Activity implements SurfaceHolder.Cal
     public String getAppId() { return mAppId; }
     public int getTargetWidth() { return mWidth; }
     public int getTargetHeight() { return mHeight; }
-
-    private void attachSurfaceControlToBridge(int surfaceId, SurfaceControl surfaceControl) {
-        if (surfaceId <= 0) {
-            Log.w(TAG, "Invalid surfaceId: " + surfaceId + ", skipping attachSurfaceControl");
-            return;
-        }
-
-    private void attachSurfaceControlToBridge(int surfaceId, SurfaceControl surfaceControl) {
-        if (surfaceId <= 0) {
-            Log.w(TAG, "Invalid surfaceId: " + surfaceId + ", skipping attachSurfaceControl");
-            return;
-        }
-
-        try {
-            Class<?> bridgeClass = Class.forName("com.android.server.linux.LinuxWindowBridgeService");
-            java.lang.reflect.Method getInstanceMethod = bridgeClass.getMethod("getInstance");
-            Object instance = getInstanceMethod.invoke(null);
-            if (instance != null) {
-                java.lang.reflect.Method attachMethod = bridgeClass.getMethod("attachSurfaceControl", int.class, SurfaceControl.class);
-                attachMethod.invoke(instance, surfaceId, surfaceControl);
-                Log.i(TAG, "Successfully attached SurfaceControl via reflection for surfaceId: " + surfaceId);
-            } else {
-                Log.w(TAG, "LinuxWindowBridgeService.getInstance() returned null via reflection");
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "Failed to attach SurfaceControl to LinuxWindowBridgeService for surfaceId " + surfaceId + ": " + e.getMessage());
-        }
-    }
-
-    private void detachSurfaceControlFromBridge(int surfaceId) {
-        if (surfaceId <= 0) return;
-
-        try {
-            Class<?> bridgeClass = Class.forName("com.android.server.linux.LinuxWindowBridgeService");
-            java.lang.reflect.Method getInstanceMethod = bridgeClass.getMethod("getInstance");
-            Object instance = getInstanceMethod.invoke(null);
-            if (instance != null) {
-                java.lang.reflect.Method attachMethod = bridgeClass.getMethod("attachSurfaceControl", int.class, SurfaceControl.class);
-                attachMethod.invoke(instance, surfaceId, (Object) null);
-                Log.i(TAG, "Successfully detached SurfaceControl via reflection for surfaceId: " + surfaceId);
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "Failed to detach SurfaceControl from LinuxWindowBridgeService for surfaceId " + surfaceId + ": " + e.getMessage());
-        }
-    }
 
     private void sendVsockConfigureFrame(int surfaceId, int width, int height) {
         try {

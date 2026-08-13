@@ -114,11 +114,7 @@ public class LinuxAppProxyActivity extends Activity implements SurfaceHolder.Cal
         }
 
         try {
-            ActivityManager.TaskDescription td = new ActivityManager.TaskDescription.Builder()
-                    .setTitle(displayTitle)
-                    .setIcon(iconBitmap)
-                    .setPrimaryColor(0xFF2C3E50)
-                    .build();
+            ActivityManager.TaskDescription td = new ActivityManager.TaskDescription(displayTitle, iconBitmap, 0xFF2C3E50);
             setTaskDescription(td);
         } catch (Exception e) {
             Log.w(TAG, "Failed to set TaskDescription: " + e.getMessage());

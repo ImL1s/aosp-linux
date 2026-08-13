@@ -1,48 +1,54 @@
-# BRIEFING — 2026-08-08T14:21:15Z
+# BRIEFING — 2026-08-14T02:10:20+08:00
 
 ## Mission
-Review LinuxStorageProvider.java implementation for correctness, robustness, API compliance, and integrity violations for Milestone M5 (R5).
+Milestone 5 final review and integrity audit of AOSP Dual-OS project against four specific acceptance criteria:
+1. Verify App layer does not import or reflect upon `com.android.server.*` private classes.
+2. Verify all AIDL methods match Java consumers in parameter types and counts.
+3. Verify Host and Guest use identical 32-byte binary secrets for RFC 2104 HMAC-SHA256 signatures.
+4. Verify Guest startup handshake connection transitions VM state to RUNNING.
 
 ## 🔒 My Identity
-- Archetype: reviewer / critic
+- Archetype: reviewer_m5_2
 - Roles: reviewer, critic
 - Working directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m5_2
-- Original parent: a0a5cd7b-a1b9-4e75-a26a-4fe83a6ef27f
-- Milestone: M5
+- Original parent: 9bf4ed43-7f01-40fa-acc0-13647ab4d92d
+- Milestone: Milestone 5
 - Instance: 2 of 2
 
 ## 🔒 Key Constraints
-- Review-only — do NOT modify implementation code
-- Perform independent evidence-based review and adversarial stress testing
-- Check for integrity violations (hardcoded test results, facade implementations, shortcuts, fabricated outputs)
+- Review-only — do NOT modify implementation code.
+- Actively check for integrity violations (hardcoded test results, facade implementations, shortcuts, self-certifying work).
+- If integrity violation detected, verdict MUST be REQUEST_CHANGES with Critical finding.
 
 ## Current Parent
-- Conversation ID: a0a5cd7b-a1b9-4e75-a26a-4fe83a6ef27f
-- Updated: 2026-08-08T14:21:15Z
+- Conversation ID: 9bf4ed43-7f01-40fa-acc0-13647ab4d92d
+- Updated: 2026-08-14T02:10:20+08:00
 
 ## Review Scope
-- **Files to review**: `frameworks/base/services/core/java/com/android/server/linux/storage/LinuxStorageProvider.java`
-- **Interface contracts**: `/Users/iml1s/Documents/mine/aosp-linux/PROJECT.md` and `ORIGINAL_REQUEST.md`
-- **Worker handoff**: `/Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m5_1/handoff.md`
-
-## Review Checklist
-- **Items reviewed**: LinuxStorageProvider.java, LinuxManagerInternal.java, LinuxManagerService.java, LinuxStorageProviderTest.java
-- **Verdict**: APPROVE
-- **Unverified claims**: none
-
-## Attack Surface
-- **Hypotheses tested**:
-  - Manual boolean fields/setters completely removed: Confirmed (0 matches).
-  - Dynamic service linkage to LinuxManagerInternal: Confirmed via code trace and unit tests.
-  - Path traversal and system root exposure: Tested home/user/../../../etc/passwd and /etc - blocked cleanly.
-  - Integrity violation check: No facade or hardcoded bypasses found.
-- **Vulnerabilities found**: 0 critical/major. 1 minor finding regarding listener registration robustness if provider created before LocalServices registration.
-- **Untested angles**: none
+- **Files to review**:
+  - `packages/apps/LinuxTerminal/` and `packages/apps/Launcher3/` (App layer)
+  - `frameworks/base/core/java/android/system/linux/` (AIDL interfaces)
+  - `frameworks/base/services/core/java/com/android/server/linux/` (System server)
+  - `system/linux_bridge/` (Host C++ daemon & HMAC key handling)
+  - `guest/bridge-agent/` (Guest Rust agent & HMAC secret handling)
+  - `guest/scripts/launch_vm.sh` / kernel cmdline logic
+- **Interface contracts**: PROJECT.md, ORIGINAL_REQUEST.md
+- **Review criteria**: Correctness, Completeness, Quality, Security/Cryptographic integrity, Integrity violations.
 
 ## Key Decisions Made
-- Issued APPROVE verdict after thorough verification and test execution.
+- All 4 Acceptance Criteria independently verified and confirmed PASS.
+- Full build checks, AIDL parameter matching, HMAC key agreement trace, and state machine transition verified.
+- Issued verdict: APPROVE.
+
+## Review Checklist
+- **Items reviewed**: App layer reflection audit, AIDL contracts & javac build, HMAC 32-byte key agreement & RFC 2104 golden vectors, AF_VSOCK 5000 handshake & VM state transition machine, unit & E2E test suites.
+- **Verdict**: APPROVE
+- **Unverified claims**: None (all verified independently)
+
+## Attack Surface
+- **Hypotheses tested**: Checked for hardcoded secrets, fake test results, missing AIDL implementations, replay attacks.
+- **Vulnerabilities found**: None.
+- **Untested angles**: None.
 
 ## Artifact Index
-- `/Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m5_2/BRIEFING.md` — Briefing file
-- `/Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m5_2/DISPATCH.md` — Dispatch log
-- `/Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m5_2/handoff.md` — Final Handoff / Review Report
+- `/Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m5_2/handoff.md` — Final review report and verdict (APPROVE)

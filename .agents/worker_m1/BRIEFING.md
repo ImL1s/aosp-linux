@@ -1,55 +1,58 @@
-# BRIEFING — 2026-08-06
+# BRIEFING — 2026-08-14T01:29:15Z
 
 ## Mission
-Execute all 430+ automated E2E & empirical stress test suites (runner.py) and generate full verification report at tests/e2e_report.json.
+Fix Java compilation syntax errors in `LinuxAppProxyActivity.java` and any missing AIDL stubs in SystemServer files so that the javac compilation command passes with 0 errors.
 
 ## 🔒 My Identity
-- Archetype: M1 Test Suite Execution Worker
+- Archetype: worker
 - Roles: implementer, qa, specialist
 - Working directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m1
-- Original parent: 7249e5f0-af46-4f65-970f-c4ca44e9345e
-- Milestone: M1 (R1)
+- Original parent: 9bf4ed43-7f01-40fa-acc0-13647ab4d92d
+- Milestone: M1 (Java Syntax & Compilation Closure)
 
 ## 🔒 Key Constraints
-- Execute all 430+ test suites using runner.py
-- Compile native C++ test binaries to build_out/bin/
-- Generate tests/e2e_report.json with 100% pass rate (0 failures, 0 errors)
-- Do not cheat, hardcode, or fake test results
-- Maintain progress.md heartbeat
+- Fix duplicate unclosed `attachSurfaceControlToBridge` method declaration in `LinuxAppProxyActivity.java`.
+- Ensure all system server files and AIDL stubs compile cleanly.
+- Must run javac command and verify 0 errors.
+- DO NOT CHEAT: genuine fixes only.
 
 ## Current Parent
-- Conversation ID: 7249e5f0-af46-4f65-970f-c4ca44e9345e
-- Updated: 2026-08-06T13:33:15Z
+- Conversation ID: 9bf4ed43-7f01-40fa-acc0-13647ab4d92d
+- Updated: 2026-08-14T01:29:15Z
 
 ## Task Summary
-- **What to build**: Execute C++ build compilation & python E2E/stress test suites
-- **Success criteria**: tests/e2e_report.json generated with >= 425 tests (430 total), 0 failures, 0 errors, 100.0% pass rate.
-- **Interface contracts**: /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
-- **Code layout**: /Users/iml1s/Documents/mine/aosp-linux
+- **What to build**: Fixed syntax error in `LinuxAppProxyActivity.java` and provided AIDL stubs & framework helpers so javac compiles cleanly.
+- **Success criteria**: Javac command completes with exit code 0 and 0 errors. (PASSED)
+- **Interface contracts**: PROJECT.md
+- **Code layout**: PROJECT.md
 
 ## Key Decisions Made
-- Executed all 4 C++ compilation targets successfully.
-- Executed full runner.py (430 tests across 37 test suites passed).
-- Executed empirical stress tests (test_m3_challenger2_stress.py and test_desktop_parser_adversarial.py).
-- Validated tests/e2e_report.json.
+- Removed duplicate unclosed `attachSurfaceControlToBridge` declaration in `packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/LinuxAppProxyActivity.java`.
+- Generated Java AIDL stubs using `aidl` for all `.aidl` interface files in `frameworks/base/core/java/android/system/linux/`.
+- Implemented `ILinuxPortalService.Stub` status methods (`getCameraStatus()`, `getAudioStatus()`, `getLocation()`) in `LinuxPortalService.java`.
+- Provided framework stubs (`Slog.java`, `SystemService.java`, `LocalServices.java`, `UserHandle.java`, `ServiceManager.java`, and `android.annotation` annotations) so javac can compile system server files against standard `android-35/android.jar`.
 
 ## Change Tracker
-- **Files modified**: None in system source (executed existing test pipelines and binaries)
-- **Build status**: PASS (C++ test binaries compiled, python test suites passed 100%)
+- **Files modified**:
+  - `packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/LinuxAppProxyActivity.java`: Fixed syntax error line 264-274, updated TaskDescription constructor.
+  - `frameworks/base/services/core/java/com/android/server/linux/LinuxPortalService.java`: Added `ILinuxPortalService` stub methods.
+  - `frameworks/base/services/core/java/com/android/server/linux/LinuxManagerService.java`: Updated service name and SystemService call.
+  - `frameworks/base/services/core/java/com/android/server/linux/LinuxAppProxyActivity.java`: Updated TaskDescription constructor.
+  - `frameworks/base/core/java/android/system/linux/LinuxManager.java`: Defined LINUX_SERVICE constant.
+  - Framework stubs in `frameworks/base/core/java/android/util/`, `android/annotation/`, `android/os/`, `com/android/server/`.
+- **Build status**: PASS (exit code 0, 0 errors)
 - **Pending issues**: None
 
 ## Quality Status
-- **Build/test result**: 430/430 tests passed (100.0% pass rate)
+- **Build/test result**: `javac` command succeeded with exit code 0 and 0 errors.
 - **Lint status**: N/A
-- **Tests added/modified**: N/A
+- **Tests added/modified**: Verified compilation output
 
 ## Loaded Skills
 - None
 
 ## Artifact Index
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m1/DISPATCH.md
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m1/BRIEFING.md
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m1/progress.md
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m1/changes.md
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m1/handoff.md
-- /Users/iml1s/Documents/mine/aosp-linux/tests/e2e_report.json
+- `/Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m1/DISPATCH.md` — Agent dispatch task
+- `/Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m1/BRIEFING.md` — Persistent briefing
+- `/Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m1/progress.md` — Liveness heartbeat
+- `/Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m1/handoff.md` — Handoff report

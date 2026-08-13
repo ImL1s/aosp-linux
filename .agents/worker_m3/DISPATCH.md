@@ -1,30 +1,30 @@
-## 2026-08-06T10:59:36Z
-You are Worker for Milestone M3 (Native Touch Terminal Engine, Custom InputConnection CJK IME, 3 Touch Modes State Machine, SGR Mouse Generator, Vsock Port 5001 PTY Framing).
+## 2026-08-13T17:38:38Z
+You are worker_m3 (M3 Auth Protocol & Handshake Initiator Worker).
+Your working directory is: /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m3
+Original Request: /Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md
+Survey Report: /Users/iml1s/Documents/mine/aosp-linux/.agents/survey_explorer_2/survey_report.md
+Project Plan: /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
 
-Working Directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m3
-
-Mandatory Reference Files:
-- ORIGINAL_REQUEST.md: /Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md (READ THIS FIRST!)
-- PROJECT.md: /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
-- SCOPE.md: /Users/iml1s/Documents/mine/aosp-linux/.agents/sub_orch_m3/SCOPE.md
-- Technical Architecture Plan: /Users/iml1s/.gemini/antigravity-cli/brain/29f720f6-2fc4-4aa4-af7a-b720fbb0d62a/aosp_linux_system_architecture_plan.md
-- Explorer 1 Analysis: /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_1/analysis.md
-- Explorer 2 Analysis: /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_2/analysis.md
-- Explorer 3 Analysis: /Users/iml1s/Documents/mine/aosp-linux/.agents/explorer_m3_3/analysis.md
+Scope & Tasks for Milestone 3 (R3):
+1. Read ORIGINAL_REQUEST.md (R3 requirement) and survey_report.md from survey_explorer_2.
+2. Fix Single-Secret HMAC Agreement across Host Java, Host C++, and Guest Agent:
+   - In `LinuxManagerService.java` and `LinuxBridgeService.java`: Generate a 32-byte binary token AND a 32-byte binary secret (total 64-byte payload). Send 64-byte payload over Unix Domain Socket (`CMD_VM_START`).
+   - In `system/linux_bridge/socket_server.cpp`: Receive the 64-byte payload containing token (bytes 0..31) and secret (bytes 32..63). Pass `secret` to `mVsockServer->setAuthToken(token, secret)` and hex-encode `secret` (or token/secret agreement) to pass as `AUTH_TOKEN` to `launch_vm.sh`.
+   - In `guest/scripts/launch_vm.sh`: Pass `android_bridge.token=${AUTH_TOKEN}` (where `AUTH_TOKEN` is hex string of the exact 32-byte secret).
+   - In `guest/bridge-agent/src/auth.rs`: Ensure `parse_secret_from_cmdline` parses `android_bridge.token=` from `/proc/cmdline` and decodes the hex string into the exact 32-byte binary secret.
+3. Fix Guest Agent Startup Initiator:
+   - Host C++ `vsock_server.cpp` remains Server listening on AF_VSOCK port 5000.
+   - In `guest/bridge-agent/src/main.rs`: Implement startup initiator logic! Upon agent boot, connect to Host `CID_HOST = 2` port 5000 via AF_VSOCK socket. Construct and send 64-byte `AuthHandshakePayload` (32-byte token + 32-byte RFC 2104 HMAC-SHA256 signature).
+   - Ensure upon successful handshake, Host C++ sends `CMD_HANDSHAKE_COMPLETE` (0x0003) to Host Java, transitioning VM state to `STATE_RUNNING`.
+4. Rust ARM64 Compilation Verification:
+   - Run `$HOME/.cargo/bin/cargo check --target aarch64-unknown-linux-gnu` inside `guest/bridge-agent` and `guest/portal-agent`. Fix any warnings so build passes cleanly with zero warnings or errors.
+5. Host C++ & Java Compilation Verification:
+   - Verify C++ bridge daemon and Java services compile cleanly.
 
 MANDATORY INTEGRITY WARNING:
 DO NOT CHEAT. All implementations must be genuine. DO NOT hardcode test results, create dummy/facade implementations, or circumvent the intended task. A teamwork_preview_auditor will independently verify your work. Integrity violations WILL be detected and your work WILL be rejected.
 
-Scope & Task Requirements:
-Implement all 7 features of Milestone M3 in packages/apps/LinuxTerminal/ (or packages/apps/TerminalApp/):
-1. F-R3-001: Native Surface Canvas Renderer (`TerminalSurfaceView.java`, `terminal_renderer.cpp`, ANativeWindow lock/unlockAndPost, Dirty Rect local refresh, 60/120 FPS target, Monospace font grid, ANSI 16/256/TrueColor palette).
-2. F-R3-002: libvterm Parser Integration (`VTermParserBridge.java`, `vterm_parser.cpp`, `libvterm_jni.cpp`, Alt screen `\e[?1049h`, 10000-line scrollback circular deque buffer, streaming UTF-8 partial byte buffering).
-3. F-R3-003: TerminalInputConnection (`TerminalInputConnection.java`, `TerminalKeyEncoder.java` extending BaseInputConnection, full keycode translation for Backspace, Enter, Tab, Arrow Keys, F1-F12, Ctrl/Alt combinations).
-4. F-R3-004: Multi-stage CJK IME Commit (`CjkComposingTextManager.java`, inline composing window, Bopomofo/Cangjie/Pinyin buffering, UTF-8 batch commit to PTY stream, InputMethodManager cursor anchor updates).
-5. F-R3-005: Touch Modes State Machine (`TouchModeStateMachine.java` for SHELL_MODE, TUI_MOUSE_MODE, TOUCHPAD_MODE, DEC escape code auto-detection `\x1b[?1000h`/`\x1b[?1006h`, session preference persistence).
-6. F-R3-006: SGR Mouse Protocol Generator (`SgrMouseProtocolGenerator.java` converting touch events/gestures to `\x1b[?<button>;<x>;<y>M`/`m`, 1-based grid coordinates, buttons 64/65 wheel scroll).
-7. F-R3-007: Vsock Port 5001 PTY Framing (`VsockPtyFramer.java`, 21-byte binary packet header `[SessionID (16B)][Type (1B)][Length (4B)][Payload]`, RESIZE 4-byte payload `cols` and `rows`, partial header reassembly, 64KB max payload validation).
+Document changes and build/test commands in:
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m3/handoff.md
 
-Also update Android.bp / C++ build configs and write comprehensive unit/integration test suites. Run local build and unit test commands to verify your implementation before reporting back.
-
-Write your implementation report to `/Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m3/changes.md` and `handoff.md`, then send a concise message back.
+Send a completion message when done.

@@ -34,3 +34,43 @@ Core Objectives — Fix All 6 Deterministic Defects:
 
 Execute all remediation tasks systematically with full verification.
 
+## Follow-up — 2026-08-14T01:19:53+08:00
+
+# AOSP Dual-OS Java Compile Closure, Binder Bridge & Auth Protocol Remediation
+
+Working directory: /Users/iml1s/Documents/mine/aosp-linux
+Integrity mode: development
+
+## Requirements
+
+### R1. Complete Java Syntax & Compilation Closure
+1. Fix syntax error in `LinuxAppProxyActivity.java` (duplicate unclosed `attachSurfaceControlToBridge` method declarations).
+2. Ensure all AIDL interfaces, system server services, and application activities compile cleanly without unresolved symbols or mismatched signatures.
+
+### R2. Pure Binder IPC Window Bridge (App/SystemServer Decoupling)
+1. Replace reflection access (`Class.forName("com.android.server.linux.LinuxWindowBridgeService")`) in `LinuxAppProxyActivity.java` with canonical Binder IPC via `ILinuxWindowBridge.aidl`.
+2. Connect `SurfaceView`/`Surface` creation, change, and destruction lifecycle to `ILinuxWindowBridge` obtained via `ServiceManager.getService("linux_window_bridge")` or `ILinuxManager`.
+
+### R3. Single-Secret HMAC Key Agreement & Startup Initiator
+1. Establish a single shared 32-byte secret agreement between Host Java, C++ daemon, and Guest agent.
+2. Host Java generates a 32-byte token and 32-byte secret; C++ propagates this exact secret via kernel cmdline (`android_bridge.token=<hex_secret>`) to Guest.
+3. Guest decodes the hex string into the exact 32-byte binary secret.
+4. Establish clear Control Channel roles: Host C++ listens on `AF_VSOCK` port 5000; Guest agent acts as initiator upon boot by connecting to Host `CID_HOST=2` port 5000, sending 32-byte token + 32-byte HMAC signature.
+
+### R4. Functional Permission Decision Component
+1. Implement functional request handling and AppOps integration in `LinuxPermissionActivity` to process incoming `app_id` and permission op requests.
+
+## Acceptance Criteria
+
+### Java & Build Integrity
+- [ ] No duplicate methods, unclosed braces, or compilation syntax errors in any Java files.
+- [ ] App layer does not import or reflect upon `com.android.server.*` private implementation classes.
+- [ ] All AIDL methods match their Java consumer callers in parameter types and counts.
+
+### Protocol & Cryptography
+- [ ] Host and Guest use identical 32-byte binary secrets to compute and verify RFC 2104 HMAC-SHA256 signatures.
+- [ ] Guest initiates startup handshake connection to Host (CID 2, Port 5000), transitioning Host VM state to `RUNNING`.
+- [ ] ARM64 build (`cargo check --target aarch64-unknown-linux-gnu`) passes cleanly with zero warnings or errors.
+- [ ] All unit and empirical tests pass.
+
+

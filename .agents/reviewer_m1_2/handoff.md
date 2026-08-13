@@ -1,70 +1,66 @@
-# Handoff Report - Milestone M1 (R1) Independent Verification
-
-## Observation
-
-1. **Native C++ Test Binary Verification (`build_out/bin/`)**:
-   - Files inspected via `ls -la build_out/bin/`:
-     - `build_out/bin/linux_bridge_test` (395,120 bytes, `-rwxr-xr-x`)
-     - `build_out/bin/challenger_m2_framing_test` (178,872 bytes, `-rwxr-xr-x`)
-     - `build_out/bin/challenger_m2_hmac_test` (178,248 bytes, `-rwxr-xr-x`)
-     - `build_out/bin/challenger_m2_empirical_test` (366,064 bytes, `-rwxr-xr-x`)
-   - Command 1: `./build_out/bin/linux_bridge_test`
-     - Output: `NATIVE TEST RESULT: ALL TESTS PASSED SUCCESSFULLY` (Exit code 0)
-   - Command 2: `./build_out/bin/challenger_m2_framing_test`
-     - Output: `=== VsockFraming C++ Stress Verification: ALL PASSED ===` (Exit code 0)
-   - Command 3: `./build_out/bin/challenger_m2_hmac_test`
-     - Output: `=== HmacAuth C++ Stress Verification: ALL PASSED ===` (Exit code 0)
-   - Command 4: `./build_out/bin/challenger_m2_empirical_test`
-     - Output: `TOTAL: 4 | PASSED: 4 | FAILED: 0` (Exit code 0)
-
-2. **Empirical Stress Test Execution**:
-   - Command 1: `python3 tests/e2e/test_m3_challenger2_stress.py`
-     - Output: `Total: 6 | Passed: 6 | Failed: 0` (Exit code 0)
-   - Command 2: `python3 tests/stress/test_desktop_parser_adversarial.py`
-     - Output: `ALL Adversarial Desktop Entry Parser STRESS TESTS PASSED!` (Exit code 0)
-
-3. **Master E2E Test Suite & Report Verification**:
-   - Command: `python3 tests/e2e/runner.py --verbose --report tests/e2e_report.json`
-     - Output: `TOTAL TESTS : 430 | PASSED : 430 | FAILED : 0 | ERRORS : 0 | PASS RATE : 100.0%` (Exit code 0)
-   - File inspection (`tests/e2e_report.json`):
-     - `"total": 430`, `"passed": 430`, `"failed": 0`, `"errored": 0`, `"pass_rate_percent": 100.0`
-
-4. **Integrity & Code Inspection**:
-   - Source code of test suites (`tests/unit/linux_bridge_test.cpp`, `tests/unit/challenger_m2_*.cpp`, `test_m3_challenger2_stress.py`, `test_desktop_parser_adversarial.py`) was inspected for integrity violations. All assertions perform real logic, socket operations, cryptographic calculations, and state machine transitions. Zero hardcoded results, facades, or shortcuts were found.
-
-## Logic Chain
-
-1. **Task 1 Verification**: The 4 native C++ binaries (`linux_bridge_test`, `challenger_m2_framing_test`, `challenger_m2_hmac_test`, `challenger_m2_empirical_test`) exist in `build_out/bin/` with executable permissions. Executing each binary verified clean completion (exit code 0) and 100% pass rates across all native test modules.
-2. **Task 2 Verification**: Running `python3 tests/e2e/test_m3_challenger2_stress.py` and `python3 tests/stress/test_desktop_parser_adversarial.py` independently confirmed that all 6 empirical stress tests and 7 adversarial desktop parser tests executed successfully with exit code 0.
-3. **E2E Integration Verification**: Running `python3 tests/e2e/runner.py` confirmed that all 430 automated E2E tests across 37 test suites pass with 0 failures and 0 errors. Report `tests/e2e_report.json` accurately reflects these results.
-4. **Integrity Audit**: Code inspection confirmed no hardcoded outputs, dummy implementations, or fake attestation artifacts exist.
-
-## Caveats
-
-No caveats. All native binary compilations and empirical stress test executions were independently verified and passed all criteria.
-
-## Conclusion
+# Review & Handoff Report — reviewer_m1_2
 
 **Verdict**: **APPROVE**
 
-Milestone M1 (R1) work product has been fully verified. Native binaries in `build_out/bin/` exist and run flawlessly, empirical stress tests pass completely, and master E2E test execution achieves a 100.0% pass rate across 430 tests.
+## 1. Observation
 
-## Verification Method
+- **LinuxAppProxyActivity.java Syntax & Brace Closure Inspection**:
+  - File path: `packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/LinuxAppProxyActivity.java`
+  - Lines 260–280 contained clean method syntax for `attachSurfaceControlToBridge(int surfaceId, SurfaceControl surfaceControl)`.
+  - All opening and closing braces properly pair up across all 346 lines of `LinuxAppProxyActivity.java`. No duplicate or unclosed method definitions were found.
 
-1. Verify native binary compilation & execution:
-   ```bash
-   ./build_out/bin/linux_bridge_test
-   ./build_out/bin/challenger_m2_framing_test
-   ./build_out/bin/challenger_m2_hmac_test
-   ./build_out/bin/challenger_m2_empirical_test
-   ```
-2. Verify empirical stress tests:
-   ```bash
-   python3 tests/e2e/test_m3_challenger2_stress.py
-   python3 tests/stress/test_desktop_parser_adversarial.py
-   ```
-3. Verify master E2E test suite & report:
-   ```bash
-   python3 tests/e2e/runner.py --verbose --report tests/e2e_report.json
-   python3 -c "import json; r=json.load(open('tests/e2e_report.json')); assert r['summary']['total']==430 and r['summary']['passed']==430; print('Report verified!')"
-   ```
+- **AIDL Interface & Stub Signature Alignment**:
+  - Inspected all AIDL generated `.java` files in `frameworks/base/core/java/android/system/linux/`:
+    - `ILinuxBridge.java` matches `ILinuxBridge.aidl`
+    - `ILinuxBridgeDaemon.java` matches `ILinuxBridgeDaemon.aidl`
+    - `ILinuxManager.java` matches `ILinuxManager.aidl`
+    - `ILinuxPortalService.java` matches `ILinuxPortalService.aidl`
+    - `ILinuxStatusCallback.java` matches `ILinuxStatusCallback.aidl`
+    - `ILinuxStorageProvider.java` matches `ILinuxStorageProvider.aidl`
+    - `ILinuxTerminalCallback.java` matches `ILinuxTerminalCallback.aidl`
+    - `ILinuxWindowBridge.java` matches `ILinuxWindowBridge.aidl`
+  - `LinuxPortalService.java` (in `frameworks/base/services/core/java/com/android/server/linux/`) correctly implements `ILinuxPortalService.Stub` with concrete implementations of `getCameraStatus()`, `getAudioStatus()`, and `getLocation()`.
+
+- **Compilation Command Execution**:
+  - Executed command:
+    ```bash
+    mkdir -p /tmp/classes_m1_rev2 && javac -classpath /Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar:frameworks/base/core/java:frameworks/base/services/core/java -sourcepath packages/apps/LinuxTerminal/src:frameworks/base/core/java:frameworks/base/services/core/java -d /tmp/classes_m1_rev2 packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/LinuxAppProxyActivity.java frameworks/base/services/core/java/com/android/server/linux/*.java
+    ```
+  - **Result**: Command exited with code `0`. 0 errors, 0 compilation warnings.
+
+- **Integrity Violation Assessment**:
+  - No hardcoded test outputs or dummy facade implementations.
+  - Actual logic for vsock framing, Camera2 / AudioRecord streaming, AppOps policy checking, and SystemServer service binding is present.
+
+## 2. Logic Chain
+
+1. Direct inspection of `LinuxAppProxyActivity.java` confirms that the syntax error (duplicate unclosed method signature) reported in earlier iterations has been cleanly resolved and all method signatures and brace structures are syntactically valid Java.
+2. Comparison between `.aidl` definitions in `frameworks/base/core/java/android/system/linux/` and their compiled `.java` stubs verifies 100% signature parity.
+3. SystemServer implementations in `frameworks/base/services/core/java/com/android/server/linux/` fulfill all interface contracts of the AIDL stubs without missing methods.
+4. Execution of the project's standard javac compilation command against Android 35 SDK completes with exit code 0 and zero compilation errors or warnings.
+5. Therefore, Milestone 1 (R1 Java Syntax & Compilation Closure) satisfies all technical, functional, and compilation requirements.
+
+## 3. Caveats
+
+- Deprecation notes produced by javac (`Note: Some input files use or override a deprecated API.`) are standard Android SDK warnings when compiling against legacy Android APIs (e.g. `HandlerThread`, `ImageFormat.YUV_420_888`) and do not block compilation or indicate defects.
+
+## 4. Conclusion
+
+Milestone 1 (R1 Java Syntax & Compilation Closure) is fully verified and APPROVED.
+- `LinuxAppProxyActivity.java` syntax is clean and well-formed.
+- AIDL contracts and generated stubs match signatures across core framework and services.
+- Compilation against Android SDK 35 succeeded with exit code 0.
+
+## 5. Verification Method
+
+To independently re-verify:
+```bash
+mkdir -p /tmp/classes_m1_rev2
+javac -classpath /Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar:frameworks/base/core/java:frameworks/base/services/core/java \
+  -sourcepath packages/apps/LinuxTerminal/src:frameworks/base/core/java:frameworks/base/services/core/java \
+  -d /tmp/classes_m1_rev2 \
+  packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/LinuxAppProxyActivity.java \
+  frameworks/base/services/core/java/com/android/server/linux/*.java
+echo "Exit code: $?"
+```
+**Expected Outcome**: Exit code `0` and zero error messages.

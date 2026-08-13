@@ -83,6 +83,7 @@ pub fn get_portal_state() -> &'static Arc<RwLock<PortalState>> {
     GLOBAL_PORTAL_STATE.get_or_init(|| Arc::new(RwLock::new(PortalState::default())))
 }
 
+#[allow(dead_code)]
 pub fn reset_portal_state() {
     let mut state = match get_portal_state().write() {
         Ok(guard) => guard,

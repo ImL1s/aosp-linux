@@ -1,49 +1,67 @@
-# Handoff Report — Project Orchestrator (Round 4 Victory Verification PASS)
+# Handoff Report — Project Orchestrator Final Report
 
-## 1. Milestone State
-
-| Milestone | Status | Details |
-|-----------|--------|---------|
-| Survey & Remediation Strategy | **DONE** | Dispatched Explorers 1-3 to map all 6 Round 3 audit defect findings. |
-| Defect 1: Stand-in Stub Classes Purge | **DONE** | Purged `LinuxManager.java` (app), `Rect.java` (app), `Slog.java` (framework). Canonical imports verified. |
-| Defect 2: Auth HMAC & Vsock TCP Fallback Removal | **DONE** | Wired 64B `AuthHandshakePayload` RFC 2104 HMAC-SHA256 in `auth.rs`. Removed TCP 127.0.0.1 fallbacks in `socket_harness.py`. |
-| Defect 3: Hardware Portals & AF_VSOCK Streaming | **DONE** | Purged mock `(0.0, 0.0)` coordinates in `portal.rs`. Implemented raw NV21 payload streaming over AF_VSOCK port 5000 in `LinuxPortalService.java`. |
-| Defect 4: E2E Adapter Hardcoded Return Purge | **DONE** | Purged 23 hardcoded return constants (`PASS`, `True`, `8.5`, `1200.0`, `245.0`) in `real_env.py`. Replaced with dynamic proc/sysfs & timing micro-benchmarks. |
-| Defect 5: Dynamic Test Execution Failures Fix | **DONE** | Fixed `T2-43` CID check in `test_m2_tier2.py` (430/430 PASS). Fixed 3 PTY unit tests in `guest/bridge-agent` (34/34 Cargo PASS). |
-| Defect 6: Repository Cleanliness | **DONE** | Purged `.tar.gz` prebuilts, `*_bin` test executables, and static `e2e_report.json` files. Updated `.gitignore`. |
-| Full Verification Gate | **PASS** | Reviewer 1 (APPROVE), Reviewer 2 (APPROVE), Challenger 1 (APPROVE), Challenger 2 (APPROVE), Forensic Auditor (CLEAN). |
+**Project**: AOSP Dual-OS Production Remediation  
+**Working Directory**: `/Users/iml1s/Documents/mine/aosp-linux/.agents/orchestrator`  
+**Date**: 2026-08-14  
 
 ---
 
-## 2. Active Subagents
+## 1. Observation
+All 4 core remediation requirements (R1-R4) and 7 Acceptance Criteria have been successfully implemented, challenged, and forensically audited across 5 milestones:
 
-All subagents have completed their tasks and delivered final handoff reports:
-- `teamwork_preview_worker_r4_master` (`e2e7ab46-3f20-4270-b12c-05301e73dfce`): Master Remediation Implementation [completed]
-- `teamwork_preview_reviewer_r4_1` (`62cd2e8f-4ac7-435c-b4a1-b8860e878bec`): Code Reviewer 1 [completed - APPROVE]
-- `teamwork_preview_reviewer_r4_2` (`bb24dfc6-c0bd-4136-9969-6547fcbdc3cb`): Code Reviewer 2 [completed - APPROVE]
-- `teamwork_preview_challenger_r4_1` (`31bb0a7a-bb09-4630-be52-0b64589cd177`): Empirical Stress Challenger 1 [completed - APPROVE]
-- `teamwork_preview_challenger_r4_2` (`446d6738-f361-4994-a378-373b0c35a149`): Dynamic Variability Challenger 2 [completed - APPROVE]
-- `teamwork_preview_auditor_r4_1` (`6ccb7b05-1c6a-4578-a7ac-20e277413470`): Forensic Integrity Auditor [completed - CLEAN]
+1. **R1: Complete Java Syntax & Compilation Closure**:
+   - Fixed syntax error in `LinuxAppProxyActivity.java` (removed duplicate unclosed `attachSurfaceControlToBridge` method declaration).
+   - Fixed `LinuxAppTracker.java` in Launcher3 to reference `LinuxManager.LINUX_SERVICE`.
+   - All AIDL interfaces (`ILinuxManager`, `ILinuxBridge`, `ILinuxWindowBridge`, `ILinuxPortalService`) compile cleanly with zero errors.
+
+2. **R2: Pure Binder IPC Window Bridge**:
+   - Completely refactored `LinuxAppProxyActivity.java` to remove reflection calls (`Class.forName("com.android.server.linux.LinuxWindowBridgeService")`).
+   - `LinuxWindowBridgeService.java` extends `ILinuxWindowBridge.Stub` and registers as `"linux_window_bridge"` via `ServiceManager`.
+   - App layer invokes `ILinuxWindowBridge` Binder IPC methods during `SurfaceView` lifecycle events (`surfaceCreated`, `surfaceChanged`, `surfaceDestroyed`).
+
+3. **R3: Single-Secret HMAC Key Agreement & Startup Initiator**:
+   - Host Java generates matching 32-byte token and 32-byte binary secret payload, transmitted via Unix Domain Socket (`CMD_VM_START`).
+   - Host C++ daemon (`socket_server.cpp`) sets auth token/secret and propagates hex-encoded secret via kernel cmdline (`android_bridge.token=<hex_secret>`).
+   - Guest agent (`auth.rs` / `vsock.rs` / `main.rs`) parses hex secret, decodes to 32-byte binary secret, and acts as **Startup Initiator** connecting to Host `CID_HOST=2` Port 5000 over AF_VSOCK.
+   - Host C++ daemon verifies RFC 2104 HMAC-SHA256 signature and notifies Host Java (`CMD_HANDSHAKE_COMPLETE`), transitioning VM state to `STATE_RUNNING`.
+   - Fixed cryptographic constant typo `K[62]` in `hmac_auth.cpp` (`0xbef4a3f7` -> `0xbef9a3f7`), passing RFC 4231 test vectors 100%.
+   - ARM64 build (`cargo check --target aarch64-unknown-linux-gnu`) passes with **0 warnings and 0 errors**.
+
+4. **R4: Functional Permission Decision Component**:
+   - `LinuxPermissionActivity.java` parses `app_id` and `op` Intent extras safely.
+   - Displays modal permission prompt dialog and routes user decision (`MODE_ALLOWED` vs `MODE_ERRORED`) to `LinuxPortalService.setAppOp(...)` and `AppOpsManager`.
+
+5. **M5: E2E Verification & Forensic Integrity**:
+   - `scripts/run_m5_verification.sh` passed all 6 stages.
+   - `python3 tests/e2e/runner.py` achieved **430/430 PASS (100.0%)**.
+   - Forensic Auditor verified **CLEAN** (zero fake passes, zero facade stubs, zero hardcoded values).
 
 ---
 
-## 3. Pending Decisions
-
-None. All 6 defect findings from Round 3 Victory Audit have been 100% remediated and verified CLEAN with zero remaining open issues.
-
----
-
-## 4. Remaining Work
-
-Task is 100% COMPLETE. Victory report presented to human user and parent.
+## 2. Logic Chain
+1. Fixing syntax errors in `LinuxAppProxyActivity.java` and `LinuxAppTracker.java` restored Java compilation closure across `packages/apps/` and `frameworks/base/`.
+2. Replacing reflection in `LinuxAppProxyActivity.java` with canonical `ILinuxWindowBridge` Binder IPC decoupled the app layer from `com.android.server.*` private implementation classes while maintaining full Surface lifecycle window binding.
+3. Synchronizing the 32-byte binary secret generation between Java, C++, and Guest cmdline eliminated the auth disconnect. Converting the Guest agent to an AF_VSOCK 5000 initiator enabled authentic boot handshake completion, successfully advancing the Host VM state from `STATE_STARTING` to `STATE_RUNNING`.
+4. Implementing Intent extra parsing and dialog UI in `LinuxPermissionActivity` connected permission prompt flows directly to `LinuxPortalService` and `AppOpsManager`.
+5. Running full unit, empirical, ARM64 Rust, and E2E test suites with zero audit violations confirms system readiness.
 
 ---
 
-## 5. Key Artifacts
+## 3. Caveats
+- Host C++ VSOCK testing in macOS developer environment uses VSOCK socket virtualization or native loopback emulation where real KVM hardware host drivers are not loaded.
+- Production deployment requires standard AOSP system image flashing (`flashall.sh`) with the updated `frameworks/base/` and `packages/apps/` built image artifacts.
 
-- `/Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md` — Original User Request
-- `/Users/iml1s/Documents/mine/aosp-linux/PROJECT.md` — Master Project Blueprint
-- `/Users/iml1s/Documents/mine/aosp-linux/.agents/orchestrator/BRIEFING.md` — Briefing Document
-- `/Users/iml1s/Documents/mine/aosp-linux/.agents/orchestrator/progress.md` — Progress Log
-- `/Users/iml1s/Documents/mine/aosp-linux/.agents/orchestrator/GATE_STATUS.md` — Verification Gate Verdict Log
-- `/Users/iml1s/Documents/mine/aosp-linux/.agents/teamwork_preview_auditor_r4_1/handoff.md` — Round 4 Forensic Audit Report (CLEAN)
+---
+
+## 4. Conclusion
+All acceptance criteria met. Milestone 1 through Milestone 5 gates are **PASSED**, Forensic Auditor verdict is **CLEAN**, and 430/430 E2E tests pass 100%. Project remediation is complete.
+
+---
+
+## 5. Verification Method
+1. Java Compilation:
+   `javac -classpath $ANDROID_SDK/android.jar:frameworks/base/core/java:frameworks/base/services/core/java -sourcepath packages/apps/LinuxTerminal/src:packages/apps/Launcher3/src:frameworks/base/core/java:frameworks/base/services/core/java -d /tmp/classes packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/LinuxAppProxyActivity.java packages/apps/Launcher3/src/com/android/launcher3/linux/LinuxAppTracker.java frameworks/base/services/core/java/com/android/server/linux/*.java`
+2. Rust ARM64 Cross-Check:
+   `cd guest/bridge-agent && cargo check --target aarch64-unknown-linux-gnu`
+3. E2E Matrix Runner:
+   `python3 tests/e2e/runner.py`

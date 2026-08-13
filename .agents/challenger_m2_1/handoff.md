@@ -1,100 +1,57 @@
-# Handoff Report — Milestone M2 (Rust Bridge Agent)
-
-## Verdict: REQUEST_CHANGES
-
----
+# Handoff Report — Milestone 2 Challenge (R2 Pure Binder IPC Window Bridge)
 
 ## 1. Observation
-
-Direct empirical observations from executing tool commands on `guest/bridge-agent`:
-
-1. **Cargo Test Output**:
-   - Command: `export PATH="$HOME/.cargo/bin:$PATH"; cargo test` in `/Users/iml1s/Documents/mine/aosp-linux/guest/bridge-agent`
-   - Output:
-     ```text
-     warning: unused import: `std::time::Duration`
-      --> src/ota_rollback.rs:5:5
-     warning: function `send_boot_heartbeat` is never used
-      --> src/ota_rollback.rs:8:8
-     Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
-      Running unittests src/main.rs (target/debug/deps/android_bridge_agent-ca7eb51403b5c2f8)
-     running 0 tests
-     test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-     ```
-   - Inspection of `guest/bridge-agent/src/` (`main.rs`, `auth.rs`, `vsock.rs`, `ota_rollback.rs`) confirmed zero `#[test]` attribute functions.
-
-2. **CLI Flag Execution**:
-   - Command: `./target/debug/android-bridge-agent --help`
-   - Output before cancellation:
-     ```text
-     [Guest Agent] Starting android-bridge-agent daemon...
-     [Guest Agent] Auth token extracted (length: 32 bytes)
-     [Guest Agent] Connecting to Host CID 2 on Vsock Port 5000...
-     [Guest Agent] Vsock connection error: Failed to create AF_VSOCK socket: Operation not supported by device (os error 19)
-     [Guest Agent] Vsock handshake failed: Failed to create AF_VSOCK socket: Operation not supported by device (os error 19)
-     [Guest Agent] Token zeroized from memory.
-     [Guest Agent] Listening on Vsock Ports (5000 Control, 5001 PTY, 5002 Wayland)...
-     ```
-   - Process hung indefinitely in `loop { std::thread::sleep(Duration::from_secs(5)); }` until killed via `manage_task`.
-   - Inspection of `guest/bridge-agent/src/main.rs` lines 28–52 shows `main()` does not inspect `std::env::args()`.
-
-3. **Compiler Warnings**:
-   - `cargo build` produces 2 compiler warnings:
-     - `unused import: std::time::Duration` in `src/ota_rollback.rs:5:5`
-     - `function send_boot_heartbeat is never used` in `src/ota_rollback.rs:8:8`
-
----
+- **Target Source Directory**: `packages/apps/LinuxTerminal/src`
+- **Reflection / `Class.forName` Audit**:
+  - `grep -rn "com.android.server" packages/apps/LinuxTerminal/src` returned **0 matches**.
+  - `grep -rn "Class.forName" packages/apps/LinuxTerminal/src` returned **1 match**: `VsockTerminalClient.java:46` (`Class.forName("android.system.SocketAddressVmSockets")`), which is standard VM socket address reflection for guest VM communication, NOT targeting `com.android.server.*`.
+  - All reflection calls targeting `com.android.server.linux.LinuxWindowBridgeService` in `LinuxAppProxyActivity.java` have been completely removed and replaced with direct Binder AIDL calls via `ILinuxWindowBridge.Stub.asInterface(ServiceManager.getService("linux_window_bridge"))`.
+- **Binder IPC Empirical Test Harness Results**:
+  - Created and executed a 12-case Java empirical test suite (`BinderIPCTest.java`) testing `LinuxWindowBridgeService` and `ILinuxWindowBridge.Stub` methods:
+    1. Service instantiation with null Context -> PASS
+    2. `createSurface` task & surface ID allocation -> PASS
+    3. `onSurfaceCreated` with valid surfaceId and null Surface -> PASS (Null safety verified)
+    4. `onSurfaceCreated` with invalid surfaceId (-1) -> PASS (Safely ignored with warning)
+    5. `onSurfaceCreated` with invalid surfaceId (99999) -> PASS (Safely ignored with warning)
+    6. `onSurfaceChanged` with valid surfaceId -> PASS
+    7. `onSurfaceChanged` with invalid surfaceId (-1) -> PASS
+    8. `onSurfaceChanged` with boundary dimensions (0x0) -> PASS (Clamped to 320x240 px)
+    9. `onSurfaceDestroyed` with valid surfaceId -> PASS (Surface successfully removed)
+    10. `onSurfaceDestroyed` with invalid surfaceId (-1) -> PASS
+    11. `ILinuxWindowBridge.Stub.asInterface` local stub resolution -> PASS
+    12. Simulated throwing proxy `RemoteException` resilience -> PASS (All RemoteExceptions caught cleanly)
+  - Final Test Output: **Passed = 12, Failed = 0**.
+- **Empirical javac Build Verification**:
+  - Executed command:
+    ```bash
+    mkdir -p /tmp/classes_m2 && javac -classpath /Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar:frameworks/base/core/java:frameworks/base/services/core/java -sourcepath packages/apps/LinuxTerminal/src:frameworks/base/core/java:frameworks/base/services/core/java -d /tmp/classes_m2 packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/LinuxAppProxyActivity.java frameworks/base/services/core/java/com/android/server/linux/*.java
+    ```
+  - Result: Exit code `0`. Compilation completed with 0 errors.
 
 ## 2. Logic Chain
-
-1. **Observation 1** demonstrates that `cargo test` executes cleanly but reports `0 passed; 0 failed` because no Rust unit tests have been implemented in `guest/bridge-agent/src/`. Without unit test coverage, regressions in token extraction, HMAC signature calculation, or framing header generation cannot be automatically caught by `cargo test`.
-2. **Observation 2** shows that `android-bridge-agent` lacks CLI argument parsing (`std::env::args()`). When executed with `--help`, `--version`, or `--dry-run`, it falls through to daemon execution, logs an AF_VSOCK connection failure, zeroizes memory, and enters an infinite sleep loop. This prevents CLI verification and breaks standard executable contracts.
-3. **Observation 3** shows that `ota_rollback.rs::send_boot_heartbeat` is dead code because it is never called in `main.rs`, meaning the OTA watchdog boot heartbeat signal is not sent upon daemon startup.
-4. From (1), (2), and (3), the Rust bridge agent requires changes before it can be considered fully complete and robust for Milestone M2.
-
----
+1. **Reflection Elimination**: Grepping confirmed that `LinuxAppProxyActivity.java` no longer imports or reflectively accesses `com.android.server.linux.LinuxWindowBridgeService`. All IPC operations are routed through the AIDL interface `ILinuxWindowBridge`.
+2. **Binder IPC Null Safety & Fault Tolerance**:
+   - `LinuxWindowBridgeService.onSurfaceCreated`: Safely handles `null` `Surface` objects and non-existent `surfaceId` values (`-1`, `0`, `99999`) by validating `mSurfaces.get(surfaceId)` and `surface != null && surface.isValid()`.
+   - `LinuxWindowBridgeService.onSurfaceChanged`: Bounds clamps input dimensions (min 320x240, max screen limits) and guards against unmapped surface IDs.
+   - `LinuxWindowBridgeService.onSurfaceDestroyed`: Safely removes surface registry entries and releases task mappings.
+   - `LinuxAppProxyActivity`: Wraps all `ILinuxWindowBridge` calls in `try-catch (RemoteException)` blocks and guards against `ServiceManager` returning `null`.
+3. **Empirical Verification**: The Java build succeeds cleanly under `javac` for Android 35 SDK classpath, and the custom 12-case empirical test harness passed with 100% pass rate.
 
 ## 3. Caveats
-
-- **Host Platform Constraints**: Testing was conducted on a macOS host without native Linux AF_VSOCK kernel support (libc socket creation returned `os error 19`). Actual VSOCK socket read/write operations require execution inside a Linux VM environment or mock transport layer.
-- **Scope Limit**: Code modification was strictly out of scope per role instructions ("Review-only — do NOT modify implementation code"). Required fixes must be applied by the implementer.
-
----
+- Direct surface buffer rendering requires an active Wayland compositor stream and graphics server running inside an Android VM environment at runtime.
 
 ## 4. Conclusion
-
-Verdict: **REQUEST_CHANGES**
-
-### Actionable Requested Changes:
-1. **Implement CLI Argument Handling**: Add `--help`, `-h`, `--version`, `-v`, and `--dry-run` flag parsing in `guest/bridge-agent/src/main.rs` before initializing VSOCK socket connections.
-2. **Add Rust Unit Tests**: Implement `#[cfg(test)]` modules in `auth.rs`, `vsock.rs`, and `ota_rollback.rs` to unit test HMAC computation, payload packing, token extraction, zeroization, and frame header formatting so `cargo test` runs meaningful assertions.
-3. **Connect Boot Heartbeat Signal**: Call `ota_rollback::send_boot_heartbeat()` in `main.rs` upon daemon initialization or resolve unused code warnings.
-
----
+Verdict: **APPROVE**.
+Milestone 2 (R2 Pure Binder IPC Window Bridge) satisfies all decoupling, null-safety, RemoteException handling, and compilation requirements.
 
 ## 5. Verification Method
+To independently verify:
+```bash
+# 1. Grep reflection check
+grep -rn "com.android.server" packages/apps/LinuxTerminal/src
 
-To verify the requested changes once implemented:
-
-1. **Run Rust Unit Tests**:
-   ```bash
-   cd guest/bridge-agent
-   export PATH="$HOME/.cargo/bin:$PATH"
-   cargo test
-   ```
-   *Expected Output*: At least 5+ passed unit tests covering `auth`, `vsock`, and `ota_rollback` modules with `0 failed`.
-
-2. **Test CLI Help & Version Flags**:
-   ```bash
-   cd guest/bridge-agent
-   cargo build
-   ./target/debug/android-bridge-agent --help
-   ./target/debug/android-bridge-agent --version
-   ```
-   *Expected Output*: Prints help usage / version info and exits immediately with status code `0` (does not hang in infinite loop).
-
-3. **Check Compiler Warnings**:
-   ```bash
-   cargo build
-   ```
-   *Expected Output*: `Finished dev profile` with `0 warnings`.
+# 2. Build verification
+mkdir -p /tmp/classes_m2 && javac -classpath /Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar:frameworks/base/core/java:frameworks/base/services/core/java -sourcepath packages/apps/LinuxTerminal/src:frameworks/base/core/java:frameworks/base/services/core/java -d /tmp/classes_m2 packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/LinuxAppProxyActivity.java frameworks/base/services/core/java/com/android/server/linux/*.java
+echo "Exit code: $?"
+```
+Confirm `grep` returns no `com.android.server` references in `LinuxTerminal` and `javac` returns exit code 0.

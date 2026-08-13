@@ -122,7 +122,7 @@ public class LinuxManagerService extends SystemService {
     @Override
     public void onStart() {
         Slog.i(TAG, "Starting LinuxManagerService");
-        publishBinderService(Context.LINUX_SERVICE, mBinderService);
+        publishBinderService("linux", mBinderService);
         publishLocalService(LinuxManagerInternal.class, mLocalService);
     }
 
@@ -216,6 +216,7 @@ public class LinuxManagerService extends SystemService {
     private byte[] mCeKeyBytes;
     private boolean mCeKeyAvailable = false;
     private byte[] mActiveAuthToken;
+    private byte[] mActiveAuthSecret;
 
     public byte[] deriveLuksKeyFromCeKey(byte[] rawCeMasterKey, int userId) {
         try {
@@ -273,9 +274,16 @@ public class LinuxManagerService extends SystemService {
 
     public byte[] generateHmacAuthToken() {
         byte[] token = new byte[32];
-        new java.security.SecureRandom().nextBytes(token);
+        byte[] secret = new byte[32];
+        java.security.SecureRandom random = new java.security.SecureRandom();
+        random.nextBytes(token);
+        random.nextBytes(secret);
         mActiveAuthToken = token;
-        return token;
+        mActiveAuthSecret = secret;
+        byte[] payload = new byte[64];
+        System.arraycopy(token, 0, payload, 0, 32);
+        System.arraycopy(secret, 0, payload, 32, 32);
+        return payload;
     }
 
     public boolean isCeKeyAvailable() {

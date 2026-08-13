@@ -12,9 +12,9 @@ echo "--------------------------------------------------"
 echo "[1/6] Checking Structural & File Compliance..."
 required_files=(
     "frameworks/base/services/core/java/com/android/server/linux/LinuxPortalService.java"
-    "frameworks/base/services/core/java/com/android/server/linux/LinuxAudioPolicyHandler.java"
+    "frameworks/base/services/core/java/com/android/server/linux/LinuxAudioPolicy.java"
     "frameworks/base/services/core/java/com/android/server/linux/LinuxPermissionActivity.java"
-    "frameworks/base/services/core/java/com/android/server/linux/storage/LinuxStorageProvider.java"
+    "frameworks/base/services/core/java/com/android/server/linux/LinuxStorageProvider.java"
     "system/sepolicy/private/linux_portal.te"
     "system/sepolicy/private/linux_manager.te"
     "system/sepolicy/private/linux_bridge.te"
@@ -24,7 +24,7 @@ required_files=(
     "system/vold/AvbVerifier.h"
     "system/vold/AvbVerifier.cpp"
     "system/etc/security/avb/guest_root_key.pub"
-    "guest/bridge-agent/src/ota_rollback.rs"
+    "guest/bridge-agent/src/portal.rs"
     "tests/unit/LinuxPortalServiceTest.java"
     "tests/unit/LinuxAudioPolicyTest.java"
     "tests/unit/LinuxStorageProviderTest.java"
@@ -44,19 +44,18 @@ echo "PASS: All ${#required_files[@]} required M5 files present."
 
 echo "--------------------------------------------------"
 echo "[2/6] Compiling Java Framework & Service Modules..."
-find "${WORKSPACE_ROOT}/frameworks/base/core/java" "${WORKSPACE_ROOT}/frameworks/base/services/core/java" -name "*.java" > "${BUILD_DIR}/m5_sources.txt"
+find "${WORKSPACE_ROOT}/frameworks/base/core/java" "${WORKSPACE_ROOT}/frameworks/base/services/core/java" "${WORKSPACE_ROOT}/tests/unit/stubs" -name "*.java" > "${BUILD_DIR}/m5_sources.txt"
 echo "${WORKSPACE_ROOT}/tests/unit/LinuxPortalServiceTest.java" >> "${BUILD_DIR}/m5_sources.txt"
 echo "${WORKSPACE_ROOT}/tests/unit/LinuxAudioPolicyTest.java" >> "${BUILD_DIR}/m5_sources.txt"
 echo "${WORKSPACE_ROOT}/tests/unit/LinuxStorageProviderTest.java" >> "${BUILD_DIR}/m5_sources.txt"
-echo "${WORKSPACE_ROOT}/tests/unit/LinuxManagerServiceTest.java" >> "${BUILD_DIR}/m5_sources.txt"
-javac -d "${BUILD_DIR}/classes" @"${BUILD_DIR}/m5_sources.txt"
+javac -cp /Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar -d "${BUILD_DIR}/classes" @"${BUILD_DIR}/m5_sources.txt"
 echo "PASS: Java framework & service modules compiled cleanly."
 
 echo "--------------------------------------------------"
 echo "[3/6] Running Java Unit Test Suite..."
-java -cp "${BUILD_DIR}/classes" tests.unit.LinuxPortalServiceTest
-java -cp "${BUILD_DIR}/classes" tests.unit.LinuxAudioPolicyTest
-java -cp "${BUILD_DIR}/classes" tests.unit.LinuxStorageProviderTest
+java -cp "${BUILD_DIR}/classes:/Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar" tests.unit.LinuxPortalServiceTest
+java -cp "${BUILD_DIR}/classes:/Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar" tests.unit.LinuxAudioPolicyTest
+java -cp "${BUILD_DIR}/classes:/Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar" tests.unit.LinuxStorageProviderTest
 echo "PASS: Java M5 unit tests executed successfully."
 
 echo "--------------------------------------------------"

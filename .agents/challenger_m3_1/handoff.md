@@ -1,80 +1,101 @@
-# Handoff Report — Challenger M3 (challenger_m3_1)
+# Handoff Report — Milestone 3 Challenger 1 (challenger_m3_1)
 
-**Role**: EMPIRICAL CHALLENGER  
-**Milestone**: M3 (Real Vsock Socket Connect & Session ID - R3)  
-**Date**: 2026-08-08  
-**Working Directory**: `/Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_1`  
-**Verdict**: **APPROVE**
+**VERDICT: APPROVE**
 
 ---
 
-## 1. Observation
+## 1. Observation (觀察事實)
 
-Direct empirical testing and verification of Worker M3's implementation revealed:
-- `VsockTerminalClient.java` (lines 33-98) initiates real AF_VSOCK connections using `Os.socket(AF_VSOCK, SOCK_STREAM, 0)` and `Os.connect(mSocketFd, address)` with target CID (`guestCid`) and Port `5001`.
-- `LinuxManagerService.java` (line 489) formats session IDs using `String.format(java.util.Locale.US, "session_%08d", ++mNextSessionId)` producing 16-byte ASCII strings (`"session_00001001"`).
-- `TerminalView.java` (lines 89-111) retrieves dynamic session tokens via `ServiceManager.getService("linux_service")` and `ILinuxManager.createTerminalSession(mColumns, mRows, null)`.
-- Empirical testing with 100 consecutive failed socket connection attempts confirmed **0 leaked file descriptors** (Initial FDs: 9, Final FDs: 9).
-- Unit tests (`TerminalAppUnitTest`, `LinuxManagerServiceTest`, `VsockTerminalClientEmpiricalTest`) and Python E2E integration test suites (Tier 1 & Tier 2 for `F-R3`) achieved a 100% pass rate.
+1. **Rust ARM64 交叉編譯檢查 (`cargo check --target aarch64-unknown-linux-gnu`)**:
+   - `guest/bridge-agent`: 執行 `$HOME/.cargo/bin/cargo check --target aarch64-unknown-linux-gnu`。
+     - 輸出：`Finished dev profile [unoptimized + debuginfo] target(s) in 0.07s`。
+     - 結果：**0 warnings, 0 errors**。
+   - `guest/portal-agent`: 執行 `$HOME/.cargo/bin/cargo check --target aarch64-unknown-linux-gnu`。
+     - 輸出：`Finished dev profile [unoptimized + debuginfo] target(s) in 0.02s`。
+     - 結果：**0 warnings, 0 errors**。
 
----
+2. **Rust 單元與實證測試 (`cargo test`)**:
+   - `guest/bridge-agent`: 執行 `$HOME/.cargo/bin/cargo test`。
+     - 測試總數：35 個測試（包含 HMAC 測試、Socket 超時測試、Pty / Wayland 壓力測試、重放與非法金鑰防禦測試）。
+     - 結果：`test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.00s`。
+   - `guest/portal-agent`: 執行 `$HOME/.cargo/bin/cargo test`。
+     - 結果：0 passed; 0 failed。測試編譯時產生 3 個未使用的匯入/變體警告（`unused import: CString`, `unused import: OsStrExt`, `variant Deleted is never constructed` in `inotify_watcher.rs`），但功能無誤。
 
-## 2. Logic Chain
+3. **原生 C++ 測試與端對端 (E2E) 測試 verification**:
+   - C++ 原生單元測試：執行 `./build_out/bin/linux_bridge_test`。
+     - 結果：`PASS (50/50 succeeded)`，`NATIVE TEST RESULT: ALL TESTS PASSED SUCCESSFULLY`。
+   - Python E2E Tier 1 & Tier 2：執行 `python3 tests/e2e/runner.py --tier 1 --feature F-R3-001..007` 與 `--tier 2 --feature F-R3-001..007`。
+     - 結果：**100.0% PASS RATE** across all Tier 1 and Tier 2 tests for Milestone 3 (F-R3-001 到 F-R3-007)。
 
-1. **Empirical Connection Verification**:
-   - `VsockTerminalClient` performs a genuine syscall `Os.connect(mSocketFd, address)` with `VmSocketAddress(5001, guestCid)`.
-   - On connection failure or missing AF_VSOCK driver, `try-catch` blocks catch `ErrnoException` / `Exception`, execute `close()`, and re-throw `IOException` with detailed diagnostic context.
-
-2. **Resource & Descriptor Teardown**:
-   - Running 100 failed connection attempts in `VsockTerminalClientEmpiricalTest` verified that `close()` cleanly closes `mSocketFd` and nullifies references. Zero descriptor accumulation was observed under stress.
-   - Closing the client interrupts `VsockReadThread`, causing the background read loop to terminate within 150ms.
-
-3. **Framing & Session ID Contract**:
-   - `LinuxManagerService`'s 16-byte session token format (`"session_%08d"`) satisfies `VsockPtyFramer`'s strict `SESSION_ID_SIZE = 16` length assertion.
-   - Session tokens of length != 16 (e.g. 12-byte or 20-byte strings) are correctly rejected with `IllegalArgumentException`.
-
-4. **Test Coverage Verification**:
-   - Minor adjustment to `javac` classpath in E2E runners to include `-sourcepath` ensured clean compilation. All 70 E2E tests (35 Tier 1 + 35 Tier 2) and all 19 Java unit tests passed cleanly.
-
----
-
-## 3. Caveats
-
-- **Kernel vsock Support on Host JVM**: Host JVM environments running tests outside an active Android kernel/AVF guest VM do not have an active AF_VSOCK kernel module. `VsockTerminalClient` correctly handles `ErrnoException` when AF_VSOCK is unavailable and provides `connectSocket(java.net.Socket socket, ...)` for loopback testing.
-
----
-
-## 4. Conclusion
-
-**Verdict**: **APPROVE**  
-Milestone M3 (Real Vsock Socket Connect & Session ID - R3) is fully verified, robust against socket leaks, correctly integrated with dynamic session IDs, and passes all unit, empirical, and E2E test suites.
+4. **安全與協議機制檢查 (Replay protection, Invalid secret, Timeout)**:
+   - **重放防護 (Replay Protection)**：
+     - 在 `system/linux_bridge/hmac_auth.cpp` 中，`HmacAuth::isTokenUsed` 與 `HmacAuth::markTokenUsed` 透過線程安全的 `sUsedTokens` 哈希表維護已使用的 Token。
+     - 在 `verifyHandshake` 中，若發現 `isTokenUsed(payloadToken)` 為 true，立即輸出 `[HmacAuth] Replayed token rejected during handshake` 並拒絕握手。
+   - **非法金鑰處理 (Invalid Secret Handling)**：
+     - `verify_token` (`guest/bridge-agent/src/auth.rs`) 與 `constantTimeCompare` (`system/linux_bridge/hmac_auth.cpp`) 採用常數時間位元比較 (Constant-time comparison)，防止時脈側信道攻擊 (Timing attacks)。
+     - 零金鑰 (`all-zero token`)、空金鑰、或 HMAC 簽名不匹配時，回應 `STATUS_UNAUTHORIZED` (0x00000401)，紀錄 Security Alert 並中止連線。
+   - **超時機制 (Timeout Behavior)**：
+     - Host 端 `HmacAuth::HANDSHAKE_TIMEOUT_SEC` 設定為 5.0 秒，超時即拒絕握手。
+     - Guest 端 `perform_handshake` 透過 `stream.set_read_timeout(Some(Duration::from_secs(5)))` 設定 5 秒 Socket 讀取超時。
+     - 在實證測試 `test_silent_socket_handshake_timeout_empirical` 中驗證：無論是傳送部分封包（5 bytes）或完全沉默連線（0 bytes），均在 5 秒超時窗口（4.8s~6.5s）準確中斷並傳回 false。
 
 ---
 
-## 5. Verification Method
+## 2. Logic Chain (推理邏輯鏈)
 
-To independently re-verify Challenger M3 findings:
+1. **單一金鑰 (Single-Secret) 協議閉環**:
+   - Host Java (`LinuxManagerService`) 隨機產生 32-byte Token + 32-byte Secret (64-byte payload)，透過 `launch_vm.sh` 以 `android_bridge.token=<64_hex_chars>` 傳遞給 Kernel Cmdline。
+   - Guest Agent (`auth.rs`) 從 `/proc/cmdline` 讀取並精確解碼為 32-byte 二進位金鑰。
+   - Guest 啟動時作為 Initiator 連線至 Host CID 2 Port 5000，發送 64-byte `AuthHandshakePayload` (Token + HMAC-SHA256 signature)。
+   - Host C++ (`vsock_server.cpp`) 驗證 HMAC 簽名成功後，發送 `CMD_HANDSHAKE_COMPLETE` 促使 VM 狀態轉為 `RUNNING`。
 
-1. **Run Challenger Empirical Test Suite (`VsockTerminalClientEmpiricalTest`)**:
+2. **強固性與防禦深度**:
+   - 經實測，所有常數時間比較、防重放雜湊表與 5 秒讀取超時運作符合預期。
+   - ARM64 交叉編譯無任何警告與錯誤，Rust 單元測試與 Python E2E 測試達到 100% 通過率。
+
+---
+
+## 3. Caveats (注意事項)
+
+- **輕微編譯警告**：`guest/portal-agent` 在執行 `cargo test` 時對 `inotify_watcher.rs` 產生 3 個 `unused import` / `dead_code` 警告，但在指定 `--target aarch64-unknown-linux-gnu` 的 `cargo check` 中為 0 警告 0 錯誤。不影響安全與功能。
+
+---
+
+## 4. Conclusion (審查結論)
+
+Milestone 3 (R3 Single-Secret HMAC Agreement & Handshake Initiator) 的實作符合所有規格與安全性要求。
+
+**審查判定：APPROVE**
+
+---
+
+## 5. Verification Method (獨立驗證方法)
+
+1. **Rust ARM64 交叉編譯檢查**:
    ```bash
-   mkdir -p /tmp/m3_empirical_classes && javac -sourcepath frameworks/base/core/java:frameworks/base/services/core/java:packages/apps/LinuxTerminal/src -classpath /Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar -d /tmp/m3_empirical_classes tests/unit/VsockTerminalClientEmpiricalTest.java && java -cp /tmp/m3_empirical_classes:/Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar tests.unit.VsockTerminalClientEmpiricalTest
+   (cd guest/bridge-agent && $HOME/.cargo/bin/cargo check --target aarch64-unknown-linux-gnu)
+   (cd guest/portal-agent && $HOME/.cargo/bin/cargo check --target aarch64-unknown-linux-gnu)
    ```
-   *Expected Output*: `EMPIRICAL TEST RESULT: ALL CHALLENGER TESTS PASSED` (Exit code: 0).
+   *預期結果*: Exit code 0, 0 warnings, 0 errors.
 
-2. **Run Java Unit Test Suite (`TerminalAppUnitTest`)**:
+2. **Rust 單元與實證測試**:
    ```bash
-   mkdir -p /tmp/m3_classes && javac -sourcepath frameworks/base/core/java:frameworks/base/services/core/java:packages/apps/LinuxTerminal/src -classpath /Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar -d /tmp/m3_classes tests/unit/TerminalAppUnitTest.java && java -cp /tmp/m3_classes:/Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar tests.unit.TerminalAppUnitTest
+   (cd guest/bridge-agent && $HOME/.cargo/bin/cargo test)
+   (cd guest/portal-agent && $HOME/.cargo/bin/cargo test)
    ```
-   *Expected Output*: `JAVA TEST RESULT: ALL M3 TESTS PASSED SUCCESSFULLY` (Exit code: 0).
+   *預期結果*: 35/35 passed, Exit code 0.
 
-3. **Run System Service Unit Test (`LinuxManagerServiceTest`)**:
+3. **C++ 原生單元測試**:
    ```bash
-   mkdir -p /tmp/m3_service_classes && javac -sourcepath frameworks/base/core/java:frameworks/base/services/core/java:packages/apps/LinuxTerminal/src -classpath /Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar -d /tmp/m3_service_classes tests/unit/LinuxManagerServiceTest.java && java -cp /tmp/m3_service_classes:/Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar tests.unit.LinuxManagerServiceTest
+   mkdir -p build_out/bin
+   clang++ -std=c++20 -Wall -Wextra -pthread -I. system/linux_bridge/hmac_auth.cpp system/linux_bridge/vsock_framing.cpp system/linux_bridge/socket_server.cpp system/linux_bridge/vsock_server.cpp tests/unit/linux_bridge_test.cpp -o build_out/bin/linux_bridge_test
+   ./build_out/bin/linux_bridge_test
    ```
-   *Expected Output*: `JAVA TEST RESULT: ALL TESTS PASSED SUCCESSFULLY` (Exit code: 0).
+   *預期結果*: `NATIVE TEST RESULT: ALL TESTS PASSED SUCCESSFULLY`.
 
-4. **Run Tier 1 & Tier 2 E2E Test Suite (`F-R3`)**:
+4. **Python E2E 測試**:
    ```bash
-   rm -rf /tmp/m3_classes /tmp/m3_remediation_classes && python3 tests/e2e/runner.py --tier 1 --feature F-R3 && python3 tests/e2e/runner.py --tier 2 --feature F-R3
+   python3 tests/e2e/runner.py --tier 1 --feature F-R3-001..007
+   python3 tests/e2e/runner.py --tier 2 --feature F-R3-001..007
    ```
-   *Expected Output*: Both Tier 1 (35/35) and Tier 2 (35/35) pass with 100.0% rate (Exit code: 0).
+   *預期結果*: 100.0% PASS RATE.

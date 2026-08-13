@@ -1,52 +1,51 @@
-# BRIEFING — 2026-08-08T14:22:50+08:00
+# BRIEFING — 2026-08-14T01:53:30Z
 
 ## Mission
-Empirically challenge and stress-test M3 implementation (dynamic session ID generation, 16-byte framing alignment, VsockPtyFramer, LinuxManagerService) and render an APPROVE/REJECT verdict.
+Challenge and stress-test Milestone 3 (R3 Single-Secret HMAC Agreement & Handshake Initiator) empirically.
 
 ## 🔒 My Identity
-- Archetype: EMPIRICAL CHALLENGER
+- Archetype: critic, specialist
 - Roles: critic, specialist
 - Working directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2
-- Original parent: 5c184781-7153-420e-a9f4-56c517ccd32e
-- Milestone: M3 (Real Vsock Socket Connect & Session ID - R3)
-- Instance: 1 of 1
+- Original parent: 9bf4ed43-7f01-40fa-acc0-13647ab4d92d
+- Milestone: Milestone 3
+- Instance: 2 of 2
 
 ## 🔒 Key Constraints
-- Review-only — do NOT modify implementation code (report findings/bugs, do not fix them in project source)
-- EMPIRICAL verification mandatory — write and run real tests / stress harnesses
-- Output reports to challenge.md and handoff.md in /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2/
+- Review-only — do NOT modify implementation code
+- Must empirically run verification tests and inspect state transitions
+- Report findings and verdict (APPROVE or REQUEST_CHANGES) in handoff.md
 
 ## Current Parent
-- Conversation ID: 5c184781-7153-420e-a9f4-56c517ccd32e
-- Updated: 2026-08-08T14:22:50+08:00
+- Conversation ID: 9bf4ed43-7f01-40fa-acc0-13647ab4d92d
+- Updated: 2026-08-14T01:53:30Z
 
 ## Review Scope
-- **Files to review**:
-  - ORIGINAL_REQUEST.md
-  - PROJECT.md
-  - .agents/worker_m3_1/changes.md
-  - .agents/worker_m3_1/handoff.md
-- **Interface contracts**: PROJECT.md
-- **Review criteria**: correctness, dynamic session ID 16-byte format/alignment, VsockPtyFramer under rapid/sequential session creation, build & test passing.
+- **Files to review**: LinuxManagerService.java, LinuxBridgeService.java, system/linux_bridge/hmac_auth.cpp, socket_server.cpp, vsock_server.cpp, guest/bridge-agent/src/auth.rs
+- **Interface contracts**: ORIGINAL_REQUEST.md
+- **Review criteria**: State transition correctness, HMAC agreement across Java/C++/Rust, empirical test execution.
 
 ## Attack Surface
-- **Hypotheses tested**: Dynamic session ID 16-byte length, 21-byte framing alignment, multithreaded session ID collision, 1-byte stream chunking fragmentation, VsockTerminalClient pre-flight assertions, TerminalView dynamic binder acquisition.
-- **Vulnerabilities found**: None. Analyzed integer formatting boundary at 99,999,999 sessions per boot, which is well within operating parameters.
-- **Untested angles**: Hardware AF_VSOCK kernel socket on real device (tested via loopback / mock in desktop JVM).
+- **Hypotheses tested**:
+  - `LinuxManagerService` state transition logic on handshake completion (STARTING -> RUNNING, timeout cancellation, idempotency, late handshake handling) -> PASSED.
+  - Rust ARM64 compilation cleanliness (`cargo check --target aarch64-unknown-linux-gnu`) -> PASSED (0 warnings, 0 errors).
+  - Native C++ Daemon `linux_bridge_test` high concurrency -> PASSED (50/50 clients succeeded).
+  - RFC 4231 Test Case 2 HMAC-SHA256 Golden Vector accuracy -> FAILED in C++ `hmac_auth.cpp:87` due to typo in constant `K[62]`.
+- **Vulnerabilities found**:
+  - Cryptographic / Interoperability Defect: `system/linux_bridge/hmac_auth.cpp` line 87 defines `K[62]` as `0xbef4a3f7` instead of standard `0xbef9a3f7`. When OpenSSL is unavailable or fallback mode is active, Host C++ HMAC-SHA256 fails RFC 4231 golden vectors and produces signatures that mismatch Guest Rust agent (`guest/bridge-agent/src/auth.rs`).
+- **Untested angles**: None.
 
 ## Loaded Skills
-[None]
+- None
 
 ## Key Decisions Made
-- Initialized BRIEFING.md and DISPATCH.md.
-- Created `ChallengerM3Challenger2StressTest.java` to stress test sequential generation (10,000 IDs), multithreaded concurrent generation (20 threads x 500 requests), 1-byte stream chunking (1,000 frames), client pre-flight assertions, and TerminalView dynamic session acquisition.
-- Executed Java unit tests, Java service tests, native C++ stress test, Java Challenger 2 stress suite, and Python E2E runner (Tier 1 & Tier 2 for F-R3).
-- Issued verdict: **APPROVE**.
+- Discovered defect in `system/linux_bridge/hmac_auth.cpp:87` via empirical test harness `challenger_m3_2_empirical_test.cpp`.
+- Issued verdict: REQUEST_CHANGES.
 
 ## Artifact Index
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2/DISPATCH.md — Incoming dispatch message log
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2/BRIEFING.md — Working memory briefing
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2/challenge.md — Detailed challenge findings report & empirical test matrix
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2/handoff.md — 5-component handoff report
-- /Users/iml1s/Documents/mine/aosp-linux/tests/unit/ChallengerM3Challenger2StressTest.java — Challenger 2 Java empirical stress test harness
-
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2/BRIEFING.md — Working memory
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2/DISPATCH.md — Dispatch log
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2/progress.md — Progress tracking
+- /Users/iml1s/Documents/mine/aosp-linux/tests/unit/LinuxManagerServiceStateTest.java — Java state test harness
+- /Users/iml1s/Documents/mine/aosp-linux/tests/unit/challenger_m3_2_empirical_test.cpp — C++ empirical stress test harness
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2/handoff.md — Final handoff report

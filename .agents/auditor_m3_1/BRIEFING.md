@@ -1,42 +1,45 @@
-# BRIEFING — 2026-08-08T14:26:09Z
+# BRIEFING — 2026-08-14T01:52:26+08:00
 
 ## Mission
-Forensic integrity audit of Milestone M3 (Real Vsock Socket Connect & Session ID - R3) in AOSP Linux project.
+Milestone 3 (R3 Single-Secret HMAC Agreement & Handshake Initiator) Forensic Integrity Audit
 
 ## 🔒 My Identity
 - Archetype: forensic_auditor
-- Roles: [critic, specialist, auditor]
+- Roles: critic, specialist, auditor
 - Working directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/auditor_m3_1
-- Original parent: 5c184781-7153-420e-a9f4-56c517ccd32e
-- Target: Milestone M3
+- Original parent: 9bf4ed43-7f01-40fa-acc0-13647ab4d92d
+- Target: Milestone 3
 
 ## 🔒 Key Constraints
 - Audit-only — do NOT modify implementation code
 - Trust NOTHING — verify everything independently
-- Check for hardcoded test results, facade implementations, static session IDs, and fake AF_VSOCK syscalls
+- ORIGINAL_REQUEST.md takes precedence over dispatch contradictions if any
+- Report verdict: CLEAN or INTEGRITY_VIOLATION
+- Report path: /Users/iml1s/Documents/mine/aosp-linux/.agents/auditor_m3_1/handoff.md
 
 ## Current Parent
-- Conversation ID: 5c184781-7153-420e-a9f4-56c517ccd32e
-- Updated: 2026-08-08T14:26:09Z
+- Conversation ID: 9bf4ed43-7f01-40fa-acc0-13647ab4d92d
+- Updated: 2026-08-14T01:52:26+08:00
 
 ## Audit Scope
-- **Work product**: Milestone M3 changes in LinuxTerminal & LinuxManagerService
-- **Profile loaded**: General Project
-- **Audit type**: Forensic integrity check
+- Work product: Milestone 3 changes (Rust, C++, Java) for HMAC-SHA256 signature generation/verification and Handshake Initiator.
+- Profile loaded: General Project
+- Audit type: forensic integrity check
 
 ## Audit Progress
-- **Phase**: reporting
-- **Checks completed**: [Read documentation & handoffs, Source code analysis, Syscall verification, Behavioral verification, Test execution authenticity, Audit report generation]
-- **Checks remaining**: []
-- **Findings so far**: CLEAN — All forensic checks passed. No violations found.
+- Phase: reporting
+- Checks completed: Source Code Analysis, Behavioral Verification, Test Execution (Rust, Java, C++, Python E2E Tier 1 & Tier 2)
+- Checks remaining: None
+- Findings so far: CLEAN
 
 ## Key Decisions Made
-- Confirmed real AF_VSOCK syscall `Os.connect(mSocketFd, address)` in VsockTerminalClient.java.
-- Confirmed dynamic 16-byte session ID generation `session_%08d` in LinuxManagerService.java.
-- Confirmed dynamic session acquisition in TerminalView.java.
-- Independently verified TerminalAppUnitTest, LinuxManagerServiceTest, and E2E F-R3 Tier 1 & Tier 2 test runners.
+- Initialized BRIEFING.md and DISPATCH.md
+- Conducted full source code audit of Java, C++, and Rust auth and initiator implementations
+- Ran ARM64 cargo check, javac compilation, Java/C++ unit tests, and Python E2E tests
+- Determined verdict CLEAN and wrote handoff.md
 
 ## Artifact Index
-- DISPATCH.md — Audit assignment instructions
-- audit.md — Forensic audit report (Verdict: CLEAN)
-- handoff.md — Agent handoff report
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/auditor_m3_1/DISPATCH.md — Dispatch instructions
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/auditor_m3_1/BRIEFING.md — Working memory briefing
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/auditor_m3_1/progress.md — Liveness progress heartbeat
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/auditor_m3_1/handoff.md — Forensic audit handoff report

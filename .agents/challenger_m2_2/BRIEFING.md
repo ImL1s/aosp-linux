@@ -1,56 +1,41 @@
-# BRIEFING — 2026-08-06T13:46:51Z
+# BRIEFING — 2026-08-14T01:33:13Z
 
 ## Mission
-Empirically challenge AVB 2.0 signed guest images and key verification for Milestone M2 (R2).
+Adversarial verification and stress-testing of Milestone 2 (R2 Pure Binder IPC Window Bridge).
 
 ## 🔒 My Identity
 - Archetype: EMPIRICAL CHALLENGER
 - Roles: critic, specialist
 - Working directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m2_2
-- Original parent: 7249e5f0-af46-4f65-970f-c4ca44e9345e
-- Milestone: M2
+- Original parent: 9bf4ed43-7f01-40fa-acc0-13647ab4d92d
+- Milestone: M2 (R2 Pure Binder IPC Window Bridge)
 - Instance: 2 of 2
 
 ## 🔒 Key Constraints
-- Review & Stress-test only — write adversarial test scripts to verify worker's implementation.
-- Execute tests empirically — run code/tests directly using tools, do not rely on worker claims.
-- Produce handoff report with verdict (APPROVE or REQUEST_CHANGES) at `/Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m2_2/handoff.md`.
+- Review-only — do NOT modify implementation code (report findings in handoff.md)
+- Empirical verification required (write & run test/compilation scripts, inspect files directly)
 
 ## Current Parent
-- Conversation ID: 7249e5f0-af46-4f65-970f-c4ca44e9345e
-- Updated: 2026-08-06T13:46:51Z
-
+- Conversation ID: 9bf4ed43-7f01-40fa-acc0-13647ab4d92d
+- Updated: 2026-08-14T01:33:13Z
 
 ## Review Scope
-- **Files reviewed & stress-tested**:
-  - `build_out/guest_images/vbmeta.img`
-  - `build_out/guest_images/user_home.img`
-  - `build_out/guest_images/base_rootfs.img`, `custom_overlay.img`
-  - `system/etc/security/avb/guest_root_key.pub`
-  - `system/vold/AvbVerifier.h` & `AvbVerifier.cpp`
-  - `guest/scripts/init_storage_layout.sh`
-  - Created `.agents/challenger_m2_2/verify_m2_r2.py`
-  - Created `tests/unit/challenger_m2_r2_avb_test.cpp`
+- **Files to review**: AIDL definitions (`ILinuxWindowBridge.aidl`), `LinuxWindowBridgeService.java`, `LinuxAppProxyActivity.java`, Launcher3, LinuxTerminal, framework server classes, build configurations.
+- **Review criteria**: AIDL parameter matching, full compilation compatibility, hidden compilation breaks, edge cases, error handling, performance/lifecycle failure modes.
 
 ## Attack Surface
-- **Hypotheses tested**:
-  - `guest_root_key.pub` key parsing and size -> PASS (RSA 4096-bit key)
-  - Guest image file sizes (2500M, 4000M, 5000M) -> PASS (exact byte match)
-  - `vbmeta.img` RSA-4096 signature & aux key block -> FAIL (`auth_sz`=0, `aux_sz`=0, `algo`=1)
-  - `user_home.img` LUKS2 header magic -> FAIL (missing `LUKS\xba\xbe`, all zero bytes)
-  - `VbmetaHeader` C++ struct packing alignment -> FAIL (56 bytes vs 44 bytes, causes `AVBRollbackDenied`)
-  - `AvbVerifier::verifyGuestImage` hash digest and RSA signature verification -> FAIL (discards image digest, skips signature check)
+- **Hypotheses tested**: [TBD]
+- **Vulnerabilities found**: [TBD]
+- **Untested angles**: [TBD]
 
 ## Loaded Skills
-- None.
+- None required directly, but using empirical testing methodologies.
 
 ## Key Decisions Made
-- Executed empirical verification scripts in Python (`verify_m2_r2.py`) and C++ (`challenger_m2_r2_avb_test.cpp`).
-- Verdict: **REQUEST_CHANGES** due to 4 critical defects in AVB signing, key matching, LUKS2 formatting, and C++ struct packing.
+- Initialized briefing and dispatch tracking.
 
 ## Artifact Index
-- `.agents/challenger_m2_2/handoff.md` — Final handoff report with REQUEST_CHANGES verdict
-- `.agents/challenger_m2_2/challenge.md` — Detailed empirical challenge report
-- `.agents/challenger_m2_2/verify_m2_r2.py` — Python empirical inspection harness
-- `tests/unit/challenger_m2_r2_avb_test.cpp` — C++ empirical AVB verifier & struct layout test
-
+- `.agents/challenger_m2_2/DISPATCH.md` — Incoming dispatch message
+- `.agents/challenger_m2_2/BRIEFING.md` — Agent briefing state
+- `.agents/challenger_m2_2/progress.md` — Liveness heartbeat
+- `.agents/challenger_m2_2/handoff.md` — Final challenge report

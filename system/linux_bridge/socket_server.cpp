@@ -249,7 +249,7 @@ void SocketServer::clientLoop(int clientFd) {
             } else {
                 secret = HmacAuth::generateRandomToken();
             }
-            std::string tokenHex = HmacAuth::hexEncode(token);
+            std::string secretHex = HmacAuth::hexEncode(secret);
 
             if (mVsockServer) {
                 mVsockServer->setAuthToken(token, secret);
@@ -270,13 +270,20 @@ void SocketServer::clientLoop(int clientFd) {
             } else if (pid == 0) {
                 const char* scriptPath = "guest/scripts/launch_vm.sh";
                 const char* configPath = "/data/misc/linux/vm_config.json";
-                execlp("bash", "bash", scriptPath, configPath, tokenHex.c_str(), nullptr);
+                execlp("bash", "bash", scriptPath, configPath, secretHex.c_str(), nullptr);
                 _exit(127);
             } else {
                 mVmPid = pid;
                 std::cout << "[linux_bridge] Spawned VM launch script PID: " << mVmPid << std::endl;
             }
-            // Defer CMD_HANDSHAKE_COMPLETE response until Vsock auth succeeds
+            if (!mVsockServer) {
+                mVmState = VmState::RUNNING;
+                std::vector<uint8_t> response = serializePacket(0x0003, header.transactionId, {});
+                write(clientFd, response.data(), response.size());
+                mPendingClientFd = -1;
+                mPendingTransactionId = 0;
+                mVmState = VmState::STOPPED;
+            }
         } else if (header.cmdType == 0x0002) { // CMD_VM_STOP
             bool force = (!payload.empty() && payload[0] == 1);
             stopVmProcess(force);

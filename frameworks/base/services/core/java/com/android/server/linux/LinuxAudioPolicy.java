@@ -201,8 +201,3 @@ public class LinuxAudioPolicy implements AudioManager.OnAudioFocusChangeListener
     }
 }
 
-class LinuxAudioPolicyHandler extends LinuxAudioPolicy {
-    public LinuxAudioPolicyHandler(Context context) {
-        super(context);
-    }
-}

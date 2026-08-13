@@ -14,7 +14,7 @@ public class TerminalScreenMatrix {
     private int mCursorCol = 0;
     private boolean mCursorVisible = true;
 
-    private final Rect mDirtyRect = new Rect();
+    private int mDirtyLeft, mDirtyTop, mDirtyRight, mDirtyBottom;
     private boolean mHasDirty = false;
 
     public TerminalScreenMatrix(int rows, int cols) {
@@ -70,13 +70,16 @@ public class TerminalScreenMatrix {
 
     public synchronized void markDirtyCell(int row, int col) {
         if (!mHasDirty) {
-            mDirtyRect.set(col, row, col + 1, row + 1);
+            mDirtyLeft = col;
+            mDirtyTop = row;
+            mDirtyRight = col + 1;
+            mDirtyBottom = row + 1;
             mHasDirty = true;
         } else {
-            mDirtyRect.left = Math.min(mDirtyRect.left, col);
-            mDirtyRect.top = Math.min(mDirtyRect.top, row);
-            mDirtyRect.right = Math.max(mDirtyRect.right, col + 1);
-            mDirtyRect.bottom = Math.max(mDirtyRect.bottom, row + 1);
+            mDirtyLeft = Math.min(mDirtyLeft, col);
+            mDirtyTop = Math.min(mDirtyTop, row);
+            mDirtyRight = Math.max(mDirtyRight, col + 1);
+            mDirtyBottom = Math.max(mDirtyBottom, row + 1);
         }
     }
 
@@ -87,18 +90,24 @@ public class TerminalScreenMatrix {
         int c2 = Math.max(0, Math.min(mCols, endCol));
 
         if (!mHasDirty) {
-            mDirtyRect.set(c1, r1, c2, r2);
+            mDirtyLeft = c1;
+            mDirtyTop = r1;
+            mDirtyRight = c2;
+            mDirtyBottom = r2;
             mHasDirty = true;
         } else {
-            mDirtyRect.left = Math.min(mDirtyRect.left, c1);
-            mDirtyRect.top = Math.min(mDirtyRect.top, r1);
-            mDirtyRect.right = Math.max(mDirtyRect.right, c2);
-            mDirtyRect.bottom = Math.max(mDirtyRect.bottom, r2);
+            mDirtyLeft = Math.min(mDirtyLeft, c1);
+            mDirtyTop = Math.min(mDirtyTop, r1);
+            mDirtyRight = Math.max(mDirtyRight, c2);
+            mDirtyBottom = Math.max(mDirtyBottom, r2);
         }
     }
 
     public synchronized void markAllDirty() {
-        mDirtyRect.set(0, 0, mCols, mRows);
+        mDirtyLeft = 0;
+        mDirtyTop = 0;
+        mDirtyRight = mCols;
+        mDirtyBottom = mRows;
         mHasDirty = true;
     }
 
@@ -106,7 +115,14 @@ public class TerminalScreenMatrix {
         if (!mHasDirty) {
             return false;
         }
-        outRect.set(mDirtyRect);
+        if (outRect != null) {
+            try {
+                outRect.left = mDirtyLeft;
+                outRect.top = mDirtyTop;
+                outRect.right = mDirtyRight;
+                outRect.bottom = mDirtyBottom;
+            } catch (Throwable ignored) {}
+        }
         mHasDirty = false;
         return true;
     }

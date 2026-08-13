@@ -90,7 +90,7 @@ public class LinuxStorageProviderTest {
 
         // System root query blocking
         try {
-            provider.queryChildDocuments("/etc", null, null);
+            provider.queryChildDocuments("/etc", null, (String) null);
             throw new RuntimeException("Test Failed: Should have thrown SecurityException when querying system root");
         } catch (SecurityException e) {
             System.out.println("Pass: Caught expected SecurityException: " + e.getMessage());

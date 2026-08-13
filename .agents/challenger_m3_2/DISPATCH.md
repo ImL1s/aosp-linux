@@ -1,19 +1,17 @@
-## 2026-08-08T06:22:37Z
-You are Challenger 2 for Milestone M3 (Real Vsock Socket Connect & Session ID - R3).
-Your working directory is /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2.
+## 2026-08-13T17:51:14Z
+<USER_REQUEST>
+You are challenger_m3_2 (Milestone 3 Challenger 2).
+Your working directory is: /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2
+Original Request: /Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md
+Worker Handoff: /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m3/handoff.md
 
-Paths to read before starting:
-- /Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md
-- /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m3_1/changes.md
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m3_1/handoff.md
+Challenge and stress-test Milestone 3 (R3 Single-Secret HMAC Agreement & Handshake Initiator):
+1. Verify `LinuxManagerService` state transition logic when handshake completes.
+2. Execute empirical unit and C++ daemon tests (`linux_bridge_test`).
+3. Report findings and verdict (APPROVE or REQUEST_CHANGES).
 
-Challenge Task:
-1. Empirically stress-test dynamic session ID generation and 16-byte framing alignment.
-2. Verify that LinuxManagerService generates session IDs that are strictly 16 bytes in length and format.
-3. Test VsockPtyFramer under sequential and rapid session ID creation.
-4. Execute test suites and empirical validation routines.
-5. Render a clear verdict: APPROVE or REJECT.
+Write report in:
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2/handoff.md
 
-Write your findings report to /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2/challenge.md and handoff report to /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m3_2/handoff.md.
-When finished, send a message to parent with your verdict, summary, and artifact path.
+Send a completion message when done.
+</USER_REQUEST>

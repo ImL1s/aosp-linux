@@ -1,39 +1,39 @@
-# BRIEFING — 2026-08-06T13:47:56Z
+# BRIEFING — 2026-08-14T01:33:30Z
 
 ## Mission
-Independently verify Soong Java/SELinux/APK compilation artifacts and run_m2_verification.sh for M2 (R2).
+Review Milestone 2 (R2 Pure Binder IPC Window Bridge) implementation for correctness, completeness, quality, and anti-cheat/integrity.
 
 ## 🔒 My Identity
-- Archetype: reviewer / critic
+- Archetype: reviewer & critic
 - Roles: reviewer, critic
 - Working directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m2_1
-- Original parent: 7249e5f0-af46-4f65-970f-c4ca44e9345e
+- Original parent: 9bf4ed43-7f01-40fa-acc0-13647ab4d92d
 - Milestone: M2
 - Instance: 1 of 1
 
 ## 🔒 Key Constraints
 - Review-only — do NOT modify implementation code
-- Check for integrity violations (hardcoded outputs, facade implementations, self-certifying work)
-- Issue verdict APPROVE or REQUEST_CHANGES
+- Report findings and issue verdict in handoff.md
+- Send message to parent upon completion
+- Use Traditional Chinese (繁體中文) for communications if required or appropriate
 
 ## Current Parent
-- Conversation ID: 7249e5f0-af46-4f65-970f-c4ca44e9345e
-- Updated: 2026-08-06T13:47:56Z
+- Conversation ID: 9bf4ed43-7f01-40fa-acc0-13647ab4d92d
+- Updated: 2026-08-14T01:33:30Z
 
 ## Review Scope
-- **Files to review**: build_out/classes/, linux_manager.te, LinuxTerminal.apk, scripts/run_m2_verification.sh, worker_m2/handoff.md
-- **Interface contracts**: PROJECT.md
-- **Review criteria**: correctness, style, conformance, integrity, build & execution test pass
+- **Files to review**:
+  - `frameworks/base/services/core/java/com/android/server/linux/LinuxWindowBridgeService.java`
+  - `packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/LinuxAppProxyActivity.java`
+  - `frameworks/base/core/java/android/system/linux/ILinuxWindowBridge.java` / AIDL
+- **Review criteria**:
+  1. `LinuxWindowBridgeService.java` extends `ILinuxWindowBridge.Stub`, registers as "linux_window_bridge" with `ServiceManager`, and implements AIDL methods (`onSurfaceCreated`, `onSurfaceChanged`, `onSurfaceDestroyed`).
+  2. `LinuxAppProxyActivity.java` has reflection (`Class.forName`) completely removed and uses Binder IPC via `ILinuxWindowBridge` for Surface lifecycle events.
+  3. Execute javac compilation command and check exit code 0.
+  4. Integrity check: no hardcoded results, dummy facades, or cheating shortcuts.
 
 ## Key Decisions Made
-- Starting M2 verification.
-- Executed `bash scripts/run_m2_verification.sh` -> 6/6 stages passed.
-- Inspected compiled class files, SELinux policy, APK contents, Rust bridge agent, AVB 2.0 image header.
-- Issued verdict: **APPROVE**.
+- Initializing review workflow.
 
 ## Artifact Index
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m2_1/DISPATCH.md — Dispatch log
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m2_1/BRIEFING.md — Working memory briefing
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m2_1/progress.md — Liveness progress heartbeat
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m2_1/review.md — Code & artifact review report
-- /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m2_1/handoff.md — Reviewer handoff report
+- `.agents/reviewer_m2_1/handoff.md` — Final review report and verdict

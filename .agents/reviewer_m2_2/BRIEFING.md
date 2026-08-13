@@ -1,49 +1,49 @@
-# BRIEFING — 2026-08-06T13:48:30Z
+# BRIEFING — 2026-08-14T01:34:10Z
 
 ## Mission
-Independently verify Rust bridge-agent static binary and AVB 2.0 signed guest images for Milestone M2 (R2).
+Review Milestone 2 (R2 Pure Binder IPC Window Bridge) implementation quality, decoupling, and compilation.
 
 ## 🔒 My Identity
-- Archetype: reviewer_critic
+- Archetype: reviewer / critic
 - Roles: reviewer, critic
 - Working directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m2_2
-- Original parent: 7249e5f0-af46-4f65-970f-c4ca44e9345e
+- Original parent: 9bf4ed43-7f01-40fa-acc0-13647ab4d92d
 - Milestone: M2
-- Instance: 2 of 2
+- Instance: 1 of 1
 
 ## 🔒 Key Constraints
 - Review-only — do NOT modify implementation code
-- Perform independent verification and stress-testing
-- Check for integrity violations
+- Perform javac compilation check and code analysis
+- Check for integrity violations or cheating/facades
+- Verdict must be APPROVE or REQUEST_CHANGES
 
 ## Current Parent
-- Conversation ID: 7249e5f0-af46-4f65-970f-c4ca44e9345e
-- Updated: 2026-08-06T13:48:30Z
+- Conversation ID: 9bf4ed43-7f01-40fa-acc0-13647ab4d92d
+- Updated: 2026-08-14T01:34:10Z
 
 ## Review Scope
-- **Files to review**: guest/bridge-agent/target/release/android-bridge-agent, build_out/guest_images/*, vm_config.json, vbmeta.img
-- **Interface contracts**: PROJECT.md, ORIGINAL_REQUEST.md
-- **Review criteria**: correctness, completeness, quality, integrity, AVB 2.0 signatures
+- **Files to review**:
+  - `frameworks/base/services/core/java/com/android/server/linux/LinuxWindowBridgeService.java`
+  - `packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/LinuxAppProxyActivity.java`
+  - `frameworks/base/core/java/android/system/linux/ILinuxWindowBridge.aidl`
+  - `frameworks/base/core/java/android/system/linux/ILinuxWindowBridge.java`
+- **Review criteria**: pure binder IPC decoupling, no imports or reflection of `com.android.server.*` in app, code quality, javac clean compilation.
 
 ## Key Decisions Made
-- Independent verification complete. All binary, storage, AVB header, and test checks passed. Verdict: APPROVE.
+- Confirmed total elimination of reflection / private server imports in `LinuxAppProxyActivity.java`.
+- Verified clean `javac` compilation (exit code 0).
+- Confirmed `ILinuxWindowBridge` Binder IPC registration in `LinuxWindowBridgeService`.
+- Verdict issued: **APPROVE**.
 
 ## Review Checklist
-- **Items reviewed**: android-bridge-agent binary, 4-layer storage images (base_rootfs.img, custom_overlay.img, user_home.img, vm_state.snapshot), vm_config.json, vbmeta.img, AvbVerifier.cpp
+- **Items reviewed**: `LinuxWindowBridgeService.java`, `LinuxAppProxyActivity.java`, `ILinuxWindowBridge.aidl`, `ILinuxWindowBridge.java`
 - **Verdict**: APPROVE
-- **Unverified claims**: None. All worker claims independently verified.
+- **Unverified claims**: none; all verified via code inspection and `javac` execution.
 
 ## Attack Surface
-- **Hypotheses tested**: 
-  - Verification of binary execution & token zeroization in android-bridge-agent -> PASSED
-  - Verification of storage layout sizes & vm_config.json structure -> PASSED
-  - Verification of AVB 2.0 vbmeta.img binary header (AVB0, rollback index 1000) & RSA-4096 root key -> PASSED
-  - Verification of full M2 suite (scripts/run_m2_verification.sh & runner.py) -> PASSED
-- **Vulnerabilities found**: None. No integrity violations or facade implementations detected.
-- **Untested angles**: None.
+- **Hypotheses tested**: Checked for lingering reflection, missing IPC error handling, GPU memory leaks (unreleased HardwareBuffer / SurfaceControl), and compilation symbol mismatch.
+- **Vulnerabilities found**: None.
+- **Untested angles**: Runtime multi-process Binder IPC messaging under live Android SystemServer container (noted in caveats).
 
 ## Artifact Index
-- DISPATCH.md — Dispatch log
-- BRIEFING.md — Working memory index
-- review.md — Detailed review report
-- handoff.md — 5-component handoff report
+- `.agents/reviewer_m2_2/handoff.md` — Final review report and verdict

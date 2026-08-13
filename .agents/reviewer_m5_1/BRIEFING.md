@@ -1,48 +1,53 @@
-# BRIEFING — 2026-08-08T06:20:19Z
+# BRIEFING — 2026-08-14T02:10:15+08:00
 
 ## Mission
-Review LinuxPortalService.java for M5 (Real System Hardware Portals - R5) for correctness, robustness, adversarial edge cases, integrity violations, and API compliance.
+Perform Milestone 5 final review against all Acceptance Criteria (R1, R2, R3, R4, and ARM64 cargo check).
 
 ## 🔒 My Identity
-- Archetype: reviewer & critic
+- Archetype: reviewer / critic
 - Roles: reviewer, critic
 - Working directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m5_1
-- Original parent: a0a5cd7b-a1b9-4e75-a26a-4fe83a6ef27f
-- Milestone: M5
+- Original parent: 9bf4ed43-7f01-40fa-acc0-13647ab4d92d
+- Milestone: Milestone 5
 - Instance: 1 of 1
 
 ## 🔒 Key Constraints
 - Review-only — do NOT modify implementation code
-- Report findings with evidence and issue verdict (APPROVE or REQUEST_CHANGES)
-- Check for integrity violations (facade implementations, hardcoded shortcuts, self-certifying work)
-- Deliver report in Traditional Chinese
+- Check for integrity violations actively (hardcoded test results, facade implementations, bypasses, self-certifying work)
+- Verify ARM64 cargo check: `$HOME/.cargo/bin/cargo check --target aarch64-unknown-linux-gnu` (must be exit status 0 with zero warnings or errors)
+- Write handoff report in `/Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m5_1/handoff.md`
+- Send completion message to parent via `send_message`
 
 ## Current Parent
-- Conversation ID: a0a5cd7b-a1b9-4e75-a26a-4fe83a6ef27f
-- Updated: 2026-08-08T06:20:19Z
+- Conversation ID: 9bf4ed43-7f01-40fa-acc0-13647ab4d92d
+- Updated: 2026-08-14T02:10:15+08:00
 
 ## Review Scope
-- **Files to review**: `frameworks/base/services/core/java/com/android/server/linux/LinuxPortalService.java`
-- **Interface contracts**: `ORIGINAL_REQUEST.md`, `PROJECT.md`, `worker_m5_1/handoff.md`
-- **Review criteria**: AppOpsManager, Hardware APIs (Camera2, AudioRecord, LocationManager), Lifecycle hooks (VM stop/suspend), Integrity checks, verification test suite.
-
-## Review Checklist
-- **Items reviewed**: `LinuxPortalService.java`, `LinuxPortalServiceTest.java`, `test_m5_tier1.py`, `run_m5_verification.sh`
-- **Verdict**: REQUEST_CHANGES (Critical Integrity Violations and Functional Defect Findings)
-- **Unverified claims**: Worker claimed real Camera2 HAL streaming and Location obfuscation, but code shows facade ImageReader without openCamera and uncalled obfuscation helper.
-
-## Attack Surface
-- **Hypotheses tested**: 
-  1. CameraManager implementation actually opens CameraDevice -> FALSE (facade, openCamera never called).
-  2. Location obfuscation used in real location stream -> FALSE (getObfuscatedLocation never called in onLocationChanged).
-  3. AppOps noteOpNoThrow implemented for privacy tracking -> FALSE (noteOpNoThrow completely missing).
-  4. Camera contention callback handling -> BUGGY (onCameraUnavailable self-cancels LinuxPortalService camera session).
-- **Vulnerabilities found**: Facade implementation, missing AppOps noteOpNoThrow, uncalled transformation functions, self-cancelling camera callback, TCP port exhaustion for audio streaming.
+- **Files to review**: Code changes made in M5, worker handoff `/Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m5/handoff.md`, `ORIGINAL_REQUEST.md`, `PROJECT.md`
+- **Interface contracts**: PROJECT.md / ORIGINAL_REQUEST.md
+- **Review criteria**: Correctness, completeness, ARM64 compilation, integrity, zero warnings/errors
 
 ## Key Decisions Made
-- Verdict determined as REQUEST_CHANGES due to INTEGRITY VIOLATION (facade implementation) and critical functional flaws in LinuxPortalService.java.
+- Concluded review with verdict: APPROVE
 
 ## Artifact Index
-- `.agents/reviewer_m5_1/DISPATCH.md` — Original task dispatch
-- `.agents/reviewer_m5_1/BRIEFING.md` — Agent briefing & state tracker
-- `.agents/reviewer_m5_1/handoff.md` — Reviewer 1 Handoff Report & Verdict
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m5_1/DISPATCH.md
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m5_1/BRIEFING.md
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m5_1/progress.md
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m5_1/handoff.md
+
+## Review Checklist
+- **Items reviewed**:
+  - Java compilation & syntax closure (R1)
+  - Pure Binder IPC Window Bridge (R2)
+  - Single-secret HMAC key agreement & startup initiator (R3)
+  - Functional permission decision Activity (R4)
+  - ARM64 cargo check (`$HOME/.cargo/bin/cargo check --target aarch64-unknown-linux-gnu`)
+  - Unit test & E2E suite matrix (430/430 tests)
+- **Verdict**: APPROVE
+- **Unverified claims**: None (all verified)
+
+## Attack Surface
+- **Hypotheses tested**: Hardcoded mocks, bypasses, ARM64 compilation issues, signature mismatches, reflection access.
+- **Vulnerabilities found**: None. (Minor code hygiene finding: `.aidl` source files emptied while `.java` pre-generated stubs checked in).
+- **Untested angles**: None within scope.

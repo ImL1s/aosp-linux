@@ -1,92 +1,109 @@
-# Handoff Report — Milestone M1 (R1) Empirical Challenge
+# Handoff Report — Milestone 1 (R1 Java Syntax & Compilation Closure) Empirical Challenge
 
 ## 1. Observation
 
-- **Command Output 1 (`python3 tests/e2e/runner.py --list`)**:
-  ```
-  Total Discovered Tests: 430
-  ```
-  Directory breakdown:
-  - Tier 1: 185 tests (`T1-01` to `T1-185`)
-  - Tier 2: 185 tests (`T2-01` to `T2-185`)
-  - Tier 3: 40 tests (`T3-PAIR-01` to `T3-PAIR-40`)
-  - Tier 4: 20 tests (`SCENARIO-01` to `SCENARIO-20`)
+- **Observation 1: Duplicate Method Syntax Error Fix in `LinuxAppProxyActivity.java`**
+  - Path: `packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/LinuxAppProxyActivity.java`
+  - Inspection confirms worker_m1 removed the duplicate unclosed method header (`private void attachSurfaceControlToBridge...`).
+  - Command:
+    ```bash
+    javac -classpath /Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar:frameworks/base/core/java \
+          -sourcepath packages/apps/LinuxTerminal/src:frameworks/base/core/java \
+          -d /tmp/classes_app $(find packages/apps/LinuxTerminal/src -name "*.java")
+    ```
+  - Result: Exit code `0`. All Java files in `packages/apps/LinuxTerminal/src` compile cleanly.
 
-- **Command Output 2 (`python3 tests/e2e/runner.py`)**:
-  ```
-  TOTAL TESTS  : 430
-  PASSED       : 430
-  FAILED       : 0
-  ERRORS       : 0
-  SKIPPED      : 0
-  PASS RATE    : 100.0%
-  DURATION     : 11.82 seconds
-  ================================================================================
-  JSON test report saved to: /Users/iml1s/Documents/mine/aosp-linux/tests/e2e_report.json
-  ```
+- **Observation 2: SystemServer Java Compilation**
+  - Path: `frameworks/base/services/core/java/com/android/server/linux/*.java`
+  - Command:
+    ```bash
+    javac -classpath /Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar:frameworks/base/core/java:frameworks/base/services/core/java \
+          -sourcepath frameworks/base/core/java:frameworks/base/services/core/java \
+          -d /tmp/classes_sys frameworks/base/services/core/java/com/android/server/linux/*.java
+    ```
+  - Result: Exit code `0`. All 15 system server service files compile cleanly with provided framework stubs.
 
-- **File Inspection (`tests/e2e_report.json`)**:
-  - File exists at `/Users/iml1s/Documents/mine/aosp-linux/tests/e2e_report.json`.
-  - `summary.total`: 430, `summary.passed`: 430, `summary.failed`: 0, `summary.errored`: 0.
-  - Length of `results` array: exactly 430.
-  - Set of `test_id`s in report matches discovered `test_id` set 100%.
+- **Observation 3: Defect 1 — Illegal Reflection of `com.android.server.*` Private Class in App Layer**
+  - Path: `packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/LinuxAppProxyActivity.java`
+  - Line 267:
+    ```java
+    Class<?> bridgeClass = Class.forName("com.android.server.linux.LinuxWindowBridgeService");
+    ```
+  - Line 286:
+    ```java
+    Class<?> bridgeClass = Class.forName("com.android.server.linux.LinuxWindowBridgeService");
+    ```
+  - AST / Scanner verification confirmed 2 instances of illegal reflection into `com.android.server.linux.LinuxWindowBridgeService`.
 
-- **AST Code Inspection**:
-  - Total static assertions across all 430 test classes: 630.
-  - Test classes with 0 assertions: 0.
-  - Test classes with empty `run_test`: 0.
+- **Observation 4: Defect 2 — Compilation Failure in `LinuxAppTracker.java` (Launcher3 App Layer)**
+  - Path: `packages/apps/Launcher3/src/com/android/launcher3/linux/LinuxAppTracker.java`
+  - Line 104:
+    ```java
+    LinuxManager manager = (LinuxManager) mContext.getSystemService(Context.LINUX_SERVICE);
+    ```
+  - Command:
+    ```bash
+    javac -classpath /Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar:frameworks/base/core/java \
+          -sourcepath packages/apps/Launcher3/src:frameworks/base/core/java \
+          -d /tmp/classes_launcher $(find packages/apps/Launcher3/src -name "*.java")
+    ```
+  - Result: Exit code `1`. Verbatim compiler error:
+    ```
+    packages/apps/Launcher3/src/com/android/launcher3/linux/LinuxAppTracker.java:104: error: cannot find symbol
+                LinuxManager manager = (LinuxManager) mContext.getSystemService(Context.LINUX_SERVICE);
+                                                                                       ^
+      symbol:   variable LINUX_SERVICE
+      location: class Context
+    1 error
+    ```
 
-- **CLI Flag Empirical Tests**:
-  - `python3 tests/e2e/runner.py --tier 4 --list`: Discovers exactly 20 tests.
-  - `python3 tests/e2e/runner.py --feature F-R1-001 --list`: Discovers exactly 12 tests across Tiers 1-4.
-  - `python3 tests/e2e/runner.py --filter T1-01 --list`: Discovers exactly 1 test.
-  - `python3 tests/e2e/runner.py --report /tmp/test_report.json`: Correctly writes JSON report to requested path.
-
----
+- **Observation 5: Defect 3 — Unimplemented AIDL Interface `ILinuxWindowBridge.Stub`**
+  - File: `frameworks/base/core/java/android/system/linux/ILinuxWindowBridge.aidl`
+  - AST / AIDL inspector scan (`aidl_inspector.py`) scanned all Java files in `frameworks/base/services/core/java/com/android/server/linux/`.
+  - Finding: No Java class extends `ILinuxWindowBridge.Stub` or implements `ILinuxWindowBridge`. `LinuxWindowBridgeService.java` is a standalone class and does not implement the AIDL interface stub.
 
 ## 2. Logic Chain
 
-1. **Step 1**: From Observation 1, running `python3 tests/e2e/runner.py --list` discovers 430 tests without missing any tier directories or test files.
-2. **Step 2**: From Observation 2 and Observation 3, executing `runner.py` completes all 430 test executions with a 100% pass rate and writes the complete results to `tests/e2e_report.json`.
-3. **Step 3**: Comparing discovered test set with `tests/e2e_report.json` shows zero missing tests, zero extra tests, and zero fake passes.
-4. **Step 4**: From Observation 4, AST code inspection confirms every single test class contains active assertion logic (630 total assertions, 0 empty test cases).
-5. **Step 5**: From Observation 5, CLI argument parsing (`--tier`, `--feature`, `--filter`, `--report`) handles targeted selection and custom report destinations properly.
-6. **Conclusion**: The test execution and report generation for Milestone M1 (R1) are empirically verified to be correct, complete, and reliable.
-
----
+1. **Step 1 (Syntax Error Fix)**: Based on Observation 1, the syntax error reported in `LinuxAppProxyActivity.java` (duplicate method signature) was fixed, allowing `packages/apps/LinuxTerminal/src` to pass basic javac syntax compilation.
+2. **Step 2 (SystemServer Compilation)**: Based on Observation 2, `frameworks/base/services/core/java/com/android/server/linux/*.java` compiles cleanly when given the framework stubs.
+3. **Step 3 (App Layer Decoupling Failure)**: Based on Observation 3, `LinuxAppProxyActivity.java` still contains active reflection calls to `Class.forName("com.android.server.linux.LinuxWindowBridgeService")` on lines 267 and 286. This directly violates Acceptance Criteria: *"App layer does not import or reflect upon com.android.server.* private implementation classes"* and Requirement R2 ("Replace reflection access with canonical Binder IPC via `ILinuxWindowBridge.aidl`").
+4. **Step 4 (Launcher3 Compilation Failure)**: Based on Observation 4, `LinuxAppTracker.java` references `Context.LINUX_SERVICE`. Standard Android SDK `Context.java` does not contain `LINUX_SERVICE` field (the constant is declared on `LinuxManager.LINUX_SERVICE`). Compiling Launcher3 results in compilation failure (exit code 1).
+5. **Step 5 (AIDL IPC Parity Gap)**: Based on Observation 5, while `ILinuxWindowBridge.aidl` exists in the API surface, `LinuxWindowBridgeService.java` does not extend `ILinuxWindowBridge.Stub`, breaking the required Binder IPC connection between `LinuxAppProxyActivity` and `LinuxWindowBridgeService`.
 
 ## 3. Caveats
 
-- **Mock Environment**: Tests execute against `MockEnvironment` in Python simulating host AOSP services, VSOCK IPC, and Linux kernel storage layers, rather than physical ARM/x86 host hardware. This is by design for E2E automated test runner execution in Milestone M1.
+- Tests in `tests/unit/` were written with custom test harness expectations (mocking `ServiceManager` and `Context`), which require test-specific classpath setup and were not part of the primary app/service compilation scope.
 
----
+## 4. Conclusion
 
-## 4. Conclusion & Verdict
+- **VERDICT: REQUEST_CHANGES**
 
-**VERDICT: APPROVE**
-
-Empirical verification confirms that `runner.py` successfully discovers and executes all 430 test suites across Tiers 1-4, and generates an accurate, complete JSON report at `tests/e2e_report.json` without missing tests or fake passes.
-
----
+Milestone 1 (R1 Java Syntax & Compilation Closure) cannot be approved due to three blocking defects:
+1. `LinuxAppProxyActivity.java` in app layer retains reflection access to `com.android.server.linux.LinuxWindowBridgeService`, violating system architecture decoupling rules.
+2. `LinuxAppTracker.java` in Launcher3 fails `javac` compilation due to referencing non-existent `Context.LINUX_SERVICE` instead of `LinuxManager.LINUX_SERVICE`.
+3. `LinuxWindowBridgeService.java` does not implement `ILinuxWindowBridge.Stub`, preventing Binder IPC interaction for window management.
 
 ## 5. Verification Method
 
-To independently verify these findings, execute the following commands from `/Users/iml1s/Documents/mine/aosp-linux`:
+To independently reproduce and verify these findings:
 
-1. **Test Discovery Count**:
+1. **Verify App Decoupling Defect**:
    ```bash
-   python3 tests/e2e/runner.py --list
+   grep -n "com.android.server" packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/LinuxAppProxyActivity.java
    ```
-   *Expected*: Total Discovered Tests: 430
+   *Expected Output*: Displays reflection calls at lines 267 and 286.
 
-2. **Full Execution & Report Generation**:
+2. **Verify Launcher3 Compilation Failure**:
    ```bash
-   python3 tests/e2e/runner.py
+   mkdir -p /tmp/verify_launcher
+   javac -classpath /Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar:frameworks/base/core/java \
+         -sourcepath packages/apps/Launcher3/src:frameworks/base/core/java \
+         -d /tmp/verify_launcher $(find packages/apps/Launcher3/src -name "*.java")
    ```
-   *Expected*: TOTAL TESTS: 430, PASSED: 430, EXIT CODE: 0.
+   *Expected Output*: Exit code 1 with `cannot find symbol LINUX_SERVICE` in `Context`.
 
-3. **Inspect Report Content**:
+3. **Verify AIDL Stub Parity Defect**:
    ```bash
-   python3 -c "import json; r=json.load(open('tests/e2e_report.json')); print(r['summary']); print(len(r['results']))"
+   grep "extends ILinuxWindowBridge.Stub" frameworks/base/services/core/java/com/android/server/linux/*.java
    ```
-   *Expected*: `{'total': 430, 'passed': 430, 'failed': 0, 'errored': 0, 'skipped': 0, ...}` and `430`.
+   *Expected Output*: No matching lines found (exit code 1).

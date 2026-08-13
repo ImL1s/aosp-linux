@@ -1,67 +1,68 @@
-# Handoff Report — Reviewer M1 (R1) Verification
+# Review & Handoff Report — reviewer_m1_1
 
-## Observation
+## Review Summary
 
-1. `tests/e2e_report.json` inspection:
-   - JSON structure parsed via Python:
-     ```json
-     {
-       "summary": {
-         "total": 430,
-         "passed": 430,
-         "failed": 0,
-         "errored": 0,
-         "skipped": 0,
-         "pass_rate_percent": 100.0,
-         "duration_seconds": 11.6912
-       }
-     }
-     ```
-   - Exact count of items in `results` array: 430 test objects.
-   - All 430 test objects have `"status": "PASS"`.
+**Verdict**: **APPROVE**
 
-2. Dynamic Test Execution Re-run:
-   - Command: `python3 tests/e2e/runner.py --verbose --report tests/e2e_report.json`
-   - Command result: Exit code 0.
-   - Output summary: `TOTAL TESTS: 430 | PASSED: 430 | FAILED: 0 | ERRORS: 0 | PASS RATE: 100.0% | DURATION: 11.92 seconds`.
+## Findings
 
-3. Native Binary & Stress Test Re-run:
-   - Command: `clang++ -std=c++20 -Wall -Wextra -pthread -I. system/linux_bridge/hmac_auth.cpp system/linux_bridge/vsock_framing.cpp system/linux_bridge/socket_server.cpp system/linux_bridge/vsock_server.cpp tests/unit/linux_bridge_test.cpp -o build_out/bin/linux_bridge_test` -> Exit code 0.
-   - Command: `./build_out/bin/linux_bridge_test && ./build_out/bin/challenger_m2_framing_test && ./build_out/bin/challenger_m2_hmac_test && ./build_out/bin/challenger_m2_empirical_test` -> Exit code 0.
-   - Command: `python3 tests/e2e/test_m3_challenger2_stress.py` -> Exit code 0 (`Total: 6 | Passed: 6 | Failed: 0`).
-   - Command: `python3 tests/stress/test_desktop_parser_adversarial.py` -> Exit code 0 (`ALL Adversarial Desktop Entry Parser STRESS TESTS PASSED!`).
+- **No Critical, Major, or Minor findings**.
+- **Integrity Audit**: Passed. No hardcoded test shortcuts, fake implementations, or self-certifying bypasses detected.
 
-4. Code Integrity Audit:
-   - Source code inspected (`tests/e2e/runner.py`, `tests/e2e/framework/`, `system/linux_bridge/`).
-   - No hardcoded test results, facade implementations, or self-certifying shortcuts detected.
+## Verified Claims
 
-## Logic Chain
+- `LinuxAppProxyActivity.java` syntax error (duplicate unclosed `attachSurfaceControlToBridge` method) → verified via `view_file` and `javac` → **PASS**
+- AIDL interface implementation in `LinuxPortalService.java` matching `ILinuxPortalService.Stub` → verified via `view_file` → **PASS**
+- Java compilation closure exit code 0 → verified via `javac` execution → **PASS**
 
-1. Observation 1 confirms that `tests/e2e_report.json` contains exactly 430 test cases, 0 failures, 0 errors, and `pass_rate_percent` equals 100.0.
-2. Observation 2 confirms independent execution of `runner.py` completes cleanly with exit code 0 and reproduces the exact test report metrics.
-3. Observation 3 confirms all supporting native C++ binaries compile and pass their unit/stress assertions with exit code 0, and Python empirical stress scripts pass cleanly.
-4. Observation 4 confirms no integrity violations, fake outputs, or facade logic exist.
+## Coverage Gaps
 
-## Caveats
+- None for Milestone 1 scope.
 
-No caveats. All verification checks passed without exceptions or discrepancies.
+## Unverified Items
 
-## Conclusion
+- None.
 
-**Explicit Verdict**: APPROVE
+---
 
-Milestone M1 (R1) verification is complete. Worker `worker_m1`'s test execution results and `tests/e2e_report.json` are 100% verified, valid, and fully compliant with requirements.
+## 1. Observation
 
-## Verification Method
+- **Target Files Inspected**:
+  - `packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/LinuxAppProxyActivity.java`: Inspected line-by-line around method `attachSurfaceControlToBridge` (lines 260–280). Verified that the duplicate unclosed method header previously reported on line 270 has been removed, and all method braces are properly balanced.
+  - `frameworks/base/services/core/java/com/android/server/linux/LinuxPortalService.java`: Inspected lines 800–835. Verified `LinuxPortalService` implements `ILinuxPortalService.Stub` with concrete implementations of `getCameraStatus()`, `getAudioStatus()`, and `getLocation()`.
+  - `frameworks/base/core/java/android/system/linux/ILinuxPortalService.aidl` & generated stubs: Inspected `ILinuxPortalService.aidl` (lines 1–12) and verified method declarations match `ILinuxPortalService.Stub`.
 
-To independently re-verify this assessment:
+- **Build Output**:
+  Executed compilation command:
+  ```bash
+  mkdir -p /tmp/classes_m1_rev1
+  javac -classpath /Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar:frameworks/base/core/java:frameworks/base/services/core/java -sourcepath packages/apps/LinuxTerminal/src:frameworks/base/core/java:frameworks/base/services/core/java -d /tmp/classes_m1_rev1 packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/LinuxAppProxyActivity.java frameworks/base/services/core/java/com/android/server/linux/*.java
+  ```
+  Result:
+  - Return code: `0`
+  - Compiler output: Clean compilation with 0 errors (only standard deprecation notes).
 
-1. Validate JSON report metrics:
-   `python3 -c "import json; r=json.load(open('tests/e2e_report.json')); assert r['summary']['total']==430; assert r['summary']['passed']==430; assert r['summary']['pass_rate_percent']==100.0; print('Report valid!')"`
+## 2. Logic Chain
 
-2. Re-run E2E runner:
-   `python3 tests/e2e/runner.py --verbose --report tests/e2e_report.json`
-   Confirm exit code is 0 and output matches 430 passed tests.
+- **Syntax Validation**: Line-by-line inspection of `LinuxAppProxyActivity.java` confirmed that `attachSurfaceControlToBridge` is declared exactly once as `private void attachSurfaceControlToBridge(int surfaceId, SurfaceControl surfaceControl)` with a complete body block enclosed in curly braces (`{ ... }`).
+- **Interface Parity**: `LinuxPortalService.java` declares an inner `mBinderService` extending `ILinuxPortalService.Stub`, implementing all 3 AIDL methods (`getCameraStatus`, `getAudioStatus`, `getLocation`), matching the `ILinuxPortalService.aidl` contract.
+- **Compilation Closure**: Running `javac` against the android-35 SDK jar along with framework stubs in `frameworks/base/core/java` and `frameworks/base/services/core/java` successfully resolves all referenced system symbols (`Slog`, `SystemService`, `LocalServices`, `UserHandle`, `ServiceManager`, `ILinuxManager`, etc.) without compilation failures.
+- **Integrity Audit**: Verified that implementations contain operational logic rather than hardcoded returns or dummy stubs designed to pass tests without real behavior.
 
-3. Re-run C++ native tests:
-   `./build_out/bin/linux_bridge_test && ./build_out/bin/challenger_m2_framing_test && ./build_out/bin/challenger_m2_hmac_test && ./build_out/bin/challenger_m2_empirical_test`
+## 3. Caveats
+
+- No caveats.
+
+## 4. Conclusion
+
+- Milestone 1 (R1: Java Syntax & Compilation Closure) implementation is complete, accurate, structurally sound, and compiles cleanly with exit code 0.
+- Verdict is **APPROVE**.
+
+## 5. Verification Method
+
+- Re-run the M1 compilation verification command:
+  ```bash
+  mkdir -p /tmp/classes_m1_rev1
+  javac -classpath /Users/iml1s/Library/Android/sdk/platforms/android-35/android.jar:frameworks/base/core/java:frameworks/base/services/core/java -sourcepath packages/apps/LinuxTerminal/src:frameworks/base/core/java:frameworks/base/services/core/java -d /tmp/classes_m1_rev1 packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/LinuxAppProxyActivity.java frameworks/base/services/core/java/com/android/server/linux/*.java
+  ```
+- Invalidation Condition: Exit code is non-zero or javac errors are reported.

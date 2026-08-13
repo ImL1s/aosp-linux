@@ -43,9 +43,11 @@ import java.util.concurrent.Executor;
  * @hide
  */
 @SystemApi
-@SystemService(Context.LINUX_SERVICE)
+@SystemService(LinuxManager.LINUX_SERVICE)
 public class LinuxManager {
     private static final String TAG = "LinuxManager";
+
+    public static final String LINUX_SERVICE = "linux";
 
     /** Permission required for managing Linux VM state and executing administrative actions. */
     public static final String PERMISSION_MANAGE_LINUX_ENVIRONMENT =

@@ -1,20 +1,18 @@
-## 2026-08-08T06:20:19Z
-You are Reviewer 2 for Milestone M5 (Real System Hardware Portals - R5).
-Working directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m5_2
+## 2026-08-14T02:07:58Z
 
-Mandatory context files:
-1. /Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md
-2. /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
-3. /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m5_1/handoff.md
+You are reviewer_m5_2 (Milestone 5 Final Reviewer 2).
+Your working directory is: /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m5_2
+Original Request: /Users/iml1s/Documents/mine/aosp-linux/ORIGINAL_REQUEST.md
+Worker Handoff: /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m5/handoff.md
+Project Plan: /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md
 
-Target Files to Review:
-- frameworks/base/services/core/java/com/android/server/linux/storage/LinuxStorageProvider.java
+Perform final review against all Acceptance Criteria:
+1. Verify App layer does not import or reflect upon `com.android.server.*` private classes.
+2. Verify all AIDL methods match Java consumers in parameter types and counts.
+3. Verify Host and Guest use identical 32-byte binary secrets for RFC 2104 HMAC-SHA256 signatures.
+4. Verify Guest startup handshake connection transitions VM state to RUNNING.
 
-Objective:
-Review LinuxStorageProvider.java implementation for correctness, robustness, and API compliance:
-1. Complete removal of manual boolean setters (setVmRunning, setCeKeyAvailable, setReadOnlyMount) and manual boolean fields.
-2. Dynamic linkage to LocalServices.getService(LinuxManagerInternal.class) for VM state (STATE_RUNNING) and LUKS2 mount lifecycle (isCeKeyAvailable(), isReadOnlyMount()).
-3. ContentResolver.notifyChange on VM state and storage unlock transitions via StorageStateListener.
-4. Run verification script: ./scripts/run_m5_verification.sh and unit tests (LinuxStorageProviderTest).
+Write report and verdict (APPROVE or REQUEST_CHANGES) in:
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m5_2/handoff.md
 
-Write your review report to /Users/iml1s/Documents/mine/aosp-linux/.agents/reviewer_m5_2/handoff.md with your verdict (APPROVE or REQUEST_CHANGES) and send message.
+Send a completion message when done.

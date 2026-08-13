@@ -1,62 +1,56 @@
-# BRIEFING — 2026-08-06T13:46:00Z
+# BRIEFING — 2026-08-14T01:32:55+08:00
 
 ## Mission
-Execute Soong Android.bp module compilation checks, Rust bridge-agent static build, AVB 2.0 signed guest image packaging, and M2 verification scripts.
+Milestone 2 (R2): Implement Pure Binder IPC Window Bridge (LinuxWindowBridgeService & LinuxAppProxyActivity) and verify compilation.
 
 ## 🔒 My Identity
-- Archetype: teamwork_preview_worker
+- Archetype: implementer/qa/specialist
 - Roles: implementer, qa, specialist
 - Working directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m2
-- Original parent: bfd3bd1a-861b-4735-816e-6f1e7241c2a8
-- Milestone: M2
+- Original parent: 9bf4ed43-7f01-40fa-acc0-13647ab4d92d
+- Milestone: M2 (R2 Pure Binder IPC Window Bridge Worker)
 
 ## 🔒 Key Constraints
-- DO NOT CHEAT. All implementations must be genuine.
-- DO NOT hardcode test results or create dummy/facade implementations.
-- Ensure 100% pass rate across unit tests and E2E test suites (Tier 1, Tier 2, Tier 3, Tier 4).
-- Output report path: `/Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m2/handoff.md`.
+- Pure Binder IPC between LinuxAppProxyActivity and LinuxWindowBridgeService ("linux_window_bridge").
+- Remove all reflection access to LinuxWindowBridgeService.
+- Implement ILinuxWindowBridge.Stub, publish to ServiceManager.
+- javac compilation must succeed with 0 errors.
+- DO NOT CHEAT. Real state and logic required.
+- Use Traditional Chinese (繁體中文) for reports and comments where appropriate.
 
 ## Current Parent
-- Conversation ID: 7249e5f0-af46-4f65-970f-c4ca44e9345e
-- Updated: 2026-08-06T13:46:00Z
+- Conversation ID: 9bf4ed43-7f01-40fa-acc0-13647ab4d92d
+- Updated: 2026-08-14T01:32:55+08:00
 
 ## Task Summary
-- **What to build**: Soong module compilation (`LinuxManagerService.class`, `linux_manager.te`, `LinuxTerminal.apk`), Rust static release build (`android-bridge-agent`), AVB 2.0 signed guest image packaging (`base_rootfs.img`, `custom_overlay.img`, `user_home.img`, `vm_state.snapshot`, `vm_config.json`, `vbmeta.img`), and M2 verification suite.
-- **Success criteria**: All artifacts produced and verified; `run_m2_verification.sh` 6/6 PASS; E2E runner 430/430 PASS (100.0% pass rate).
-- **Interface contracts**: PROJECT.md & ORIGINAL_REQUEST.md
-- **Code layout**: PROJECT.md
+- **What to build**:
+  1. Extend `ILinuxWindowBridge.Stub` in `LinuxWindowBridgeService.java`, add service to `ServiceManager` as `"linux_window_bridge"`, implement `onSurfaceCreated`, `onSurfaceChanged`, `onSurfaceDestroyed`.
+  2. Refactor `LinuxAppProxyActivity.java` to use `ILinuxWindowBridge.Stub.asInterface(ServiceManager.getService("linux_window_bridge"))` and wire `SurfaceHolder.Callback` events to Binder IPC calls.
+  3. Compile with specified `javac` command and verify 0 errors.
+- **Success criteria**: Javac compilation succeeds with exit code 0 and zero compilation errors.
+- **Interface contracts**: PROJECT.md, ORIGINAL_REQUEST.md, survey_report.md
 
 ## Change Tracker
-- **Files modified/created**:
-  - `build_out/classes/com/android/server/linux/LinuxManagerService.class`: Compiled Java framework service
-  - `build_out/artifacts/LinuxTerminal.apk` & `build_out/deployment/apps/LinuxTerminal.apk`: Packaged terminal UI app
-  - `build_out/artifacts/linux_manager.te` & `build_out/deployment/sepolicy/linux_manager.te`: SELinux domain policy
-  - `guest/bridge-agent/target/release/android-bridge-agent`: Static release executable
-  - `build_out/guest_images/`: Initialized 4-layer storage layout (`base_rootfs.img`, `custom_overlay.img`, `user_home.img`, `vm_state.snapshot`), `vm_config.json`, and AVB 2.0 signed `vbmeta.img`
-  - `scripts/run_m2_verification.sh`: Updated Java source selection
-  - `guest/scripts/init_storage_layout.sh`: Added `vm_config.json` and AVB 2.0 `vbmeta.img` generation logic
-  - `frameworks/base/core/java/android/graphics/Rect.java`: Added `set` helper methods
-- **Build status**: PASS (`run_m2_verification.sh` 6/6 PASS, `runner.py` 430/430 PASS)
+- **Files modified**:
+  - `frameworks/base/services/core/java/com/android/server/linux/LinuxWindowBridgeService.java`: Extended `ILinuxWindowBridge.Stub`, added `ServiceManager.addService("linux_window_bridge", this)`, implemented `onSurfaceCreated`, `onSurfaceChanged`, `onSurfaceDestroyed`.
+  - `packages/apps/LinuxTerminal/src/com/android/virtualization/terminal/LinuxAppProxyActivity.java`: Removed reflection calls to SystemServer, obtained `ILinuxWindowBridge` via `ServiceManager`, wired `SurfaceHolder` lifecycle events to Binder IPC.
+- **Build status**: PASS (javac exit code 0, 0 compilation errors)
 - **Pending issues**: None
 
 ## Quality Status
-- **Build/test result**: PASS (430/430 E2E tests, 100% pass rate)
-- **Lint status**: CLEAN
-- **Tests added/modified**: Executed full M2 verification suite and E2E test runner
+- **Build/test result**: PASS
+- **Lint status**: Clean (no compile errors)
+- **Tests added/modified**: Compilation verification via target javac command
 
 ## Loaded Skills
 - None
 
 ## Key Decisions Made
-- Executed compilation of all Java framework modules and LinuxTerminal app.
-- Built Rust `android-bridge-agent` in release mode.
-- Generated AVB 2.0 `vbmeta.img` with `AVB0` header magic and RSA-4096 signature.
-- Confirmed 100.0% pass rate on E2E runner (430/430 tests passed).
+- `LinuxWindowBridgeService` extends `ILinuxWindowBridge.Stub` directly and publishes itself to `ServiceManager` under name `"linux_window_bridge"`.
+- `LinuxAppProxyActivity` obtains the Binder interface using `ILinuxWindowBridge.Stub.asInterface(ServiceManager.getService("linux_window_bridge"))` and dispatches `onSurfaceCreated`, `onSurfaceChanged`, and `onSurfaceDestroyed` calls over Binder IPC.
+- All reflection methods (`attachSurfaceControlToBridge`, `detachSurfaceControlFromBridge`) and class imports referencing internal `com.android.server.*` packages in application code were completely removed.
 
 ## Artifact Index
-- `/Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m2/DISPATCH.md` — Dispatch prompt
-- `/Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m2/BRIEFING.md` — Working briefing
-- `/Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m2/progress.md` — Progress heartbeat
-- `/Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m2/changes.md` — Execution details
-- `/Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m2/handoff.md` — Handoff report
-
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m2/DISPATCH.md — Dispatch instructions
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m2/progress.md — Progress tracker
+- /Users/iml1s/Documents/mine/aosp-linux/.agents/worker_m2/handoff.md — Final handoff report

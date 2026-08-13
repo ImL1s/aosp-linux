@@ -8,9 +8,10 @@ mod wayland;
 mod empirical_tests;
 
 
+use std::io::Write;
 use std::sync::Arc;
 use std::thread;
-use vsock::{VsockListener, VMADDR_CID_ANY, PORT_PORTAL, PORT_PTY, PORT_WAYLAND};
+use vsock::{VsockListener, VMADDR_CID_ANY, VMADDR_CID_HOST, PORT_PORTAL, PORT_PTY, PORT_WAYLAND};
 
 fn main() {
     println!("[Bridge-Agent] Starting Production Guest Agent Loop...");
@@ -24,6 +25,36 @@ fn main() {
     };
 
     println!("[Bridge-Agent] Dynamic auth secret key extracted successfully.");
+
+    // Startup Initiator: Connect to Host (CID_HOST = 2) Port 5000 via AF_VSOCK socket.
+    // Construct and send 64-byte AuthHandshakePayload (32-byte token + 32-byte RFC 2104 HMAC-SHA256 signature).
+    println!("[Bridge-Agent] Initiating startup auth handshake to Host (CID {}, Port {})...", VMADDR_CID_HOST, PORT_PORTAL);
+    let mut handshake_sent = false;
+    for attempt in 1..=5 {
+        match vsock::VsockStream::connect(VMADDR_CID_HOST, PORT_PORTAL) {
+            Ok(mut stream) => {
+                let token = secret.as_slice();
+                let signature = auth::HmacSha256::compute_hmac_response(&secret, token);
+                let mut payload = Vec::with_capacity(64);
+                payload.extend_from_slice(token);
+                payload.extend_from_slice(&signature);
+
+                if stream.write_all(&payload).is_ok() && stream.flush().is_ok() {
+                    println!("[Bridge-Agent] Startup auth handshake sent successfully (attempt {})", attempt);
+                    handshake_sent = true;
+                    break;
+                }
+            }
+            Err(e) => {
+                eprintln!("[Bridge-Agent] Connection attempt {} to Host CID {} port {} failed: {}", attempt, VMADDR_CID_HOST, PORT_PORTAL, e);
+                thread::sleep(std::time::Duration::from_millis(200));
+            }
+        }
+    }
+
+    if !handshake_sent {
+        eprintln!("[Bridge-Agent] Warning: Startup auth handshake to Host was not acknowledged immediately.");
+    }
 
     let listener_portal = match VsockListener::bind(VMADDR_CID_ANY, PORT_PORTAL) {
         Ok(l) => l,

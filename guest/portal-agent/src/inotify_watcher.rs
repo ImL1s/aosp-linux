@@ -4,8 +4,8 @@
 use std::collections::{HashMap, HashSet};
 use std::ffi::CString;
 use std::os::unix::ffi::OsStrExt;
-use std::path::{Path, PathBuf};
-use std::sync::mpsc::{channel, Sender};
+use std::path::PathBuf;
+use std::sync::mpsc::channel;
 use std::thread;
 use std::time::Duration;
 

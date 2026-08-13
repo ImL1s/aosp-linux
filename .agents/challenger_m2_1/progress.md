@@ -1,12 +1,10 @@
-# Progress Log
+# Progress Log - challenger_m2_1
 
-Last visited: 2026-08-06T13:47:55Z
+Last visited: 2026-08-14T01:37:45Z
 
-- [x] Initialized DISPATCH.md and BRIEFING.md
-- [x] Inspect `PROJECT.md` and `ORIGINAL_REQUEST.md`
-- [x] Inspect files in `guest/bridge-agent/`
-- [x] Run `cargo test` in `guest/bridge-agent/` (verified clean build, but 0 unit tests found)
-- [x] Run `cargo build` and test `android-bridge-agent` CLI help/version/dry-run mode (discovered process hangs indefinitely on CLI arguments)
-- [x] Stress-test edge cases, invalid inputs, failure modes in bridge-agent
-- [x] Produce `challenge.md` and `handoff.md` (Verdict: REQUEST_CHANGES)
-- [x] Send completion message to parent agent
+- [x] Initialized DISPATCH.md, BRIEFING.md, progress.md
+- [x] Read worker_m2 handoff report
+- [x] Grep `packages/apps/LinuxTerminal/src` for `Class.forName` and reflection calls targeting `com.android.server.*`
+- [x] Audit and stress-test Binder IPC methods (`onSurfaceCreated`, `onSurfaceChanged`, `onSurfaceDestroyed`) for null pointer safety, invalid surfaceId handling, and RemoteException handling
+- [x] Run empirical build / javac verification
+- [x] Write handoff report and send completion message to parent

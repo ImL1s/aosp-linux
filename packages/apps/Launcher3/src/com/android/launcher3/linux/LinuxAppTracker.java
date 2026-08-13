@@ -101,7 +101,7 @@ public class LinuxAppTracker {
     public synchronized void syncLinuxApps() {
         if (mContext == null) return;
         try {
-            LinuxManager manager = (LinuxManager) mContext.getSystemService(Context.LINUX_SERVICE);
+            LinuxManager manager = (LinuxManager) mContext.getSystemService(LinuxManager.LINUX_SERVICE);
             if (manager != null) {
                 List<LinuxAppInfo> apps = manager.getInstalledApps();
                 updateShortcutsFromList(apps, 0 /* default userId */);

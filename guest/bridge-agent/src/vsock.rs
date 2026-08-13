@@ -11,6 +11,7 @@ pub const PORT_WAYLAND: u32 = 5002;
 #[cfg(target_os = "linux")]
 const AF_VSOCK: i32 = libc::AF_VSOCK;
 #[cfg(not(target_os = "linux"))]
+#[allow(dead_code)]
 const AF_VSOCK: i32 = 40;
 
 #[cfg(target_os = "linux")]
@@ -26,10 +27,48 @@ struct sockaddr_vm {
 pub enum VsockStream {
     #[allow(dead_code)]
     Vsock(libc::c_int),
+    #[allow(dead_code)]
     Tcp(TcpStream),
 }
 
 impl VsockStream {
+    pub fn connect(cid: u32, port: u32) -> io::Result<Self> {
+        #[cfg(target_os = "linux")]
+        {
+            let fd = unsafe { libc::socket(AF_VSOCK, libc::SOCK_STREAM, 0) };
+            if fd < 0 {
+                return Err(io::Error::last_os_error());
+            }
+            let mut sa: sockaddr_vm = unsafe { std::mem::zeroed() };
+            sa.svm_family = AF_VSOCK as u16;
+            sa.svm_cid = cid;
+            sa.svm_port = port;
+
+            let res = unsafe {
+                libc::connect(
+                    fd,
+                    &sa as *const _ as *const libc::sockaddr,
+                    std::mem::size_of::<sockaddr_vm>() as libc::socklen_t,
+                )
+            };
+
+            if res < 0 {
+                let err = io::Error::last_os_error();
+                unsafe { libc::close(fd); }
+                Err(err)
+            } else {
+                Ok(VsockStream::Vsock(fd))
+            }
+        }
+
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = cid;
+            let addr = format!("127.0.0.1:{}", port);
+            let stream = TcpStream::connect(&addr)?;
+            Ok(VsockStream::Tcp(stream))
+        }
+    }
     pub fn try_clone(&self) -> io::Result<Self> {
         match self {
             VsockStream::Vsock(fd) => {
@@ -126,6 +165,7 @@ impl Drop for VsockStream {
 pub enum VsockListener {
     #[allow(dead_code)]
     Vsock(libc::c_int, u32),
+    #[allow(dead_code)]
     Tcp(TcpListener, u32),
 }
 

@@ -1,52 +1,56 @@
-# BRIEFING — 2026-08-06T13:34:31Z
+# BRIEFING — 2026-08-14T01:30:36+08:00
 
 ## Mission
-Empirically challenge runner.py test execution and report generation for Milestone M1 (R1).
+Adversarial challenge and empirical verification of Milestone 1 (R1 Java Syntax & Compilation Closure) for aosp-linux project.
 
 ## 🔒 My Identity
-- Archetype: challenger
+- Archetype: Empirical Challenger (critic, specialist)
 - Roles: critic, specialist
 - Working directory: /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m1_1
-- Original parent: 7249e5f0-af46-4f65-970f-c4ca44e9345e
-- Milestone: M1
+- Original parent: 9bf4ed43-7f01-40fa-acc0-13647ab4d92d
+- Milestone: Milestone 1 (R1 Java Syntax & Compilation Closure)
 - Instance: 1 of 1
 
 ## 🔒 Key Constraints
-- Review-only — do NOT modify implementation code
-- Empirically challenge test runner and test report generation
-- Verify tests/e2e/runner.py and tests/e2e_report.json
-- Issue explicit verdict (APPROVE or REQUEST_CHANGES) in handoff.md
+- Must perform empirical verification by running javac / test scripts.
+- Do NOT trust worker's claims or logs without reproducing.
+- Output final verdict and report to /Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m1_1/handoff.md.
+- Send completion message to parent when done.
+- Respond in Traditional Chinese (繁體中文).
 
 ## Current Parent
-- Conversation ID: 7249e5f0-af46-4f65-970f-c4ca44e9345e
-- Updated: 2026-08-06T13:34:31Z
+- Conversation ID: 9bf4ed43-7f01-40fa-acc0-13647ab4d92d
+- Updated: 2026-08-14T01:30:36+08:00
 
 ## Review Scope
-- **Files to review**: tests/e2e/runner.py, tests/e2e_report.json, tests/e2e/ directory, test files
-- **Interface contracts**: /Users/iml1s/Documents/mine/aosp-linux/PROJECT.md, /Users/iml1s/Documents/mine/aosp-linux/.agents/ORIGINAL_REQUEST.md
-- **Review criteria**: test discovery completeness, execution accuracy, report matching, fake passes, missing tests
-
-## Key Decisions Made
-- Confirmed test discovery count: exactly 430 tests discovered across Tiers 1-4.
-- Confirmed execution and report matching: 430/430 tests passed, `tests/e2e_report.json` 100% matched without missing tests or fake passes.
-- Issued explicit verdict: **APPROVE**.
-
-## Artifact Index
-- `/Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m1_1/DISPATCH.md` — Initial dispatch message
-- `/Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m1_1/BRIEFING.md` — Persistent briefing state
-- `/Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m1_1/progress.md` — Liveness heartbeat
-- `/Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m1_1/challenge.md` — Empirical challenge report
-- `/Users/iml1s/Documents/mine/aosp-linux/.agents/challenger_m1_1/handoff.md` — Handoff report with explicit APPROVE verdict
+- **Files to review**: Java files under packages/apps/LinuxTerminal/src and frameworks/base/services/core/java/com/android/server/linux/, and any Android.bp / build files.
+- **Interface contracts**: ORIGINAL_REQUEST.md, PROJECT.md (if any), worker handoff.
+- **Review criteria**: Java syntax correctness, compilation closure under javac / android environment, missing imports, missing/mismatched overrides, unclosed statements, stub dependencies.
 
 ## Attack Surface
-- **Hypotheses tested**:
-  - Test discovery completeness: PASS (430 tests discovered)
-  - Execution and report parity: PASS (430 tests executed & recorded in e2e_report.json)
-  - Fake pass & empty method audit: PASS (630 static assertions across 430 test classes, 0 empty tests)
-  - Exception & failure handling: PASS (AssertionError recorded as FAIL, Exception recorded as ERROR)
-  - CLI argument robustness: PASS (`--tier`, `--feature`, `--filter`, `--report` flags operate properly)
-- **Vulnerabilities found**: None.
-- **Untested angles**: Hardware kernel level execution (mock environment used).
+- **Hypotheses tested**: 
+  - Hypothesis 1: `LinuxAppProxyActivity.java` duplicate syntax error fixed. (CONFIRMED FIXED)
+  - Hypothesis 2: All app layer files decoupled from `com.android.server.*`. (REJECTED: reflection still present in `LinuxAppProxyActivity.java:267, 286`).
+  - Hypothesis 3: `LinuxAppTracker.java` in Launcher3 compiles cleanly. (REJECTED: `Context.LINUX_SERVICE` error).
+  - Hypothesis 4: `ILinuxWindowBridge.aidl` implemented in SystemServer. (REJECTED: no class extends `ILinuxWindowBridge.Stub`).
+- **Vulnerabilities found**: 
+  - Illegal reflection in app layer (`LinuxAppProxyActivity.java:267, 286`)
+  - Unresolved symbol `Context.LINUX_SERVICE` in `LinuxAppTracker.java:104`
+  - Unimplemented AIDL stub `ILinuxWindowBridge.Stub`
+- **Untested angles**: 
+  - Runtime execution of AIDL IPC calls in full emulator environment.
 
 ## Loaded Skills
-- None
+- None loaded.
+
+## Key Decisions Made
+- Executed empirical javac verification harness across all repository Java files.
+- Formulated verdict: `REQUEST_CHANGES` due to 3 critical architectural / compilation defects.
+
+## Artifact Index
+- DISPATCH.md — Received task context
+- BRIEFING.md — Persistent working memory
+- empirical_verifier.py — Python empirical compilation test harness
+- aidl_inspector.py — Python AIDL stub vs Java implementation scanner
+- full_java_scanner.py — Python AST/syntax integrity scanner
+- handoff.md — Final handoff report with REQUEST_CHANGES verdict

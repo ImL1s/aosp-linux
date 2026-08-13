@@ -23,8 +23,12 @@ import android.hardware.HardwareBuffer;
 import android.net.LocalSocket;
 import android.net.LocalSocketAddress;
 import android.os.Bundle;
+import android.os.RemoteException;
+import android.os.ServiceManager;
 import android.system.linux.LinuxAppInfo;
+import android.system.linux.ILinuxWindowBridge;
 import android.util.Slog;
+import android.view.Surface;
 import android.view.SurfaceControl;
 
 import java.io.DataOutputStream;
@@ -46,7 +50,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * and Recents overview mapping.
  * {@hide}
  */
-public class LinuxWindowBridgeService {
+public class LinuxWindowBridgeService extends ILinuxWindowBridge.Stub {
     private static final String TAG = "LinuxWindowBridgeService";
     public static final int VSOCK_PORT_WAYLAND = 5002;
     public static final int MAX_CONCURRENT_TASKS = 20;
@@ -101,6 +105,41 @@ public class LinuxWindowBridgeService {
     public LinuxWindowBridgeService(Context context) {
         mContext = context;
         sInstance = this;
+        publish();
+    }
+
+    public void publish() {
+        try {
+            ServiceManager.addService("linux_window_bridge", this);
+            Slog.i(TAG, "Published linux_window_bridge service to ServiceManager");
+        } catch (Exception e) {
+            Slog.w(TAG, "Failed to publish linux_window_bridge service to ServiceManager: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public void onSurfaceCreated(int surfaceId, Surface surface) throws RemoteException {
+        Slog.i(TAG, "onSurfaceCreated Binder IPC for surfaceId: " + surfaceId + ", surface=" + surface);
+        WaylandSurface ws = mSurfaces.get(surfaceId);
+        if (ws == null) {
+            Slog.w(TAG, "onSurfaceCreated: Unknown surfaceId " + surfaceId);
+            return;
+        }
+        if (surface != null && surface.isValid()) {
+            Slog.i(TAG, "onSurfaceCreated: Valid surface provided for surfaceId " + surfaceId);
+        }
+    }
+
+    @Override
+    public void onSurfaceChanged(int surfaceId, int width, int height) throws RemoteException {
+        Slog.i(TAG, "onSurfaceChanged Binder IPC for surfaceId: " + surfaceId + " (" + width + "x" + height + ")");
+        configureSurface(surfaceId, width, height);
+    }
+
+    @Override
+    public void onSurfaceDestroyed(int surfaceId) throws RemoteException {
+        Slog.i(TAG, "onSurfaceDestroyed Binder IPC for surfaceId: " + surfaceId);
+        destroySurface(surfaceId);
     }
 
     public synchronized boolean attachSurfaceControl(int surfaceId, SurfaceControl surfaceControl) {

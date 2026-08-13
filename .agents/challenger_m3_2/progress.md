@@ -1,13 +1,9 @@
-# Progress Log — Challenger 2 (Milestone M3)
+# Progress Log - challenger_m3_2
 
-Last visited: 2026-08-06T19:05:00Z
-
-- [x] Initialized workspace and Briefing (`BRIEFING.md`, `DISPATCH.md`).
-- [x] Read mandatory input files (`ORIGINAL_REQUEST.md`, `PROJECT.md`, `SCOPE.md`, `handoff.md`).
-- [x] Conducted static code audit of F-R3-005, F-R3-006, F-R3-007.
-- [x] Executed E2E test runner (`python3 tests/e2e/runner.py --filter F-R3`, 80/80 passed).
-- [x] Built and executed Python empirical stress test harness (`tests/e2e/test_m3_challenger2_stress.py`, 6/6 passed).
-- [x] Built and compiled C++ native stress harness (`tests/unit/m3_native_challenger2_stress.cpp`, 4/4 passed, 6.25M pkts/sec).
-- [x] Documented findings & edge-case vulnerabilities.
-- [x] Generated Handoff Report (`handoff.md`) with explicit verdict: APPROVE.
-- [x] Sent final completion message to sub-orchestrator parent.
+- Last visited: 2026-08-14T01:53:30Z
+- Status: Completed empirical testing of Milestone 3 (R3 Single-Secret HMAC Agreement & Handshake Initiator).
+- Findings:
+  1. LinuxManagerService state transition logic when handshake completes is VERIFIED & CORRECT. Handshake completion transitions state from STARTING to RUNNING, cancels 15s boot timeout timer, handles duplicate handshakes idempotently, ignores late handshakes after boot timeout, and handles disconnect cleanly.
+  2. Native C++ daemon test `linux_bridge_test` and Java `TerminalAppUnitTest` passed 100%.
+  3. Empirical stress test `challenger_m3_2_empirical_test` uncovered a critical defect in `system/linux_bridge/hmac_auth.cpp:87` where SHA-256 constant K[62] is typoed as `0xbef4a3f7` instead of standard `0xbef9a3f7`, causing fallback HMAC-SHA256 computation mismatch against standard RFC 4231 test vectors and Guest Rust agent.
+- Verdict: REQUEST_CHANGES.

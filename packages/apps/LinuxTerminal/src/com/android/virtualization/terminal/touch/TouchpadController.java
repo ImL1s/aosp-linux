@@ -51,13 +51,25 @@ public class TouchpadController {
         } else {
             mTouchSlop = 8;
         }
-        mHandler = (Looper.myLooper() != null) ? new Handler(Looper.myLooper()) : null;
+        Handler h = null;
+        try {
+            if (Looper.myLooper() != null) {
+                h = new Handler(Looper.myLooper());
+            }
+        } catch (Throwable ignored) {}
+        mHandler = h;
         initGrid(80, 24, 20, 40);
     }
 
     public TouchpadController(int totalCols, int totalRows, int cellWidth, int cellHeight) {
         mTouchSlop = 8;
-        mHandler = (Looper.myLooper() != null) ? new Handler(Looper.myLooper()) : null;
+        Handler h = null;
+        try {
+            if (Looper.myLooper() != null) {
+                h = new Handler(Looper.myLooper());
+            }
+        } catch (Throwable ignored) {}
+        mHandler = h;
         initGrid(totalCols, totalRows, cellWidth, cellHeight);
     }
 
