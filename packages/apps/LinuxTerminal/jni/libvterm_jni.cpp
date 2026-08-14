@@ -122,16 +122,24 @@ Java_com_android_virtualization_terminal_parser_VTermParser_nativeInit(
         JNIEnv* env, jobject thiz, jint rows, jint cols, jobject callback) {
     auto* ctx = new NativeVTermContext();
     env->GetJavaVM(&ctx->jvm);
-    ctx->callbackObj = env->NewGlobalRef(callback);
+    ctx->callbackObj = callback ? env->NewGlobalRef(callback) : nullptr;
     ctx->rows = rows;
     ctx->cols = cols;
+    ctx->onDamageMethod = nullptr;
+    ctx->onCursorMoveMethod = nullptr;
+    ctx->onAltScreenMethod = nullptr;
+    ctx->onMouseTrackingMethod = nullptr;
 
-    jclass cbClass = env->GetObjectClass(callback);
-    ctx->onDamageMethod = env->GetMethodID(cbClass, "onDamage", "(IIII)V");
-    ctx->onCursorMoveMethod = env->GetMethodID(cbClass, "onCursorMove", "(IIZ)V");
-    ctx->onAltScreenMethod = env->GetMethodID(cbClass, "onAltScreenChanged", "(Z)V");
-    ctx->onMouseTrackingMethod = env->GetMethodID(cbClass, "onMouseTrackingChanged", "(Z)V");
-    env->DeleteLocalRef(cbClass);
+    if (callback) {
+        jclass cbClass = env->GetObjectClass(callback);
+        if (cbClass) {
+            ctx->onDamageMethod = env->GetMethodID(cbClass, "onDamage", "(IIII)V");
+            ctx->onCursorMoveMethod = env->GetMethodID(cbClass, "onCursorMove", "(IIZ)V");
+            ctx->onAltScreenMethod = env->GetMethodID(cbClass, "onAltScreenChanged", "(Z)V");
+            ctx->onMouseTrackingMethod = env->GetMethodID(cbClass, "onMouseTrackingChanged", "(Z)V");
+            env->DeleteLocalRef(cbClass);
+        }
+    }
 
     ctx->vt = vterm_new(rows, cols);
     vterm_set_utf8(ctx->vt, 1);
