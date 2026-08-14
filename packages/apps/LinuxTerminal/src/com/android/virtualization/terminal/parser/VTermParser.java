@@ -67,6 +67,14 @@ public class VTermParser {
         }
     }
 
+    public synchronized int[] getCursorPos() {
+        int[] pos = new int[2];
+        if (mNativePtr != 0) {
+            nativeGetCursorPos(mNativePtr, pos);
+        }
+        return pos;
+    }
+
     public synchronized void destroy() {
         if (mNativePtr != 0) {
             nativeDestroy(mNativePtr);
@@ -79,5 +87,6 @@ public class VTermParser {
     private native void nativeWrite(long ptr, byte[] data, int length);
     private native void nativeResize(long ptr, int rows, int cols);
     private native void nativeGetScreenMatrix(long ptr, int[] codepoints, int[] fgColors, int[] bgColors, int[] attrs, int[] widths);
+    private native void nativeGetCursorPos(long ptr, int[] outPos);
     private native void nativeDestroy(long ptr);
 }

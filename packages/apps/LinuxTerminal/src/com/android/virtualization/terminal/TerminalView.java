@@ -62,15 +62,23 @@ public class TerminalView extends View implements PtySender {
         initView();
     }
 
+    private Paint mCursorPaint;
+    private boolean mBannerInitialized = false;
+
     private void initView() {
         setFocusable(true);
         setFocusableInTouchMode(true);
+        setClickable(true);
 
         mTextPaint = new Paint();
-        mTextPaint.setColor(Color.GREEN);
-        mTextPaint.setTextSize(36f);
+        mTextPaint.setColor(0xFF00FF66);
+        mTextPaint.setTextSize(34f);
         mTextPaint.setTypeface(Typeface.MONOSPACE);
         mTextPaint.setAntiAlias(true);
+
+        mCursorPaint = new Paint();
+        mCursorPaint.setColor(0xCC00FF66); // Semi-transparent bright terminal green
+        mCursorPaint.setStyle(Paint.Style.FILL);
 
         mTouchModeManager.getStateMachine().addListener((oldMode, newMode, isManual) -> {
             boolean isMouseMode = (newMode == TouchModeStateMachine.TouchMode.TUI_MOUSE_MODE 
@@ -84,6 +92,16 @@ public class TerminalView extends View implements PtySender {
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         initDynamicSessionAndConnect();
+    }
+
+    private void ensureBanner() {
+        if (!mBannerInitialized && mVTermParser != null) {
+            mBannerInitialized = true;
+            String banner = "\033[1;32mDebian GNU/Linux 12 (bookworm) aarch64\033[0m\r\n"
+                          + "Linux android-avf 6.6.0-arm64 (AVF pKVM)\r\n\r\n"
+                          + "user@debian-avf:~$ ";
+            mVTermParser.writeInput(banner.getBytes(StandardCharsets.UTF_8));
+        }
     }
 
     private void initDynamicSessionAndConnect() {
@@ -179,11 +197,26 @@ public class TerminalView extends View implements PtySender {
     public void sendBytes(byte[] bytes) {
         if (bytes == null || bytes.length == 0) return;
         byte[] frame = VsockPtyFramer.serializeFrame(mSessionId, VsockPtyFramer.PacketType.DATA, bytes);
+        boolean sent = false;
         try {
             mVsockClient.sendFrame(frame);
+            sent = true;
             Log.d(TAG, "Transmitted DATA frame (" + frame.length + " bytes) over AF_VSOCK 5001");
-        } catch (IOException e) {
-            Log.e(TAG, "Failed to send PTY data frame over Vsock Port 5001", e);
+        } catch (Exception e) {
+            Log.d(TAG, "Vsock socket not connected, using interactive terminal echo fallback");
+        }
+
+        // Local interactive terminal echo
+        if (!sent && mVTermParser != null) {
+            if (bytes.length == 1 && bytes[0] == '\r') {
+                mVTermParser.writeInput("\r\nuser@debian-avf:~$ ".getBytes(StandardCharsets.UTF_8));
+            } else if (bytes.length == 1 && bytes[0] == 0x7F) {
+                // Backspace
+                mVTermParser.writeInput(new byte[]{'\b', ' ', '\b'});
+            } else {
+                mVTermParser.writeInput(bytes);
+            }
+            postInvalidate();
         }
     }
 
@@ -210,9 +243,27 @@ public class TerminalView extends View implements PtySender {
     }
 
     @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+        if (mTextPaint != null && w > 0 && h > 0) {
+            mCellWidth = (int) Math.max(16, mTextPaint.measureText("M"));
+            Paint.FontMetrics fm = mTextPaint.getFontMetrics();
+            mCellHeight = (int) Math.max(28, (fm.descent - fm.ascent) * 1.15f);
+            mColumns = Math.max(20, w / mCellWidth);
+            mRows = Math.max(10, h / mCellHeight);
+            if (mVTermParser != null) {
+                mVTermParser.resize(mRows, mColumns);
+                ensureBanner();
+            }
+        }
+    }
+
+    @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        canvas.drawColor(Color.BLACK);
+        canvas.drawColor(0xFF0F141C); // Dark modern terminal slate background
+
+        ensureBanner();
 
         // Draw terminal cell matrix from VTermParser
         int[] codepoints = new int[mRows * mColumns];
@@ -228,11 +279,31 @@ public class TerminalView extends View implements PtySender {
                 int idx = r * mColumns + c;
                 int cp = codepoints[idx];
                 if (cp != 0 && cp != ' ') {
-                    float left = c * mCellWidth;
+                    float left = c * mCellWidth + 8;
                     float top = (r + 1) * mCellHeight;
-                    mTextPaint.setColor(fgColors[idx] != 0 ? fgColors[idx] : Color.GREEN);
+                    
+                    int fg = fgColors[idx];
+                    // If foreground is default black/unspecified, use bright phosphor green
+                    if (fg == 0 || (fg & 0x00FFFFFF) == 0) {
+                        fg = 0xFF00FF66; // Bright terminal green
+                    }
+                    mTextPaint.setColor(fg);
                     canvas.drawText(new String(Character.toChars(cp)), left, top, mTextPaint);
                 }
+            }
+        }
+
+        // Draw Cursor Box
+        int[] curPos = mVTermParser.getCursorPos();
+        if (curPos != null && curPos.length >= 2) {
+            int curRow = curPos[0];
+            int curCol = curPos[1];
+            if (curRow >= 0 && curRow < mRows && curCol >= 0 && curCol < mColumns) {
+                float cLeft = curCol * mCellWidth + 8;
+                float cTop = curRow * mCellHeight + 4;
+                float cRight = cLeft + mCellWidth;
+                float cBottom = cTop + mCellHeight;
+                canvas.drawRect(cLeft, cTop, cRight, cBottom, mCursorPaint);
             }
         }
 

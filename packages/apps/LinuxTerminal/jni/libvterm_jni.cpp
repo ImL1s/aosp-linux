@@ -22,6 +22,8 @@ struct NativeVTermContext {
     JavaVM* jvm;
     int rows;
     int cols;
+    int cursorRow = 0;
+    int cursorCol = 0;
     std::mutex mtx;
     std::vector<uint8_t> partialUtf8Buffer;
     std::deque<std::vector<VTermScreenCell>> scrollbackBuffer;
@@ -50,7 +52,10 @@ static int cb_damage(VTermRect rect, void* user_data) {
 
 static int cb_movecursor(VTermPos pos, VTermPos oldpos, int visible, void* user_data) {
     auto* ctx = static_cast<NativeVTermContext*>(user_data);
-    if (!ctx || !ctx->jvm) return 1;
+    if (!ctx) return 1;
+    ctx->cursorRow = pos.row;
+    ctx->cursorCol = pos.col;
+    if (!ctx->jvm) return 1;
     JNIEnv* env = nullptr;
     bool needsDetach = false;
     jint res = ctx->jvm->GetEnv((void**)&env, JNI_VERSION_1_6);
@@ -251,6 +256,18 @@ Java_com_android_virtualization_terminal_parser_VTermParser_nativeGetScreenMatri
     if (wd) {
         env->ReleaseIntArrayElements(widths, wd, 0);
     }
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_android_virtualization_terminal_parser_VTermParser_nativeGetCursorPos(
+        JNIEnv* env, jobject thiz, jlong ptr, jintArray outPos) {
+    auto* ctx = reinterpret_cast<NativeVTermContext*>(ptr);
+    if (!ctx || !outPos) return;
+
+    std::lock_guard<std::mutex> lock(ctx->mtx);
+    jint posArr[2] = {ctx->cursorRow, ctx->cursorCol};
+    env->SetIntArrayRegion(outPos, 0, 2, posArr);
 }
 
 extern "C"
